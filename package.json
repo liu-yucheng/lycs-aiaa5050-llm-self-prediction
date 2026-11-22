@@ -1,0 +1,54 @@
+{
+  "name": "lycs-aiaa5050-llm-self-prediction",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness plugin for the LLM next-token self-prediction experiment across DeepSeek, Qwen, and GLM.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "locale",
+    "docs",
+    "inputs",
+    "README.md",
+    "LICENSE",
+    "license-2",
+    "icon.svg"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "experiment": "npm run build && node lib/cli.js",
+    "dataset:check": "npm run build && node lib/cli.js dataset"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "next-token-prediction",
+    "self-prediction",
+    "kl-divergence",
+    "aiaa5050"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "icon": "icon.svg",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}
