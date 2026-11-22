@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "description": "Default provider definitions for the 2026 self-prediction experiment. Each provider uses an OpenAI-compatible chat completions endpoint. The model field names the provider's current flash model at the time of the run; record any change in session.json.",
+  "providers": [
+    {
+      "key": "deepseek",
+      "label": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "apiKeyEnvironmentVariable": "DEEPSEEK_API_KEY",
+      "enabled": true
+    },
+    {
+      "key": "qwen",
+      "label": "Qwen",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-flash",
+      "apiKeyEnvironmentVariable": "DASHSCOPE_API_KEY",
+      "enabled": true
+    },
+    {
+      "key": "glm",
+      "label": "GLM",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-4.5-flash",
+      "apiKeyEnvironmentVariable": "ZHIPU_API_KEY",
+      "enabled": true
+    },
+    {
+      "key": "mock",
+      "label": "Mock",
+      "baseUrl": "mock://local",
+      "model": "mock-flash",
+      "apiKeyEnvironmentVariable": "",
+      "enabled": false
+    }
+  ]
+}

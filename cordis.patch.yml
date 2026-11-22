@@ -1,0 +1,10 @@
+# lycs-aiaa5050-llm-self-prediction: mount the experiment host plugin.
+#
+# The row names the package. The id is the stable identity of the row.
+# This bundle exports one host entry point, so one row is sufficient.
+- insert:
+    - id: aiaa5050-llm-self-prediction
+      name: lycs-aiaa5050-llm-self-prediction
+      config:
+        outputRoot: ""
+        maxConcurrency: 3

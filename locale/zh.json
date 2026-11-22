@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "大语言模型自预测",
+    "description": "在 DeepSeek、Qwen 和 GLM 上运行 128 个任务的下一个词预测与自预测实验，并报告双向 KL 散度。",
+    "detail": "docs/DETAIL.md"
+  }
+}

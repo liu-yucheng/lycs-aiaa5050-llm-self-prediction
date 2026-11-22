@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protocol — Next-token self-prediction</title>
+<meta name="description" content="Request bodies, the forced tool schema, and the reply rules of the experiment.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="inner">
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.2.0</small></div>
+    <nav class="site-nav" aria-label="Documentation">
+      <a href="index.html">Overview</a>
+      <a href="design.html">Design</a>
+      <a href="protocol.html" aria-current="page">Protocol</a>
+      <a href="measures.html">Measures</a>
+      <a href="reference.html">Reference</a>
+      <a href="reproducibility.html">Reproducibility</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Protocol</h1>
+  <p class="lede">The exact bytes on the wire, so a run can be repeated with another client.</p>
+
+  <h2>1. Endpoint and headers</h2>
+  <p>Each provider declares a base URL in <code>inputs/providers.json</code>. The client sends one
+    <code>POST</code> to <code>&lt;baseUrl&gt;/chat/completions</code>:</p>
+  <pre><code>POST /v1/chat/completions
+content-type: application/json
+authorization: Bearer $PROVIDER_API_KEY</code></pre>
+  <p>One request has a ceiling of 120 seconds, and the run signal cancels it earlier when the user
+    stops the session.</p>
+
+  <h2>2. Actual-prediction request</h2>
+  <pre><code>{
+  "model": "deepseek-chat",
+  "messages": [
+    {
+      "role": "system",
+      "content": "你正在参加一项中文下一个词预测实验。你要阅读一段句子前缀，并给出紧接着出现的一个词。只输出这一个词，不要解释，不要加标点。"
+    },
+    {
+      "role": "user",
+      "content": "句子前缀：床前明月光，疑是地上\n\n请只输出紧接着的一个词。"
+    }
+  ],
+  "max_tokens": 1,
+  "logprobs": true,
+  "top_logprobs": 64,
+  "stream": false
+}</code></pre>
+  <p>The reply table comes from <code>choices[0].logprobs.content[0].top_logprobs</code>. Each entry
+    holds a <code>token</code> and a <code>logprob</code> in nats. A provider that omits the table is
+    an invalid response.</p>
+
+  <h2>3. Self-prediction request</h2>
+  <pre><code>{
+  "model": "deepseek-chat",
+  "messages": [
+    {
+      "role": "system",
+      "content": "&lt;the system prompt of section 3.1&gt;"
+    },
+    {
+      "role": "user",
+      "content": "&lt;the user prompt of section 3.1&gt;"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "submit_next_token_log_probabilities",
+        "description": "提交下一个词的自然对数概率表。每个条目给出一个词和它的自然对数概率。按概率从高到低排列，概率之和必须约等于 1。",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "entries": {
+              "type": "array",
+              "description": "下一个词的概率表条目，按概率从高到低排列。",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "token": { "type": "string", "description": "一个词。" },
+                  "logProbability": { "type": "number", "description": "这个词的自然对数概率。" }
+                },
+                "required": ["token", "logProbability"],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 64
+            }
+          },
+          "required": ["entries"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "tool_choice": {
+    "type": "function",
+    "function": { "name": "submit_next_token_log_probabilities" }
+  },
+  "max_tokens": 2048,
+  "stream": false
+}</code></pre>
+  <p>The ceiling of 2048 completion tokens leaves room for 64 entries. The forced choice keeps the
+    model from answering in prose.</p>
+
+  <h3>3.1 Prompt text</h3>
+  <p>The system message joins these segments in this order, with no space between them:</p>
+  <ol>
+    <li>你正在参加一项中文下一个词自我预测实验。</li>
+    <li>你要报告自己作为语言模型在看到一段句子前缀时，对紧接着出现的那个词的概率分布。</li>
+    <li>你必须调用工具提交结果，不要在正文中写答案。</li>
+  </ol>
+  <p>The user message joins these segments in this order:</p>
+  <ol>
+    <li><code>句子前缀：&lt;prefix&gt;</code>, then two newline characters.</li>
+    <li>请调用 submit_next_token_log_probabilities 工具，提交你认为最可能的 64 个词，每个词给出自然对数概率
+      logProbability。</li>
+    <li>概率之和必须约等于 1，数值必须小于或等于 0。</li>
+    <li>按概率从高到低排列。</li>
+  </ol>
+  <p>The prefix comes from the task, and the entry count comes from <code>top_logprobs</code>.</p>
+
+  <h2>4. Parsing the self-prediction reply</h2>
+  <ol>
+    <li>Read <code>choices[0].message.tool_calls[0].function.arguments</code>.</li>
+    <li>When the value is a string, parse it as JSON. When it is already an object, use it.</li>
+    <li>Require one <code>entries</code> array with at least one item and at most 64 items.</li>
+    <li>Require one <code>token</code> string and one finite <code>logProbability</code> number for
+      each item.</li>
+    <li>When the message carries no tool call, accept one text body that holds the same JSON object
+      and record the raw reply in both cases.</li>
+  </ol>
+  <p>A reply that breaks a rule becomes one error file and one warning. The run continues with the
+    remaining tasks.</p>
+
+  <h2>5. Dataset file</h2>
+  <pre><code>{
+  "datasetId": "llm-self-prediction-zh-128-v1",
+  "language": "zh-Hans",
+  "tasks": [
+    {
+      "id": "T001",
+      "category": "poetry",
+      "prefix": "床前明月光，疑是地上",
+      "referenceToken": "霜"
+    }
+  ]
+}</code></pre>
+  <p>The shipped file holds 128 tasks. The plugin reads the packaged copy and never writes to it.</p>
+
+  <h2>6. Provider file</h2>
+  <pre><code>{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "key": "deepseek",
+      "label": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "apiKeyEnvironmentVariable": "DEEPSEEK_API_KEY",
+      "enabled": true
+    }
+  ]
+}</code></pre>
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Rule</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>key</code></td><td>A unique name in lower case. The mock provider uses <code>mock</code>.</td></tr>
+      <tr>
+        <td><code>baseUrl</code></td>
+        <td>An HTTP or HTTPS URL. The client adds <code>/chat/completions</code>.</td>
+      </tr>
+      <tr><td><code>model</code></td><td>The model name that the provider accepts.</td></tr>
+      <tr>
+        <td><code>apiKeyEnvironmentVariable</code></td>
+        <td>The name of the variable that holds the credential. An empty name means no credential.</td>
+      </tr>
+      <tr>
+        <td><code>enabled</code></td>
+        <td>A disabled entry needs the explicit key <code>mock</code> or the flag <code>includeDisabled</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>7. Session manifest</h2>
+  <p><code>session.json</code> records the session code, the dataset identifier, the dataset digest,
+    the resolved options, the provider definitions with their model names, the environment, the
+    status, and the failure message when a run stops.</p>
+
+  <p><a href="measures.html">Next: how the two tables become one number →</a></p>
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
+      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
+  </div>
+</footer>
+</body>
+</html>

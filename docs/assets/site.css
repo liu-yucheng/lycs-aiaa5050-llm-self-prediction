@@ -1,0 +1,289 @@
+/*
+ * Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
+ * GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
+ *
+ * The shared style sheet of the documentation site.
+ */
+
+:root {
+  color-scheme: light dark;
+  --background: #ffffff;
+  --surface: #f6f8fb;
+  --border: #d8dee8;
+  --text: #17202c;
+  --muted: #5a6676;
+  --accent: #0b62c4;
+  --accent-soft: #e7f0fb;
+  --code-background: #f2f5f9;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #10151d;
+    --surface: #171e28;
+    --border: #2a3442;
+    --text: #e6ecf5;
+    --muted: #9aa7b8;
+    --accent: #7cb8ff;
+    --accent-soft: #1b2b40;
+    --code-background: #151c26;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover,
+a:focus {
+  text-decoration: underline;
+}
+
+header.site-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+header.site-header .inner,
+main,
+footer.site-footer .inner {
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+header.site-header .inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  align-items: baseline;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+header.site-header .brand {
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+header.site-header .brand small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+nav.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-left: auto;
+  font-size: 0.92rem;
+}
+
+nav.site-nav a[aria-current="page"] {
+  color: var(--text);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.3rem;
+}
+
+main {
+  padding-top: 2rem;
+  padding-bottom: 3rem;
+}
+
+h1 {
+  font-size: 2rem;
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+  margin: 2.25rem 0 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 1.05rem;
+  margin: 1.6rem 0 0.4rem;
+}
+
+p.lede {
+  color: var(--muted);
+  font-size: 1.05rem;
+  margin-top: 0;
+}
+
+ul,
+ol {
+  padding-left: 1.35rem;
+}
+
+li {
+  margin: 0.25rem 0;
+}
+
+code,
+kbd,
+pre {
+  font-family: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.88em;
+}
+
+code {
+  background: var(--code-background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
+pre {
+  background: var(--code-background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 1.25rem;
+  font-size: 0.94rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: var(--surface);
+  font-weight: 650;
+}
+
+td.numeric,
+th.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+div.callout {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin: 1.25rem 0;
+}
+
+div.callout p:first-child {
+  margin-top: 0;
+}
+
+div.callout p:last-child {
+  margin-bottom: 0;
+}
+
+div.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.9rem;
+  margin: 1.5rem 0;
+}
+
+div.cards a.card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1rem 1.1rem;
+  color: inherit;
+}
+
+div.cards a.card:hover,
+div.cards a.card:focus {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+div.cards a.card strong {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--accent);
+}
+
+div.cards a.card span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+dl.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 1rem 0;
+}
+
+dl.facts dt {
+  color: var(--muted);
+}
+
+dl.facts dd {
+  margin: 0;
+}
+
+footer.site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+footer.site-footer .inner {
+  padding-top: 1rem;
+  padding-bottom: 1.5rem;
+}
+
+@media (max-width: 40rem) {
+  nav.site-nav {
+    margin-left: 0;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+}

@@ -1,0 +1,776 @@
+{
+  "datasetId": "llm-self-prediction-zh-128-v1",
+  "language": "zh-Hans",
+  "description": "One hundred twenty-eight Simplified Chinese next-token tasks. Each task gives the text before the target position and a human reference token. The reference token is a sanity label; it does not enter a metric.",
+  "taskCount": 128,
+  "tasks": [
+    {
+      "id": "T001",
+      "category": "poetry",
+      "prefix": "床前明月光，疑是地上",
+      "referenceToken": "霜"
+    },
+    {
+      "id": "T002",
+      "category": "poetry",
+      "prefix": "白日依山尽，黄河入海",
+      "referenceToken": "流"
+    },
+    {
+      "id": "T003",
+      "category": "poetry",
+      "prefix": "春眠不觉晓，处处闻啼",
+      "referenceToken": "鸟"
+    },
+    {
+      "id": "T004",
+      "category": "poetry",
+      "prefix": "举头望明月，低头思故",
+      "referenceToken": "乡"
+    },
+    {
+      "id": "T005",
+      "category": "poetry",
+      "prefix": "锄禾日当午，汗滴禾下",
+      "referenceToken": "土"
+    },
+    {
+      "id": "T006",
+      "category": "poetry",
+      "prefix": "两个黄鹂鸣翠柳，一行白鹭上青",
+      "referenceToken": "天"
+    },
+    {
+      "id": "T007",
+      "category": "poetry",
+      "prefix": "停车坐爱枫林晚，霜叶红于二月",
+      "referenceToken": "花"
+    },
+    {
+      "id": "T008",
+      "category": "poetry",
+      "prefix": "海内存知己，天涯若比",
+      "referenceToken": "邻"
+    },
+    {
+      "id": "T009",
+      "category": "poetry",
+      "prefix": "会当凌绝顶，一览众山",
+      "referenceToken": "小"
+    },
+    {
+      "id": "T010",
+      "category": "poetry",
+      "prefix": "山重水复疑无路，柳暗花明又一",
+      "referenceToken": "村"
+    },
+    {
+      "id": "T011",
+      "category": "poetry",
+      "prefix": "长风破浪会有时，直挂云帆济沧",
+      "referenceToken": "海"
+    },
+    {
+      "id": "T012",
+      "category": "poetry",
+      "prefix": "独在异乡为异客，每逢佳节倍思",
+      "referenceToken": "亲"
+    },
+    {
+      "id": "T013",
+      "category": "poetry",
+      "prefix": "千山鸟飞绝，万径人踪",
+      "referenceToken": "灭"
+    },
+    {
+      "id": "T014",
+      "category": "poetry",
+      "prefix": "大漠孤烟直，长河落日",
+      "referenceToken": "圆"
+    },
+    {
+      "id": "T015",
+      "category": "poetry",
+      "prefix": "感时花溅泪，恨别鸟惊",
+      "referenceToken": "心"
+    },
+    {
+      "id": "T016",
+      "category": "poetry",
+      "prefix": "但愿人长久，千里共婵",
+      "referenceToken": "娟"
+    },
+    {
+      "id": "T017",
+      "category": "idiom",
+      "prefix": "画蛇添足，多此一",
+      "referenceToken": "举"
+    },
+    {
+      "id": "T018",
+      "category": "idiom",
+      "prefix": "守株待兔，不如主动出",
+      "referenceToken": "击"
+    },
+    {
+      "id": "T019",
+      "category": "idiom",
+      "prefix": "亡羊补牢，为时未",
+      "referenceToken": "晚"
+    },
+    {
+      "id": "T020",
+      "category": "idiom",
+      "prefix": "掩耳盗铃，自欺欺",
+      "referenceToken": "人"
+    },
+    {
+      "id": "T021",
+      "category": "idiom",
+      "prefix": "井底之蛙，目光短",
+      "referenceToken": "浅"
+    },
+    {
+      "id": "T022",
+      "category": "idiom",
+      "prefix": "拔苗助长，欲速则不",
+      "referenceToken": "达"
+    },
+    {
+      "id": "T023",
+      "category": "idiom",
+      "prefix": "刻舟求剑，不知变",
+      "referenceToken": "通"
+    },
+    {
+      "id": "T024",
+      "category": "idiom",
+      "prefix": "塞翁失马，焉知非",
+      "referenceToken": "福"
+    },
+    {
+      "id": "T025",
+      "category": "idiom",
+      "prefix": "千里之行，始于足",
+      "referenceToken": "下"
+    },
+    {
+      "id": "T026",
+      "category": "idiom",
+      "prefix": "知己知彼，百战不",
+      "referenceToken": "殆"
+    },
+    {
+      "id": "T027",
+      "category": "idiom",
+      "prefix": "读书破万卷，下笔如有",
+      "referenceToken": "神"
+    },
+    {
+      "id": "T028",
+      "category": "idiom",
+      "prefix": "不到长城非好",
+      "referenceToken": "汉"
+    },
+    {
+      "id": "T029",
+      "category": "idiom",
+      "prefix": "世上无难事，只怕有心",
+      "referenceToken": "人"
+    },
+    {
+      "id": "T030",
+      "category": "idiom",
+      "prefix": "一寸光阴一寸金，寸金难买寸光",
+      "referenceToken": "阴"
+    },
+    {
+      "id": "T031",
+      "category": "idiom",
+      "prefix": "路遥知马力，日久见人",
+      "referenceToken": "心"
+    },
+    {
+      "id": "T032",
+      "category": "idiom",
+      "prefix": "三个臭皮匠，顶个诸葛",
+      "referenceToken": "亮"
+    },
+    {
+      "id": "T033",
+      "category": "daily",
+      "prefix": "早上闹钟响了三遍，他才从床上坐",
+      "referenceToken": "起来"
+    },
+    {
+      "id": "T034",
+      "category": "daily",
+      "prefix": "地铁到站前，她提前把背包拉链拉",
+      "referenceToken": "好"
+    },
+    {
+      "id": "T035",
+      "category": "daily",
+      "prefix": "出门时天有点阴，他顺手拿了一把",
+      "referenceToken": "伞"
+    },
+    {
+      "id": "T036",
+      "category": "daily",
+      "prefix": "洗衣机响了，她起身去阳台晾",
+      "referenceToken": "衣服"
+    },
+    {
+      "id": "T037",
+      "category": "daily",
+      "prefix": "快递放在门口，他弯腰把纸箱搬进",
+      "referenceToken": "屋"
+    },
+    {
+      "id": "T038",
+      "category": "daily",
+      "prefix": "手机只剩百分之三的电，他赶紧找充电",
+      "referenceToken": "器"
+    },
+    {
+      "id": "T039",
+      "category": "daily",
+      "prefix": "钥匙落在办公室，他只好在门外等",
+      "referenceToken": "人"
+    },
+    {
+      "id": "T040",
+      "category": "daily",
+      "prefix": "楼道灯坏了，他摸着扶手慢慢下",
+      "referenceToken": "楼"
+    },
+    {
+      "id": "T041",
+      "category": "daily",
+      "prefix": "周末大扫除，他把旧报纸捆成一",
+      "referenceToken": "摞"
+    },
+    {
+      "id": "T042",
+      "category": "daily",
+      "prefix": "邻居家的狗一直叫，他翻来覆去睡不",
+      "referenceToken": "着"
+    },
+    {
+      "id": "T043",
+      "category": "daily",
+      "prefix": "公交车上人很多，他抓紧扶手站稳脚",
+      "referenceToken": "跟"
+    },
+    {
+      "id": "T044",
+      "category": "daily",
+      "prefix": "她把洗好的床单抖开，搭在阳台的晾衣",
+      "referenceToken": "架上"
+    },
+    {
+      "id": "T045",
+      "category": "daily",
+      "prefix": "下班回家，他先烧了一壶热",
+      "referenceToken": "水"
+    },
+    {
+      "id": "T046",
+      "category": "daily",
+      "prefix": "雨天路滑，骑车的人放慢了速",
+      "referenceToken": "度"
+    },
+    {
+      "id": "T047",
+      "category": "daily",
+      "prefix": "他蹲下来系紧松开的鞋",
+      "referenceToken": "带"
+    },
+    {
+      "id": "T048",
+      "category": "daily",
+      "prefix": "深夜加班回来，他轻手轻脚地打开",
+      "referenceToken": "门"
+    },
+    {
+      "id": "T049",
+      "category": "food",
+      "prefix": "锅里水开了，她把面条下进",
+      "referenceToken": "去"
+    },
+    {
+      "id": "T050",
+      "category": "food",
+      "prefix": "早餐摊前排着队，老板熟练地摊着煎",
+      "referenceToken": "饼"
+    },
+    {
+      "id": "T051",
+      "category": "food",
+      "prefix": "他往碗里加了一勺辣椒",
+      "referenceToken": "油"
+    },
+    {
+      "id": "T052",
+      "category": "food",
+      "prefix": "米饭蒸好后，她掀开锅盖闻到一阵",
+      "referenceToken": "香味"
+    },
+    {
+      "id": "T053",
+      "category": "food",
+      "prefix": "西瓜切开，露出鲜红的果",
+      "referenceToken": "肉"
+    },
+    {
+      "id": "T054",
+      "category": "food",
+      "prefix": "汤有点淡，他又撒了一小撮",
+      "referenceToken": "盐"
+    },
+    {
+      "id": "T055",
+      "category": "food",
+      "prefix": "烤箱叮的一声，面包烤得金黄酥",
+      "referenceToken": "脆"
+    },
+    {
+      "id": "T056",
+      "category": "food",
+      "prefix": "他剥开橘子，掰下一瓣放进嘴",
+      "referenceToken": "里"
+    },
+    {
+      "id": "T057",
+      "category": "food",
+      "prefix": "火锅沸腾了，她夹起一片羊肉涮了",
+      "referenceToken": "涮"
+    },
+    {
+      "id": "T058",
+      "category": "food",
+      "prefix": "冰箱里的牛奶过期了，他顺手扔进垃圾",
+      "referenceToken": "桶"
+    },
+    {
+      "id": "T059",
+      "category": "food",
+      "prefix": "粽子剥开，糯米裹着红枣，冒着热",
+      "referenceToken": "气"
+    },
+    {
+      "id": "T060",
+      "category": "food",
+      "prefix": "面条煮好后，他浇上一勺炸酱拌",
+      "referenceToken": "匀"
+    },
+    {
+      "id": "T061",
+      "category": "food",
+      "prefix": "茶杯里浮着几片绿",
+      "referenceToken": "叶"
+    },
+    {
+      "id": "T062",
+      "category": "food",
+      "prefix": "她揉好面团，盖上湿布醒",
+      "referenceToken": "面"
+    },
+    {
+      "id": "T063",
+      "category": "food",
+      "prefix": "烤鸭片好端上桌，配上薄饼和甜面",
+      "referenceToken": "酱"
+    },
+    {
+      "id": "T064",
+      "category": "food",
+      "prefix": "早餐喝了碗豆浆，又吃了两根油",
+      "referenceToken": "条"
+    },
+    {
+      "id": "T065",
+      "category": "weather",
+      "prefix": "乌云压得很低，眼看就要下",
+      "referenceToken": "雨"
+    },
+    {
+      "id": "T066",
+      "category": "weather",
+      "prefix": "雪下了一夜，屋顶白茫茫一",
+      "referenceToken": "片"
+    },
+    {
+      "id": "T067",
+      "category": "weather",
+      "prefix": "太阳落山后，气温一下子降了下",
+      "referenceToken": "来"
+    },
+    {
+      "id": "T068",
+      "category": "weather",
+      "prefix": "春风吹过，河边的柳树抽出新",
+      "referenceToken": "芽"
+    },
+    {
+      "id": "T069",
+      "category": "weather",
+      "prefix": "台风过境，路边的大树被连根拔",
+      "referenceToken": "起"
+    },
+    {
+      "id": "T070",
+      "category": "weather",
+      "prefix": "雷声在头顶炸开，雨点砸在窗户",
+      "referenceToken": "上"
+    },
+    {
+      "id": "T071",
+      "category": "weather",
+      "prefix": "清晨的草地上挂满了露",
+      "referenceToken": "珠"
+    },
+    {
+      "id": "T072",
+      "category": "weather",
+      "prefix": "秋天的银杏叶落了一地，像铺了层金",
+      "referenceToken": "毯"
+    },
+    {
+      "id": "T073",
+      "category": "weather",
+      "prefix": "雾太大，高速公路上能见度不到五十",
+      "referenceToken": "米"
+    },
+    {
+      "id": "T074",
+      "category": "weather",
+      "prefix": "雨停后，天边挂着一道彩",
+      "referenceToken": "虹"
+    },
+    {
+      "id": "T075",
+      "category": "weather",
+      "prefix": "沙漠里昼夜温差很",
+      "referenceToken": "大"
+    },
+    {
+      "id": "T076",
+      "category": "weather",
+      "prefix": "湖面结了一层薄冰，几只野鸭站在岸",
+      "referenceToken": "边"
+    },
+    {
+      "id": "T077",
+      "category": "weather",
+      "prefix": "山里的空气很清新，泉水顺着石缝往下",
+      "referenceToken": "流"
+    },
+    {
+      "id": "T078",
+      "category": "weather",
+      "prefix": "海风吹来，带着一股咸",
+      "referenceToken": "味"
+    },
+    {
+      "id": "T079",
+      "category": "weather",
+      "prefix": "连续高温，柏油马路被晒得发",
+      "referenceToken": "软"
+    },
+    {
+      "id": "T080",
+      "category": "weather",
+      "prefix": "傍晚的天空被晚霞染成了橘红",
+      "referenceToken": "色"
+    },
+    {
+      "id": "T081",
+      "category": "technology",
+      "prefix": "手机系统提示更新，他点了稍后提",
+      "referenceToken": "醒"
+    },
+    {
+      "id": "T082",
+      "category": "technology",
+      "prefix": "电脑突然蓝屏，他只好长按电源键重",
+      "referenceToken": "启"
+    },
+    {
+      "id": "T083",
+      "category": "technology",
+      "prefix": "她把文件拖进共享文件夹，点了上",
+      "referenceToken": "传"
+    },
+    {
+      "id": "T084",
+      "category": "technology",
+      "prefix": "网速太慢，视频一直在缓",
+      "referenceToken": "冲"
+    },
+    {
+      "id": "T085",
+      "category": "technology",
+      "prefix": "他给路由器换了根新的网",
+      "referenceToken": "线"
+    },
+    {
+      "id": "T086",
+      "category": "technology",
+      "prefix": "代码跑完测试，终端打印出绿色的通",
+      "referenceToken": "过"
+    },
+    {
+      "id": "T087",
+      "category": "technology",
+      "prefix": "数据库连接超时，日志里全是报",
+      "referenceToken": "错"
+    },
+    {
+      "id": "T088",
+      "category": "technology",
+      "prefix": "他用手机扫了二维码，页面跳转到支付",
+      "referenceToken": "页"
+    },
+    {
+      "id": "T089",
+      "category": "technology",
+      "prefix": "服务器磁盘快满了，运维删掉一批旧日",
+      "referenceToken": "志"
+    },
+    {
+      "id": "T090",
+      "category": "technology",
+      "prefix": "耳机连上蓝牙，提示音在耳边响了",
+      "referenceToken": "一下"
+    },
+    {
+      "id": "T091",
+      "category": "technology",
+      "prefix": "她打开相册，把照片备份到云",
+      "referenceToken": "端"
+    },
+    {
+      "id": "T092",
+      "category": "technology",
+      "prefix": "长按应用图标，桌面弹出快捷菜",
+      "referenceToken": "单"
+    },
+    {
+      "id": "T093",
+      "category": "technology",
+      "prefix": "邮件附件太大，他改用网盘分享链",
+      "referenceToken": "接"
+    },
+    {
+      "id": "T094",
+      "category": "technology",
+      "prefix": "摄像头识别到人脸，门锁自动弹",
+      "referenceToken": "开"
+    },
+    {
+      "id": "T095",
+      "category": "technology",
+      "prefix": "智能音箱听到指令，缓缓拉开窗",
+      "referenceToken": "帘"
+    },
+    {
+      "id": "T096",
+      "category": "technology",
+      "prefix": "输入法记住了他的用词习惯，候选词越排越",
+      "referenceToken": "前"
+    },
+    {
+      "id": "T097",
+      "category": "news",
+      "prefix": "早高峰的地铁站里，人流排到了楼梯",
+      "referenceToken": "口"
+    },
+    {
+      "id": "T098",
+      "category": "news",
+      "prefix": "社区贴出通知，明天上午停水两",
+      "referenceToken": "小时"
+    },
+    {
+      "id": "T099",
+      "category": "news",
+      "prefix": "学校门口拉起了警戒线，家长在旁焦急等",
+      "referenceToken": "待"
+    },
+    {
+      "id": "T100",
+      "category": "news",
+      "prefix": "消防车鸣着笛赶到，火势很快被控制",
+      "referenceToken": "住"
+    },
+    {
+      "id": "T101",
+      "category": "news",
+      "prefix": "招聘会上，毕业生排着队投递简",
+      "referenceToken": "历"
+    },
+    {
+      "id": "T102",
+      "category": "news",
+      "prefix": "医院走廊里坐满了等待叫号的病",
+      "referenceToken": "人"
+    },
+    {
+      "id": "T103",
+      "category": "news",
+      "prefix": "志愿者把物资搬下车，挨家挨户地送",
+      "referenceToken": "到"
+    },
+    {
+      "id": "T104",
+      "category": "news",
+      "prefix": "台风预警升级，沿海渔船全部回港避",
+      "referenceToken": "风"
+    },
+    {
+      "id": "T105",
+      "category": "news",
+      "prefix": "交警在路口指挥，车辆缓慢通",
+      "referenceToken": "行"
+    },
+    {
+      "id": "T106",
+      "category": "news",
+      "prefix": "公园里新修了步道，晚上散步的人多了起",
+      "referenceToken": "来"
+    },
+    {
+      "id": "T107",
+      "category": "news",
+      "prefix": "图书馆延长开放时间，备考的学生拍手称",
+      "referenceToken": "快"
+    },
+    {
+      "id": "T108",
+      "category": "news",
+      "prefix": "快递员冒雨把包裹送到，浑身都湿",
+      "referenceToken": "透"
+    },
+    {
+      "id": "T109",
+      "category": "news",
+      "prefix": "老小区加装电梯，居民们议论",
+      "referenceToken": "纷"
+    },
+    {
+      "id": "T110",
+      "category": "news",
+      "prefix": "夜市的摊位一字排开，烟火气扑面而",
+      "referenceToken": "来"
+    },
+    {
+      "id": "T111",
+      "category": "news",
+      "prefix": "博物馆推出夜场，预约名额很快被抢",
+      "referenceToken": "光"
+    },
+    {
+      "id": "T112",
+      "category": "news",
+      "prefix": "环卫工人凌晨四点开始清扫街",
+      "referenceToken": "道"
+    },
+    {
+      "id": "T113",
+      "category": "story",
+      "prefix": "他推开门，屋里一片漆",
+      "referenceToken": "黑"
+    },
+    {
+      "id": "T114",
+      "category": "story",
+      "prefix": "她翻开日记本，第一页只写了一行",
+      "referenceToken": "字"
+    },
+    {
+      "id": "T115",
+      "category": "story",
+      "prefix": "火车缓缓启动，站台上的人挥了挥",
+      "referenceToken": "手"
+    },
+    {
+      "id": "T116",
+      "category": "story",
+      "prefix": "老人从抽屉里取出一个泛黄的信",
+      "referenceToken": "封"
+    },
+    {
+      "id": "T117",
+      "category": "story",
+      "prefix": "小孩蹲在路边，盯着蚂蚁搬运面",
+      "referenceToken": "包屑"
+    },
+    {
+      "id": "T118",
+      "category": "story",
+      "prefix": "他沿着小路一直走，直到看见远处的灯",
+      "referenceToken": "光"
+    },
+    {
+      "id": "T119",
+      "category": "story",
+      "prefix": "她咬着嘴唇，半天没说出一句",
+      "referenceToken": "话"
+    },
+    {
+      "id": "T120",
+      "category": "story",
+      "prefix": "雨夜里，巷子尽头的灯忽明忽",
+      "referenceToken": "暗"
+    },
+    {
+      "id": "T121",
+      "category": "story",
+      "prefix": "他把最后一块拼图按进凹槽，长舒了一口",
+      "referenceToken": "气"
+    },
+    {
+      "id": "T122",
+      "category": "story",
+      "prefix": "门外传来脚步声，屋里的谈话戛然而",
+      "referenceToken": "止"
+    },
+    {
+      "id": "T123",
+      "category": "story",
+      "prefix": "她捧着奖杯，眼泪一下子涌了出",
+      "referenceToken": "来"
+    },
+    {
+      "id": "T124",
+      "category": "story",
+      "prefix": "老照片的边角已经卷起，颜色也淡",
+      "referenceToken": "了"
+    },
+    {
+      "id": "T125",
+      "category": "story",
+      "prefix": "他反复核对名单，生怕漏掉一个名",
+      "referenceToken": "字"
+    },
+    {
+      "id": "T126",
+      "category": "story",
+      "prefix": "风筝线突然断了，纸鸢摇摇晃晃地飘向天",
+      "referenceToken": "空"
+    },
+    {
+      "id": "T127",
+      "category": "story",
+      "prefix": "锅里的水咕嘟咕嘟响，香味飘满了整间厨",
+      "referenceToken": "房"
+    },
+    {
+      "id": "T128",
+      "category": "story",
+      "prefix": "他合上书，关灯，房间陷入安",
+      "referenceToken": "静"
+    }
+  ]
+}
