@@ -171,11 +171,33 @@ seed.
 | `src/dataset.ts` | The dataset validation, the loader, the digest, and the task selection. |
 | `src/files.ts` | The file helpers, the session code, and the packaged path. |
 | `src/errors.ts` | The error codes, the error type, and the record guard. |
+| `src/env.ts` | The environment file parser, the section builder, the example copy, and the placeholder rule. |
 | `src/constants.ts` | The names, the defaults, and the limits. |
 | `src/types.ts` | The shared types. |
 | `src/cli.ts` | The command-line interface. |
 
-## 13. Limitations
+## 13. Environment file and API keys
+
+The plugin reads the private file `.env` in the workspace. The public file `.env.example` ships with
+the plugin and holds one section for each provider. A section has three properties:
+
+- `base_url` overrides the base URL of the provider catalog.
+- `model_to_use` overrides the model name of the provider catalog.
+- `api_key` holds the credential.
+
+The section name comes from the `environmentPrefix` field of the catalog, so the provider `glm`
+uses the section `zhipu`. A property that the section omits keeps the value of `inputs/providers.json`.
+
+When the private file is absent, the first run copies the example file, and the run stops with a
+prompt that names the keys to fill in. A process environment variable is the fallback, so a shell
+that already exports a key needs no file. A value between angle brackets is a placeholder, and the
+run treats it as an absent key. The plugin writes no key to a session file, and `.gitignore` keeps
+the private file out of the repository.
+
+The command `node lib/cli.js env` prints the path of each file and the state of each key, without
+printing a key.
+
+## 14. Limitations
 
 - The actual table comes from the provider, so a provider that returns a truncated or a smoothed
   table limits the comparison.
@@ -184,13 +206,15 @@ seed.
 - The default sample of 128 tasks is small for a claim about a model family.
 - One run measures one model version.
 
-## 14. Test coverage
+## 15. Test coverage
 
 The test suite covers the probability measures against known values, the dataset rules, one full
 mock session with its files, the verdict at two tolerances, the tool definitions, the prompt and
 tool-argument parsers, the plugin entry point, and the HTTP client against a local server.
 
-The suite runs 24 tests.
+The suite runs 31 tests.
+The environment tests cover the parser, the sections, the copy of the example, and the prompt of a
+missing key.
 The entry-point test calls `apply` with a stub host context and runs the registered run tool.
 The HTTP test sends one actual request and one self request to a local server and checks the header,
 the request body, and the parsed table.

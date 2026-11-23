@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.2.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -192,7 +192,38 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
     </tbody>
   </table>
 
-  <h2>7. Session manifest</h2>
+  <h2>7. Environment file</h2>
+  <p>The private file <code>.env</code> sits in the workspace, and the public file
+    <code>.env.example</code> ships with the plugin. Both use one section for each provider:</p>
+  <pre><code>deepseek.base_url=https://api.deepseek.com
+deepseek.api_key=&lt;Your API key, not mine.&gt;
+deepseek.model_to_use=deepseek-flash</code></pre>
+  <table>
+    <thead>
+      <tr><th>Property</th><th>Rule</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>base_url</code></td>
+        <td>Overrides <code>baseUrl</code> of the provider catalog.</td>
+      </tr>
+      <tr>
+        <td><code>model_to_use</code></td>
+        <td>Overrides <code>model</code> of the provider catalog.</td>
+      </tr>
+      <tr>
+        <td><code>api_key</code></td>
+        <td>The credential. A value between angle brackets is a placeholder, and the run treats it
+          as an absent key.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>The section name comes from the <code>environmentPrefix</code> field of the catalog, so the
+    provider <code>glm</code> uses the section <code>zhipu</code>. The process environment is the
+    fallback: <code>DEEPSEEK_API_KEY</code>, <code>DASHSCOPE_API_KEY</code>, and
+    <code>ZHIPU_API_KEY</code>. The plugin writes no key to a session file.</p>
+
+  <h2>8. Session manifest</h2>
   <p><code>session.json</code> records the session code, the dataset identifier, the dataset digest,
     the resolved options, the provider definitions with their model names, the environment, the
     status, and the failure message when a run stops.</p>

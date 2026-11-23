@@ -1,3 +1,4 @@
+import { type ProviderEnvironment } from "./env.js";
 import type { PredictionAnswer, ProbabilityEntry, ProviderCatalog, ProviderDefinition, Task } from "./types.js";
 /** The mock provider key. */
 export declare const MOCK_PROVIDER_KEY = "mock";
@@ -40,6 +41,35 @@ export declare function selectProviders(catalog: ProviderCatalog, keys: readonly
  */
 export declare function readProviderCredential(definition: ProviderDefinition): string | undefined;
 /**
+ * Read the section name of one provider in the environment file.
+ *
+ * @param definition - the provider definition.
+ * @returns the section name, which defaults to the provider key.
+ */
+export declare function resolveEnvironmentPrefix(definition: ProviderDefinition): string;
+/**
+ * Resolve the API key of one provider.
+ *
+ * The environment file wins. The process environment is the fallback, so a shell session that
+ * already holds the variable needs no file.
+ *
+ * @param definition - the provider definition.
+ * @param environments - the section values of the environment file.
+ * @returns the key, or undefined when no usable key exists.
+ */
+export declare function resolveProviderApiKey(definition: ProviderDefinition, environments: ReadonlyMap<string, ProviderEnvironment>): string | undefined;
+/**
+ * Apply the environment file to a provider catalog.
+ *
+ * A section overrides the base URL and the model of the matching provider. An empty value keeps
+ * the catalog value. The function does not read or copy an API key.
+ *
+ * @param catalog - the validated catalog.
+ * @param environments - the section values of the environment file.
+ * @returns the catalog with the overrides applied.
+ */
+export declare function applyProviderEnvironments(catalog: ProviderCatalog, environments: ReadonlyMap<string, ProviderEnvironment>): ProviderCatalog;
+/**
  * Create the client of one provider.
  *
  * @param definition - the provider definition.
@@ -47,7 +77,7 @@ export declare function readProviderCredential(definition: ProviderDefinition): 
  * @returns the client.
  * @throws ExperimentError when a real provider has no credential.
  */
-export declare function createProviderClient(definition: ProviderDefinition, timeoutMilliseconds?: number): ProviderClient;
+export declare function createProviderClient(definition: ProviderDefinition, timeoutMilliseconds?: number, apiKeyOverride?: string): ProviderClient;
 /**
  * Parse one provider reply into an answer.
  *
