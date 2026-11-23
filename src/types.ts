@@ -32,6 +32,7 @@ export interface ProviderDefinition {
   readonly baseUrl: string;
   readonly model: string;
   readonly apiKeyEnvironmentVariable: string;
+  readonly environmentPrefix?: string;
   readonly enabled: boolean;
 }
 
@@ -179,6 +180,8 @@ export interface SessionEnvironment {
   readonly startedAt: string;
   readonly finishedAt: string;
   readonly elapsedSeconds: number;
+  readonly environmentFile?: string;
+  readonly environmentFileCreated?: boolean;
 }
 
 /** The options of one experiment run. */

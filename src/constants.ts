@@ -11,7 +11,7 @@
 export const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 
 /** The plugin version. Keep it equal to the version in `package.json`. */
-export const PLUGIN_VERSION = "0.2.0";
+export const PLUGIN_VERSION = "0.3.0";
 
 /** The host tool names. */
 export const TOOL_RUN = "llm_self_prediction_run";
@@ -43,6 +43,17 @@ export const DATASET_FILE_NAME = "dataset-zh-128.json";
 
 /** The file name of the bundled provider catalog. */
 export const PROVIDER_FILE_NAME = "providers.json";
+
+/** The file name of the private environment file. A user fills in the API keys. */
+export const ENV_FILE_NAME = ".env";
+
+/** The file name of the public environment example file. The plugin copies it to the private one. */
+export const ENV_EXAMPLE_FILE_NAME = ".env.example";
+
+/** The property names of one provider section in the environment file. */
+export const ENV_BASE_URL_PROPERTY = "base_url";
+export const ENV_API_KEY_PROPERTY = "api_key";
+export const ENV_MODEL_PROPERTY = "model_to_use";
 
 /** The default number of concurrent prediction calls. */
 export const DEFAULT_MAX_CONCURRENCY = 3;

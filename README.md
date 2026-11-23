@@ -43,7 +43,8 @@ Each page covers one part of the experiment:
 
 - DeepSeek Harness 0.2.0 or later.
 - Node.js 20.11 or later.
-- One credential for each provider that the run uses. The mock provider needs no credential.
+- The private file `.env` with one API key for each provider that the run uses.
+  The mock provider needs no key.
 
 ## Install
 
@@ -91,6 +92,7 @@ node lib/cli.js run --providers=deepseek,qwen --limit=8
 node lib/cli.js status --limit=5
 node lib/cli.js report --session=<session code>
 node lib/cli.js dataset --sample=8
+node lib/cli.js env
 ```
 
 The command line writes below `.outputs` in the current directory unless `--output` names another
@@ -103,16 +105,38 @@ Each task has an identifier, a category, a sentence prefix, and one reference ne
 The prefix ends before the reference token, and the validator rejects a task that breaks this rule.
 The dataset is read-only during a run.
 
+## Credentials
+
+The plugin reads the private file `.env` in the workspace.
+The public file `.env.example` ships with the plugin and holds one section for each provider:
+
+```text
+deepseek.base_url=https://api.deepseek.com
+deepseek.api_key=<Your API key, not mine.>
+deepseek.model_to_use=deepseek-flash
+```
+
+A section overrides the base URL and the model of the catalog, and it carries the API key.
+A property that the section omits keeps the value of `inputs/providers.json`.
+
+When `.env` is absent, the first run copies `.env.example` to `.env` and stops with a prompt that
+names the keys to fill in. A process environment variable is the fallback, so a shell that already
+exports `DEEPSEEK_API_KEY` needs no file. The plugin never writes a key to a session file, and
+`.gitignore` keeps `.env` out of the repository.
+
+The command `node lib/cli.js env` prints the path of the file and the state of each key without
+printing a key.
+
 ## Providers
 
 The file `inputs/providers.json` declares the providers.
 Each provider uses an OpenAI-compatible chat-completions endpoint.
 
-| Key | Model | Environment variable |
+| Key | Model | Section of `.env` |
 | --- | --- | --- |
-| `deepseek` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
-| `qwen` | `qwen-flash` | `DASHSCOPE_API_KEY` |
-| `glm` | `glm-4.5-flash` | `ZHIPU_API_KEY` |
+| `deepseek` | `deepseek-chat` | `deepseek` |
+| `qwen` | `qwen-flash` | `qwen` |
+| `glm` | `glm-4.5-flash` | `zhipu` |
 | `mock` | `mock-flash` | none |
 
 The actual request sets `logprobs` and `top_logprobs` to 64.
@@ -159,9 +183,9 @@ npm run typecheck
 npm test
 ```
 
-The test suite runs 24 tests, which cover the probability measures, the dataset rules, one full
-mock session, the tool definitions, the prompts, the plugin entry point, and the HTTP client of a
-provider against a local server.
+The test suite runs 31 tests, which cover the probability measures, the dataset rules, the
+environment file, one full mock session, the tool definitions, the prompts, the plugin entry
+point, and the HTTP client of a provider against a local server.
 
 ## Recorded versions
 
@@ -169,7 +193,7 @@ provider against a local server.
 - Tool versions: TypeScript 5.9.3.
 - Platform: Windows 11 x64.
 - Random seed: 20260815.
-- Plugin version: 0.2.0.
+- Plugin version: 0.3.0.
 
 ## Licence
 

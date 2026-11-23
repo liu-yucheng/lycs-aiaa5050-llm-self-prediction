@@ -24,6 +24,14 @@ import {
 } from "./constants.js";
 import { computeDatasetHash, loadDataset, selectTasks } from "./dataset.js";
 import type { Agent, Logger } from "./dsh.js";
+import type { EnvironmentFileState, ProviderEnvironment } from "./env.js";
+import {
+  buildProviderEnvironments,
+  describeEnvironmentKey,
+  ensureEnvironmentFile,
+  isPlaceholderValue,
+  readEnvironmentFile,
+} from "./env.js";
 import { ExperimentError, errorMessage } from "./errors.js";
 import {
   createSessionCode,
@@ -37,7 +45,15 @@ import {
   writeTextFile,
 } from "./files.js";
 import { buildTaskRecord, computeSessionMetrics, resolveTolerance } from "./metrics.js";
-import { createProviderClient, loadProviderCatalog, selectProviders } from "./providers.js";
+import {
+  applyProviderEnvironments,
+  createProviderClient,
+  MOCK_PROVIDER_KEY,
+  loadProviderCatalog,
+  resolveEnvironmentPrefix,
+  resolveProviderApiKey,
+  selectProviders,
+} from "./providers.js";
 import type { ProviderClient } from "./providers.js";
 import { renderReport, renderSummaryCsv, renderTasksCsv } from "./report.js";
 import type {
@@ -131,7 +147,13 @@ export class ExperimentService {
       requestedRoot === "" ? this.options.outputRoot() : requestedRoot,
     );
     const dataset = await loadDataset();
-    const catalog = await loadProviderCatalog();
+    const environmentState = await ensureEnvironmentFile(workspace);
+    const environmentValues =
+      environmentState.filePath === undefined
+        ? {}
+        : await readEnvironmentFile(environmentState.filePath);
+    const environments = buildProviderEnvironments(environmentValues);
+    const catalog = applyProviderEnvironments(await loadProviderCatalog(), environments);
     const dryRun = request.dryRun === true;
     const requestedKeys = dryRun ? [dryRunProviderKey(catalog)] : (request.providerKeys ?? []);
     const repetitionCount = clampInteger(
@@ -149,8 +171,10 @@ export class ExperimentService {
     if (providers.length === 0) {
       throw new ExperimentError("INVALID_PROVIDER", "The run selected no provider.");
     }
+    const setupWarnings = checkProviderCredentials(providers, environments, environmentState,
+      dryRun);
     const clients: ProviderClient[] = providers.map((provider) =>
-      createProviderClient(provider),
+      createProviderClient(provider, undefined, resolveProviderApiKey(provider, environments)),
     );
     const randomSeed = request.randomSeed ?? DEFAULT_RANDOM_SEED;
     const toleranceNats = resolveTolerance(request.toleranceNats ?? DEFAULT_TOLERANCE_NATS);
@@ -191,6 +215,8 @@ export class ExperimentService {
         startedAt: startedAt.toISOString(),
         finishedAt: startedAt.toISOString(),
         elapsedSeconds: 0,
+        environmentFile: environmentState.filePath,
+        environmentFileCreated: environmentState.created,
       },
       status: "running",
     };
@@ -240,7 +266,10 @@ export class ExperimentService {
       );
       await writeTextFile(path.join(directory, "summary.csv"), renderSummaryCsv(metrics));
       await writeTextFile(path.join(directory, "tasks.csv"), renderTasksCsv(records));
-      const warnings = metrics.providers.flatMap((provider) => provider.warnings);
+      const warnings = [
+        ...setupWarnings,
+        ...metrics.providers.flatMap((provider) => provider.warnings),
+      ];
       this.options.logger?.info(
         `llm-self-prediction: session ${sessionCode} is complete in ` +
           `${((finishedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1)}s.`,
@@ -548,6 +577,70 @@ export async function readSessionStatus(directory: string): Promise<SessionStatu
     verdicts,
     failures,
   };
+}
+
+/**
+ * Check the API key of each selected provider.
+ *
+ * A real run stops with a prompt when a key is absent or holds a placeholder. A dry run continues
+ * and reports a warning instead, because the mock provider needs no key.
+ *
+ * @param providers - the selected providers.
+ * @param environments - the section values of the environment file.
+ * @param environmentState - the state of the environment file.
+ * @param dryRun - true for a dry run.
+ * @returns the warnings of the run setup.
+ * @throws ExperimentError when a real run has no usable key.
+ */
+function checkProviderCredentials(
+  providers: readonly ProviderDefinition[],
+  environments: ReadonlyMap<string, ProviderEnvironment>,
+  environmentState: EnvironmentFileState,
+  dryRun: boolean,
+): string[] {
+  const missing = providers
+    .filter((provider) => provider.key !== MOCK_PROVIDER_KEY)
+    .filter((provider) => resolveProviderApiKey(provider, environments) === undefined)
+    .map((provider) => describeEnvironmentKey(resolveEnvironmentPrefix(provider), "api_key"));
+  if (missing.length > 0 && !dryRun) {
+    throw new ExperimentError(
+      "MISSING_CREDENTIAL",
+      buildCredentialPrompt(missing, environmentState),
+    );
+  }
+  const warnings: string[] = [];
+  if (environmentState.created && environmentState.filePath !== undefined) {
+    warnings.push(
+      `The run created ${environmentState.filePath} from the example file. ` +
+        "Fill in the placeholder API keys, then run the experiment again.",
+    );
+  }
+  if (missing.length > 0) {
+    warnings.push(`A dry run needs no API key. A real run needs ${missing.join(", ")}.`);
+  }
+  return warnings;
+}
+
+/**
+ * Build the prompt that asks a user to fill in the API keys.
+ *
+ * @param missing - the environment keys that hold no usable value.
+ * @param environmentState - the state of the environment file.
+ * @returns the prompt text.
+ */
+function buildCredentialPrompt(
+  missing: readonly string[],
+  environmentState: EnvironmentFileState,
+): string {
+  const keys = missing.join(", ");
+  if (environmentState.filePath === undefined) {
+    return `The run needs an API key for ${keys}. Create a .env file next to .env.example, ` +
+      "fill in the keys, then run the experiment again.";
+  }
+  const origin = environmentState.created
+    ? `The run copied the example file to ${environmentState.filePath}.`
+    : `The environment file is ${environmentState.filePath}.`;
+  return `${origin} Fill in the placeholder value of ${keys}, then run the experiment again.`;
 }
 
 /**
