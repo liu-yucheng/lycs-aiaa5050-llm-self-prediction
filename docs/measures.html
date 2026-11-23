@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.4.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -24,7 +24,7 @@
 
 <main>
   <h1>Measures</h1>
-  <p class="lede">How two top-64 tables become one divergence, one interval, and one verdict.</p>
+  <p class="lede">How two top-20 tables become one divergence, one interval, and one verdict.</p>
 
   <h2>1. Normalize one table</h2>
   <ol>
@@ -37,7 +37,7 @@
     answer is missing.</p>
 
   <h2>2. Align two tables</h2>
-  <p>Two top-64 tables rarely share the same tokens, because the tail differs. The plugin builds the
+  <p>Two top-20 tables rarely share the same tokens, because the tail differs. The plugin builds the
     union of both supports, gives the probability floor <code>1e-12</code> to each token that one
     side does not report, and renormalizes each side over the union.</p>
   <pre><code>tokens = union(actual.tokens, self.tokens)

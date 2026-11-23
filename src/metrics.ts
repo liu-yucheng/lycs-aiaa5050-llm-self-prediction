@@ -303,6 +303,15 @@ export function computeProviderMetrics(
       .flatMap((record) => record.pairs);
     categories[category] = summarizePairs(categoryPairs);
   }
+  const languages: Record<string, MetricSummary> = {};
+  const languageNames = [...new Set(records.map((record) => record.task.language ?? "unknown"))]
+    .sort();
+  for (const language of languageNames) {
+    const languagePairs = records
+      .filter((record) => (record.task.language ?? "unknown") === language)
+      .flatMap((record) => record.pairs);
+    languages[language] = summarizePairs(languagePairs);
+  }
   const warnings = records.flatMap((record) => record.warnings);
   const separatedFraction =
     pairs.length === 0
@@ -319,6 +328,7 @@ export function computeProviderMetrics(
     separatedFraction,
     verdict: decideVerdict(summary, interval, toleranceNats),
     categories,
+    languages,
     warnings,
   };
 }
@@ -333,6 +343,7 @@ export function computeProviderMetrics(
 export function computeSessionMetrics(options: {
   readonly sessionCode: string;
   readonly datasetId: string;
+  readonly datasetLanguage?: string;
   readonly records: readonly TaskRecord[];
   readonly toleranceNats: number;
   readonly repetitionCount: number;
@@ -358,6 +369,9 @@ export function computeSessionMetrics(options: {
   return {
     sessionCode: options.sessionCode,
     datasetId: options.datasetId,
+    datasetLanguage:
+      options.datasetLanguage ??
+      [...new Set(options.records.map((record) => record.task.language ?? "unknown"))].join(", "),
     generatedAt: options.generatedAt,
     toleranceNats: options.toleranceNats,
     repetitionCount: options.repetitionCount,

@@ -57,7 +57,7 @@ export function renderReport(
   lines.push("");
   lines.push("## 2. Method");
   lines.push("");
-  lines.push(`The dataset holds ${metrics.taskCount} Simplified Chinese tasks.`);
+  lines.push(`The dataset holds ${metrics.taskCount} tasks in these languages: ${metrics.datasetLanguage}.`);
   lines.push(
     `Each task and each model gives ${metrics.repetitionCount} actual predictions and ` +
       `${metrics.repetitionCount} self predictions.`,
@@ -116,6 +116,23 @@ export function renderReport(
       `| ${provider.provider.label} | ${formatNumber(provider.baselineSymmetricKl)} | ` +
         `${formatNumber(provider.separatedFraction, 3)} |`,
     );
+  }
+  lines.push("");
+  lines.push("### By language");
+  lines.push("");
+  const languages = [
+    ...new Set(metrics.providers.flatMap((provider) => Object.keys(provider.languages))),
+  ].sort();
+  lines.push(
+    `| Language | ${metrics.providers.map((provider) => provider.provider.label).join(" | ")} |`,
+  );
+  lines.push(`| --- | ${metrics.providers.map(() => "---:").join(" | ")} |`);
+  for (const language of languages) {
+    const cells = metrics.providers.map((provider) => {
+      const summary = provider.languages[language];
+      return summary === undefined ? "n/a" : formatNumber(summary.meanSymmetricKl);
+    });
+    lines.push(`| ${language} | ${cells.join(" | ")} |`);
   }
   lines.push("");
   lines.push("### By category");

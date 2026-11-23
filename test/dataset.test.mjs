@@ -13,17 +13,23 @@ import {
 } from "../lib/dataset.js";
 import { ExperimentError } from "../lib/errors.js";
 
-test("the bundled dataset holds 128 unique tasks in 8 categories", async () => {
+test("the bundled dataset holds 128 unique tasks in 8 categories and 2 languages", async () => {
   const dataset = await loadDataset();
   assert.equal(dataset.taskCount, 128);
   assert.equal(dataset.tasks.length, 128);
-  assert.equal(dataset.language, "zh-Hans");
+  assert.equal(dataset.language, "zh-Hans, en-US");
+  assert.deepEqual(dataset.languages, ["zh-Hans", "en-US"]);
   const identifiers = new Set(dataset.tasks.map((task) => task.id));
   assert.equal(identifiers.size, 128);
   const categories = countByCategory(dataset.tasks);
   assert.equal(Object.keys(categories).length, 8);
   for (const count of Object.values(categories)) {
     assert.equal(count, 16);
+  }
+  const languages = new Set(dataset.tasks.map((task) => task.language));
+  assert.deepEqual([...languages].sort(), ["en-US", "zh-Hans"]);
+  for (const language of ["en-US", "zh-Hans"]) {
+    assert.equal(dataset.tasks.filter((task) => task.language === language).length, 64);
   }
 });
 
@@ -42,15 +48,15 @@ test("each task ends the prefix before the reference token", async () => {
 
 test("selectTasks keeps the dataset order and applies one limit", async () => {
   const dataset = await loadDataset();
-  const selected = selectTasks(dataset, ["T005", "T002"], 0);
+  const selected = selectTasks(dataset, ["Z005", "Z002"], 0);
   assert.deepEqual(
     selected.map((task) => task.id),
-    ["T002", "T005"],
+    ["Z002", "Z005"],
   );
   const limited = selectTasks(dataset, [], 3);
   assert.deepEqual(
     limited.map((task) => task.id),
-    ["T001", "T002", "T003"],
+    ["Z001", "Z002", "Z003"],
   );
   assert.throws(() => selectTasks(dataset, ["T999"], 0), ExperimentError);
 });

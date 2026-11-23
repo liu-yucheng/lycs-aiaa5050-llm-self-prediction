@@ -29,10 +29,29 @@ test("the actual prompt names the prefix and asks for one token", () => {
 });
 
 test("the self prompt asks for the forced tool call", () => {
-  const prompt = buildSelfPredictionPrompt(TASK, 64);
+  const prompt = buildSelfPredictionPrompt(TASK, 20);
   assert.match(prompt.user, /床前明月光/);
   assert.match(prompt.user, new RegExp(SELF_PREDICTION_TOOL_NAME));
-  assert.match(prompt.user, /64/);
+  assert.match(prompt.user, /20/);
+  assert.match(prompt.system, /JSON/);
+});
+
+test("an English task gets an English prompt pair", () => {
+  const task = {
+    id: "E001",
+    category: "poetry",
+    language: "en-US",
+    prefix: "Roses are red, violets are",
+    referenceToken: "blue",
+  };
+  const actual = buildActualPredictionPrompt(task);
+  assert.match(actual.system, /next-token prediction/u);
+  assert.match(actual.user, /Roses are red/u);
+  assert.match(actual.user, /one word/u);
+  const selfPrompt = buildSelfPredictionPrompt(task, 20);
+  assert.match(selfPrompt.system, /self-prediction/u);
+  assert.match(selfPrompt.user, /Roses are red/u);
+  assert.match(selfPrompt.user, new RegExp(SELF_PREDICTION_TOOL_NAME));
 });
 
 test("the self-prediction tool bounds the entry count", () => {

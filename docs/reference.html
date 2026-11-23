@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.4.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -39,7 +39,8 @@
           <code>toleranceNats</code>, <code>outputDirectory</code>, <code>seed</code>,
           <code>maxConcurrency</code>, <code>topLogprobs</code>, <code>dryRun</code></td>
         <td>The session code, the directory, the report path, the task count, the pair count, the
-          verdict of each provider, and the warnings.</td>
+          verdict of each model, and the warnings. A probe result of every excluded model is one
+          warning.</td>
       </tr>
       <tr>
         <td><code>llm_self_prediction_status</code></td>
@@ -123,9 +124,10 @@
       <tr>
         <td><code>topLogprobs</code></td>
         <td>integer</td>
-        <td>the provider value</td>
+        <td>20</td>
         <td>The support size of both modes, from 1 to 64. The value overrides every provider
-          section.</td>
+          section. A model must return that many entries during the probe, or the run excludes
+          it.</td>
       </tr>
       <tr>
         <td><code>dryRun</code></td>
@@ -135,12 +137,17 @@
       </tr>
     </tbody>
   </table>
+  <p>The <code>providers</code> argument holds either provider keys such as <code>openrouter</code>
+    or model identifiers such as <code>qwen/qwen3.8-flash</code>.</p>
+  <p>A run expands every model list, probes each model, and keeps the models that return a
+    <code>logprobs</code> table at the support size. A run stops with <code>INVALID_PROVIDER</code>
+    when no model passes the probe, and the message lists the reason of each model.</p>
   <p>An unknown argument is ignored. An argument of the wrong type stops the run with the message
     <code>The argument NAME is not ...</code>.</p>
 
   <h2>3. Command line</h2>
   <pre><code>node lib/cli.js run --dry-run --limit=3 --repetitions=2
-node lib/cli.js run --providers=deepseek,qwen --limit=8 --tolerance=0.02
+node lib/cli.js run --providers=qwen/qwen3.8-flash --limit=8 --tolerance=0.02
 node lib/cli.js status --limit=5
 node lib/cli.js report --session=20261122T133644Z-20260815-60375c
 node lib/cli.js dataset --sample=8

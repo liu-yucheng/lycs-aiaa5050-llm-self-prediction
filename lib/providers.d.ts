@@ -70,6 +70,61 @@ export declare function resolveProviderApiKey(definition: ProviderDefinition, en
  */
 export declare function applyProviderEnvironments(catalog: ProviderCatalog, environments: ReadonlyMap<string, ProviderEnvironment>): ProviderCatalog;
 /**
+ * Resolve the requested keys to the keys of the expanded catalog.
+ *
+ * A request that names a provider with a model list selects every model of that list.
+ *
+ * @param catalog - the catalog before the model expansion.
+ * @param keys - the requested provider keys or model identifiers.
+ * @returns the keys of the expanded catalog.
+ */
+export declare function resolveRequestedKeys(catalog: ProviderCatalog, keys: readonly string[]): string[];
+/**
+ * Build the model identifier of one chat request.
+ *
+ * OpenRouter lists a `:batch` variant that answers no chat completion request. The plugin drops
+ * that suffix for the request and keeps the variant name in the catalog, the report, and the file
+ * names.
+ *
+ * @param model - the model identifier of the catalog.
+ * @returns the identifier to send to the endpoint.
+ */
+export declare function resolveRequestModel(model: string): string;
+/**
+ * Build a file-name-safe provider key from one model identifier.
+ *
+ * @param providerKey - the key of the provider that lists the model.
+ * @param model - the model identifier.
+ * @returns the key, which holds only letters, digits, dots, underscores, and hyphens.
+ */
+export declare function buildModelProviderKey(providerKey: string, model: string): string;
+/**
+ * Expand each provider that lists model identifiers into one provider per model.
+ *
+ * One environment section supplies the model list, so one OpenRouter section yields one provider
+ * per model and every model keeps its own metrics and its own output files.
+ *
+ * @param catalog - the validated catalog.
+ * @returns the catalog with one provider per model.
+ */
+export declare function expandProviderModels(catalog: ProviderCatalog): ProviderCatalog;
+/** The outcome of one capability probe. */
+export interface ProbeOutcome {
+    readonly supported: boolean;
+    readonly reason?: string;
+}
+/**
+ * Probe whether one model returns a logprobs table at the requested support size.
+ *
+ * The experiment uses only the models that answer this probe, as the design requires.
+ *
+ * @param client - the client of the model.
+ * @param topLogprobsCount - the requested support size.
+ * @param signal - the cancellation signal of the run.
+ * @returns the outcome, with a reason when the model does not support the request.
+ */
+export declare function probeLogprobsSupport(client: ProviderClient, topLogprobsCount: number, signal: AbortSignal): Promise<ProbeOutcome>;
+/**
  * Create the client of one provider.
  *
  * @param definition - the provider definition.

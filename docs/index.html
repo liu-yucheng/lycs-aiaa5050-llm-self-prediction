@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.4.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html" aria-current="page">Overview</a>
       <a href="design.html">Design</a>
@@ -30,15 +30,15 @@
 
   <div class="callout">
     <p><strong>The two questions.</strong> For one sentence prefix, the plugin asks the model for
-      the top 64 next-token log probabilities, then asks the model to report that same table itself.
+      the top 20 next-token log probabilities, then asks the model to report that same table itself.
       The divergence between the two tables is the measurement.</p>
   </div>
 
   <dl class="facts">
-    <dt>Dataset</dt><dd>128 Simplified Chinese tasks in 8 categories, dataset
-      <code>llm-self-prediction-zh-128-v1</code></dd>
+    <dt>Dataset</dt><dd>64 Simplified Chinese and 64 US English tasks in 8 categories, dataset
+      <code>llm-self-prediction-zh64-en64-v2</code></dd>
     <dt>Providers</dt><dd>DeepSeek, Qwen, GLM flash models, plus a deterministic mock provider</dd>
-    <dt>Table size</dt><dd>64 entries for the actual request, at most 64 entries for the self request</dd>
+    <dt>Table size</dt><dd>20 entries for the actual request, at most 64 entries for the self request</dd>
     <dt>Pairs</dt><dd>4 actual answers × 4 self answers = 16 pairs for each task and provider</dd>
     <dt>Verdict</dt><dd>Bootstrap interval of the mean symmetric KL against a tolerance of 0.05 nats</dd>
   </dl>
