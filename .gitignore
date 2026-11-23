@@ -7,6 +7,10 @@
 **/.*
 !**/.git*
 
+# The private environment file stays local. The example file is public.
+**/.env
+!**/.env.example
+
 # VSCode custom configs.
 **/.vscode/
 

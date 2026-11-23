@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.2.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -136,7 +136,8 @@
 node lib/cli.js run --providers=deepseek,qwen --limit=8 --tolerance=0.02
 node lib/cli.js status --limit=5
 node lib/cli.js report --session=20261122T133644Z-20260815-60375c
-node lib/cli.js dataset --sample=8</code></pre>
+node lib/cli.js dataset --sample=8
+node lib/cli.js env</code></pre>
   <table>
     <thead>
       <tr><th>Command</th><th>Options</th></tr>
@@ -151,6 +152,10 @@ node lib/cli.js dataset --sample=8</code></pre>
       <tr><td><code>status</code></td><td><code>--limit</code>, <code>--output</code></td></tr>
       <tr><td><code>report</code></td><td><code>--session</code>, <code>--output</code></td></tr>
       <tr><td><code>dataset</code></td><td><code>--sample</code></td></tr>
+      <tr>
+        <td><code>env</code></td>
+        <td>none. The command copies the example file when the private file is absent.</td>
+      </tr>
       <tr><td><code>help</code></td><td>none</td></tr>
     </tbody>
   </table>
@@ -220,8 +225,9 @@ node lib/cli.js dataset --sample=8</code></pre>
     </thead>
     <tbody>
       <tr>
-        <td>A provider has no credential</td>
-        <td>The run stops before the first call and names the missing variable.</td>
+        <td>A provider has no usable key</td>
+        <td>The run stops before the first call with <code>MISSING_CREDENTIAL</code>, and the prompt
+          names the environment keys to fill in.</td>
       </tr>
       <tr>
         <td>A call fails, times out, or returns an invalid reply</td>

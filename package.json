@@ -1,6 +1,6 @@
 {
   "name": "lycs-aiaa5050-llm-self-prediction",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "DeepSeek Harness plugin for the LLM next-token self-prediction experiment across DeepSeek, Qwen, and GLM.",
   "type": "module",
   "main": "lib/index.js",
@@ -21,7 +21,8 @@
     "README.md",
     "LICENSE",
     "license-2",
-    "icon.svg"
+    "icon.svg",
+    ".env.example"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.2.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -53,9 +53,9 @@
       </tr>
       <tr>
         <td><code>environment</code></td>
-        <td>The Node.js version, the platform, the plugin name and version, the seed, the start time, the end time, and
-        the
-          elapsed seconds.</td>
+        <td>The Node.js version, the platform, the plugin name and version, the seed, the start
+          time, the end time, the elapsed seconds, the path of the environment file, and whether the
+          run created that file.</td>
       </tr>
       <tr>
         <td><code>status</code></td>
@@ -85,7 +85,7 @@
   <ol>
     <li>Read <code>session.json</code> and copy the provider list, the task list, the repetitions,
       the tolerance, and the seed.</li>
-    <li>Set the same credential variables.</li>
+    <li>Fill in the same API keys in the private environment file.</li>
     <li>Run <code>node lib/cli.js run</code> with those values.</li>
   </ol>
   <p>A provider with a live model may serve another model version later, and a sampling parameter
@@ -100,7 +100,7 @@
       <tr><th>Item</th><th>Value</th></tr>
     </thead>
     <tbody>
-      <tr><td>Plugin version</td><td>0.2.0</td></tr>
+      <tr><td>Plugin version</td><td>0.3.0</td></tr>
       <tr><td>Node.js of the command line</td><td>26.13.0</td></tr>
       <tr><td>Node.js of the harness host</td><td>24.21.0</td></tr>
       <tr><td>TypeScript</td><td>5.9.3</td></tr>
@@ -126,7 +126,7 @@
   </ul>
 
   <h2>6. Tests</h2>
-  <p>The test suite runs 24 tests with the Node.js test runner:</p>
+  <p>The test suite runs 31 tests with the Node.js test runner:</p>
   <table>
     <thead>
       <tr><th>File</th><th>Coverage</th></tr>
@@ -135,6 +135,10 @@
       <tr>
         <td><code>test/probability.test.mjs</code></td>
         <td>Normalization, aggregation, divergence values, bounds, alignment, coverage.</td>
+      </tr>
+      <tr>
+        <td><code>test/env.test.mjs</code></td>
+        <td>The parser, the section builder, the copy of the example, the placeholder prompt.</td>
       </tr>
       <tr>
         <td><code>test/dataset.test.mjs</code></td>
@@ -171,6 +175,12 @@ npm test</code></pre>
       <tr><th>Version</th><th>Change</th></tr>
     </thead>
     <tbody>
+      <tr>
+        <td>0.3.0</td>
+        <td>The private environment file <code>.env</code> with the public example
+          <code>.env.example</code>, the automatic copy, the credential prompt, and the
+          <code>env</code> command.</td>
+      </tr>
       <tr>
         <td>0.2.0</td>
         <td>The documentation site in <code>docs/</code>, with <code>index.html</code> as the entry. The README links
