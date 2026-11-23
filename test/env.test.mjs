@@ -23,7 +23,11 @@ import {
 } from "../lib/env.js";
 import { ExperimentError } from "../lib/errors.js";
 import { ExperimentService } from "../lib/experiment.js";
-import { applyProviderEnvironments, resolveProviderApiKey } from "../lib/providers.js";
+import {
+  applyProviderEnvironments,
+  expandProviderModels,
+  resolveProviderApiKey,
+} from "../lib/providers.js";
 import { loadProviderCatalog } from "../lib/providers.js";
 
 /**
@@ -90,7 +94,7 @@ test("buildProviderEnvironments groups the properties of one section", () => {
 });
 
 test("ensureEnvironmentFile copies the example once and keeps an edited file", async () => {
-  const example = "deepseek.api_key=<Your API key, not mine.>\n";
+  const example = "openrouter.api_key=<Your API key.>\n";
   const directory = await makeWorkspace({ "inputs/.env.example": example });
   try {
     const first = await ensureEnvironmentFile(directory);
@@ -108,20 +112,26 @@ test("ensureEnvironmentFile copies the example once and keeps an edited file", a
   }
 });
 
-test("applyProviderEnvironments overrides the base URL and the model", async () => {
+test("applyProviderEnvironments overrides the base URL and the model list", async () => {
   const catalog = await loadProviderCatalog();
   const environments = buildProviderEnvironments({
-    "deepseek.base_url": "https://api.example.test/v1",
-    "deepseek.model_to_use": "deepseek-flash",
-    "zhipu.model_to_use": "",
+    "openrouter.base_url": "https://api.example.test/v1",
+    "openrouter.models_to_use": "alpha/one:batch, beta/two",
   });
   const merged = applyProviderEnvironments(catalog, environments);
-  const deepseek = merged.providers.find((provider) => provider.key === "deepseek");
-  assert.equal(deepseek.baseUrl, "https://api.example.test/v1");
-  assert.equal(deepseek.model, "deepseek-flash");
-  const glm = merged.providers.find((provider) => provider.key === "glm");
-  assert.equal(glm.model, "glm-4.5-flash");
-  assert.equal(resolveProviderApiKey(deepseek, environments), undefined);
+  const openrouter = merged.providers.find((provider) => provider.key === "openrouter");
+  assert.equal(openrouter.baseUrl, "https://api.example.test/v1");
+  assert.deepEqual(openrouter.models, ["alpha/one:batch", "beta/two"]);
+  assert.equal(resolveProviderApiKey(openrouter, environments), undefined);
+  const expanded = expandProviderModels(merged);
+  assert.deepEqual(
+    expanded.providers.map((provider) => provider.key),
+    ["openrouter-alpha-one-batch", "openrouter-beta-two", "mock"],
+  );
+  assert.deepEqual(
+    expanded.providers.map((provider) => provider.model),
+    ["alpha/one:batch", "beta/two", "mock-flash"],
+  );
 });
 
 test("a real run stops with a prompt when the key is a placeholder", async () => {
@@ -133,13 +143,13 @@ test("a real run stops with a prompt when the key is a placeholder", async () =>
       resolveWorkspace: async () => directory,
       outputRoot: () => "",
     });
-    const request = { providerKeys: ["deepseek"], limit: 1, repetitions: 1 };
+    const request = { providerKeys: ["openrouter"], limit: 1, repetitions: 1 };
     await assert.rejects(
       service.run(undefined, request, new AbortController().signal),
       (error) => {
         assert.equal(error instanceof ExperimentError, true);
         assert.equal(error.code, "MISSING_CREDENTIAL");
-        assert.match(error.message, /deepseek\.api_key/u);
+        assert.match(error.message, /openrouter\.api_key/u);
         assert.match(error.message, /\.env/u);
         return true;
       },

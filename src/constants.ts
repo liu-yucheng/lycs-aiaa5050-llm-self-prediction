@@ -11,7 +11,7 @@
 export const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 
 /** The plugin version. Keep it equal to the version in `package.json`. */
-export const PLUGIN_VERSION = "0.3.1";
+export const PLUGIN_VERSION = "0.4.0";
 
 /** The host tool names. */
 export const TOOL_RUN = "llm_self_prediction_run";
@@ -24,7 +24,7 @@ export const TOOL_HELP = "llm_self_prediction_help";
 export const SELF_PREDICTION_TOOL_NAME = "submit_next_token_log_probabilities";
 
 /** The size of the requested top log-probability table. */
-export const TOP_LOGPROBS_COUNT = 64;
+export const TOP_LOGPROBS_COUNT = 20;
 
 /** The default number of repetitions of each prediction mode. */
 export const DEFAULT_REPETITION_COUNT = 4;
@@ -42,7 +42,7 @@ export const INPUTS_DIRECTORY_NAME = "inputs";
 export const DEFAULT_OUTPUT_DIRECTORY_NAME = "outputs";
 
 /** The file name of the bundled dataset. */
-export const DATASET_FILE_NAME = "dataset-zh-128.json";
+export const DATASET_FILE_NAME = "dataset-128.json";
 
 /** The file name of the bundled provider catalog. */
 export const PROVIDER_FILE_NAME = "providers.json";
@@ -57,10 +57,12 @@ export const ENV_EXAMPLE_FILE_NAME = ".env.example";
 export const ENV_BASE_URL_PROPERTY = "base_url";
 export const ENV_API_KEY_PROPERTY = "api_key";
 export const ENV_MODEL_PROPERTY = "model_to_use";
+export const ENV_MODELS_PROPERTY = "models_to_use";
 
 /** The property names of the optional request tuning of one provider section. */
 export const ENV_TOP_LOGPROBS_PROPERTY = "top_logprobs";
 export const ENV_THINKING_PROPERTY = "thinking";
+export const ENV_REASONING_PROPERTY = "reasoning";
 
 /** The default number of concurrent prediction calls. */
 export const DEFAULT_MAX_CONCURRENCY = 3;

@@ -19,6 +19,8 @@ import {
   ENV_EXAMPLE_FILE_NAME,
   ENV_FILE_NAME,
   ENV_MODEL_PROPERTY,
+  ENV_MODELS_PROPERTY,
+  ENV_REASONING_PROPERTY,
   ENV_THINKING_PROPERTY,
   ENV_TOP_LOGPROBS_PROPERTY,
   INPUTS_DIRECTORY_NAME,
@@ -35,9 +37,11 @@ import {
 export interface ProviderEnvironment {
   readonly baseUrl?: string;
   readonly model?: string;
+  readonly models?: readonly string[];
   readonly apiKey?: string;
   readonly topLogprobsCount?: number;
   readonly thinking?: string;
+  readonly reasoning?: string;
 }
 
 /** The state of the environment file of one directory. */
@@ -157,6 +161,14 @@ export function buildProviderEnvironments(
       environments.set(prefix, { ...current, baseUrl: value });
     } else if (property === ENV_MODEL_PROPERTY) {
       environments.set(prefix, { ...current, model: value });
+    } else if (property === ENV_MODELS_PROPERTY) {
+      const models = value
+        .split(",")
+        .map((model) => model.trim())
+        .filter((model) => model !== "");
+      if (models.length > 0) {
+        environments.set(prefix, { ...current, models });
+      }
     } else if (property === ENV_API_KEY_PROPERTY) {
       environments.set(prefix, { ...current, apiKey: value });
     } else if (property === ENV_TOP_LOGPROBS_PROPERTY) {
@@ -168,6 +180,11 @@ export function buildProviderEnvironments(
       const thinking = value.trim().toLowerCase();
       if (thinking !== "") {
         environments.set(prefix, { ...current, thinking });
+      }
+    } else if (property === ENV_REASONING_PROPERTY) {
+      const reasoning = value.trim().toLowerCase();
+      if (reasoning !== "") {
+        environments.set(prefix, { ...current, reasoning });
       }
     }
   }

@@ -23,6 +23,7 @@ import { ExperimentError, errorMessage } from "./errors.js";
 import { ExperimentService } from "./experiment.js";
 import {
   applyProviderEnvironments,
+  expandProviderModels,
   loadProviderCatalog,
   resolveEnvironmentPrefix,
   resolveProviderApiKey,
@@ -203,7 +204,7 @@ async function showEnvironmentCommand(): Promise<number> {
   writeLine("");
   writeLine("| Provider | Section | Model | API key |");
   writeLine("| --- | --- | --- | --- |");
-  for (const provider of catalog.providers) {
+  for (const provider of expandProviderModels(catalog).providers) {
     const section = resolveEnvironmentPrefix(provider);
     const key = resolveProviderApiKey(provider, environments);
     writeLine(`| ${provider.label} | ${section} | ${provider.model} | ${key === undefined ?

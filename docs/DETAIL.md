@@ -19,27 +19,31 @@ verdict for each provider.
 ## 2. Flow
 
 1. The user opens a workspace and a session in DeepSeek Harness and names the experiment.
-2. The agent calls `llm_self_prediction_run` with the providers, the tasks, and the repetition count.
-3. The plugin loads the dataset and the provider catalog, creates one session directory, and
-   starts one job for each task and provider pair.
-4. A job asks for one actual prediction, then one self prediction, for each repetition.
-5. The job writes each raw reply, then one parsed record with the pair metrics.
-6. The run writes the aggregate metrics, the report, and the CSV tables.
-7. The agent calls `llm_self_prediction_report` and reports the verdict.
+2. The agent calls `llm_self_prediction_run` with the models, the tasks, and the repetition count.
+3. The plugin loads the dataset and the provider catalog, expands the model list of each section,
+   probes each listed model, and keeps the models that return a `logprobs` table at
+   `top_logprobs` = 20.
+4. The plugin creates one session directory and starts one job for each task and model pair.
+5. A job asks for one actual prediction, then one self prediction, for each repetition.
+6. The job writes each raw reply, then one parsed record with the pair metrics.
+7. The run writes the aggregate metrics, the report, and the CSV tables.
+8. The agent calls `llm_self_prediction_report` and reports the verdict.
 
 A dry run replaces each provider with the mock provider and needs no network.
 
 ## 3. Dataset
 
-The dataset `llm-self-prediction-zh-128-v1` holds 128 tasks in eight categories: poetry, idiom,
+The dataset `llm-self-prediction-zh64-en64-v2` holds 128 tasks in eight categories: poetry, idiom,
 daily life, food, weather, technology, news, and story.
-One category holds 16 tasks.
+The tasks are 64 Simplified Chinese tasks and 64 US English tasks, so one language and one category
+hold 8 tasks and one category holds 16 tasks.
 
-Each task has four fields:
+Each task has five fields:
 
 | Field | Meaning |
 | --- | --- |
-| `id` | The identifier, from `T001` to `T128`. |
+| `id` | The identifier, from `Z001` to `Z064` for Chinese and `E001` to `E064` for English. |
+| `language` | The language tag, `zh-Hans` or `en-US`. |
 | `category` | The category name. |
 | `prefix` | The sentence text before the target token. |
 | `referenceToken` | The next token of the source sentence. |
@@ -58,10 +62,13 @@ the reference token.
 
 ### 4.1 Actual prediction
 
-The request sets `max_tokens` to 1, `logprobs` to true, and `top_logprobs` to the support size of
-the provider. A provider section sets the size with `<prefix>.top_logprobs`, and a run sets one size
-for every provider with the `topLogprobs` argument. The default is 64, which the catalog value
-reduces for an endpoint with a lower cap.
+The request sets `max_tokens` to 1, `logprobs` to true, and `top_logprobs` to 20. A provider section
+sets the size with `<prefix>.top_logprobs`, and a run sets one size for every model with the
+`topLogprobs` argument.
+The request sets `reasoning` to `{"enabled": false}`, because a reasoning model spends its first
+tokens on thinking and returns no table for the prefix.
+The request sets `provider.require_parameters` to true, because OpenRouter must route the call to an
+upstream endpoint that serves the requested parameters.
 The system message asks for one next word, and the user message gives the prefix.
 The reply table is `choices[0].logprobs.content[0].top_logprobs`.
 
@@ -191,14 +198,19 @@ one directory for each session. The plugin reads `inputs/.env` first, and the pa
 fallback. A workspace file wins over the packaged file of the same name.
 
 The public file `.env.example` ships with the plugin and holds one section for each provider.
-A section has three properties:
+A section has these properties:
 
 - `base_url` overrides the base URL of the provider catalog.
 - `model_to_use` overrides the model name of the provider catalog.
+- `models_to_use` holds a comma-separated model list, and the plugin makes one provider per model.
 - `api_key` holds the credential.
+- `top_logprobs` sets the support size of the section.
+- `reasoning` sets the reasoning switch of the section.
+- `thinking` sets the thinking switch of a direct provider endpoint.
 
-The section name comes from the `environmentPrefix` field of the catalog, so the provider `glm`
-uses the section `zhipu`. A property that the section omits keeps the value of `inputs/providers.json`.
+The section name comes from the `environmentPrefix` field of the catalog, so the provider
+`openrouter` uses the section `openrouter`. A property that the section omits keeps the value of
+`inputs/providers.json`.
 
 When the private file is absent, the first run copies the example file, and the run stops with a
 prompt that names the keys to fill in. A process environment variable is the fallback, so a shell
@@ -217,7 +229,7 @@ printing a key.
 
 - The actual table comes from the provider, so a provider that returns a truncated or a smoothed
   table limits the comparison.
-- The top-64 truncation leaves out the tail of the distribution, so each side is renormalized over a partial support.
+- The top-20 truncation leaves out the tail of the distribution, so each side is renormalized over a partial support.
 - A self prediction is a report, not a measurement, so a model can report a table that differs from its own output.
 - The default sample of 128 tasks is small for a claim about a model family.
 - One run measures one model version.
@@ -228,7 +240,7 @@ The test suite covers the probability measures against known values, the dataset
 mock session with its files, the verdict at two tolerances, the tool definitions, the prompt and
 tool-argument parsers, the plugin entry point, and the HTTP client against a local server.
 
-The suite runs 34 tests.
+The suite runs 35 tests.
 The environment tests cover the parser, the sections, the copy of the example, and the prompt of a
 missing key.
 The entry-point test calls `apply` with a stub host context and runs the registered run tool.

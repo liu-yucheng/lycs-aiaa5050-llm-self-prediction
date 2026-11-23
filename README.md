@@ -18,9 +18,12 @@ gives sixteen actual-versus-self pairs.
 The plugin also measures a baseline, which is the divergence between two predictions of the same
 mode, so the report separates the model effect from the sampling noise.
 
-The dataset holds 128 Simplified Chinese next-token tasks in eight categories.
-The default providers are the flash models of DeepSeek, Qwen, and GLM, and the plugin uses the
-provider default inference parameters.
+The dataset holds 128 next-token tasks in eight categories: 64 Simplified Chinese tasks and 64
+US English tasks.
+The provider is OpenRouter, and one `.env` section lists the models to use.
+A run probes each listed model and keeps the models that return a `logprobs` table at
+`top_logprobs` = 20, as the experiment design requires.
+The plugin sends no sampling parameter, so every model keeps its recommended default.
 
 ## Documentation
 
@@ -73,7 +76,7 @@ Every path stays inside one of two directories of the workspace:
 | `inputs/` | The private `.env`, the example `.env.example`, and optional dataset or provider files. |
 | `outputs/` | One directory for each session, named by the session code. |
 
-A run reads `inputs/.env` first, then `inputs/dataset-zh-128.json`, and then `inputs/providers.json`.
+A run reads `inputs/.env` first, then `inputs/dataset-128.json`, and then `inputs/providers.json`.
 A file that `inputs/` does not hold comes from the package.
 The first run copies the packaged `.env.example` to `inputs/.env` and stops with the credential prompt.
 A run also copies an old `.env` of the workspace root to `inputs/.env`, and it reports that copy.
@@ -102,7 +105,7 @@ A tool call with `dryRun` uses the mock provider, writes a complete session, and
 
 ```text
 node lib/cli.js run --dry-run --limit=2 --repetitions=2
-node lib/cli.js run --providers=deepseek,qwen --limit=8
+node lib/cli.js run --limit=8
 node lib/cli.js status --limit=5
 node lib/cli.js report --session=<session code>
 node lib/cli.js dataset --sample=8
@@ -114,8 +117,11 @@ root.
 
 ## Dataset
 
-The file `inputs/dataset-zh-128.json` holds the dataset `llm-self-prediction-zh-128-v1`.
-Each task has an identifier, a category, a sentence prefix, and one reference next token.
+The file `inputs/dataset-128.json` holds the dataset `llm-self-prediction-zh64-en64-v2`.
+Each task has an identifier, a language tag, a category, a sentence prefix, and one reference next
+token. The identifiers `Z001` to `Z064` are Simplified Chinese tasks, and `E001` to `E064` are US
+English tasks.
+The prompt of a task uses the language of that task.
 The prefix ends before the reference token, and the validator rejects a task that breaks this rule.
 The dataset is read-only during a run.
 
@@ -125,17 +131,21 @@ The plugin reads the private file `inputs/.env` in the workspace.
 The public file `inputs/.env.example` ships with the plugin and holds one section for each provider:
 
 ```text
-deepseek.base_url=https://api.deepseek.com
-deepseek.api_key=<Your API key, not mine.>
-deepseek.model_to_use=deepseek-flash
+openrouter.base_url=https://openrouter.ai/api/v1
+openrouter.api_key=<Your API key.>
+openrouter.models_to_use=google/gemini-4-neon:batch, qwen/qwen3.8-flash
 ```
 
-A section overrides the base URL and the model of the catalog, and it carries the API key.
+The property `models_to_use` holds a comma-separated model list, and the plugin expands the list
+into one provider per model. The property `model_to_use` sets one model.
+The optional properties `top_logprobs` and `reasoning` apply to every model of the section.
+
+A section overrides the base URL and the model list of the catalog, and it carries the API key.
 A property that the section omits keeps the value of `inputs/providers.json`.
 
 When `inputs/.env` is absent, the first run copies `inputs/.env.example` to `inputs/.env` and stops
 with a prompt that names the keys to fill in. A process environment variable is the fallback, so a shell that already
-exports `DEEPSEEK_API_KEY` needs no file. The plugin never writes a key to a session file, and
+exports `OPENROUTER_API_KEY` needs no file. The plugin never writes a key to a session file, and
 `.gitignore` keeps `.env` out of the repository.
 
 The command `node lib/cli.js env` prints the path of the file and the state of each key without
@@ -144,27 +154,37 @@ printing a key.
 ## Providers
 
 The file `inputs/providers.json` declares the providers.
-Each provider uses an OpenAI-compatible chat-completions endpoint.
+The catalog holds one OpenRouter provider and one local mock provider.
+OpenRouter uses an OpenAI-compatible chat-completions endpoint.
 
-| Key | Model | Section of `.env` |
+| Key | Section of `.env` | Models |
 | --- | --- | --- |
-| `deepseek` | `deepseek-chat` | `deepseek` |
-| `qwen` | `qwen-flash` | `qwen` |
-| `glm` | `glm-4.5-flash` | `zhipu` |
-| `mock` | `mock-flash` | none |
+| `openrouter` | `openrouter` | The seven models of `models_to_use` |
+| `mock` | none | `mock-flash` |
 
-The actual request sets `logprobs` to true and `top_logprobs` to the support size of the provider.
-The self request forces the tool `submit_next_token_log_probabilities` with one entry list of that
-same size.
+The plugin expands `models_to_use` into one provider per model, and the report names the model of
+each row. A run accepts a model identifier wherever it accepts a provider key.
 
-An endpoint caps `top_logprobs`, so each provider declares its own size in `inputs/providers.json`.
-A `.env` section sets it with `<prefix>.top_logprobs`, and a run sets one size for every provider
-with the `topLogprobs` argument or the `--top-logprobs` option. The plugin rejects a value that is
-not an integer from 1 to 64.
+The actual request sets `logprobs` to true and `top_logprobs` to 20.
+The self request asks for the 20 most likely tokens, either through the forced tool
+`submit_next_token_log_probabilities` or as one JSON object in the message body, and the plugin
+parses either form.
 
-A reasoning model refuses a forced tool choice while it thinks. A section value of
-`<prefix>.thinking=disabled` turns thinking off, and `low`, `high`, or `max` sets the effort level.
-The catalog sets `disabled` for the providers that support it.
+A model answers no `logprobs` table when it spends its first tokens on reasoning, and the design
+needs a clean next-token distribution. The catalog sets `reasoning` to `disabled`, and a section
+changes it with `<prefix>.reasoning`. A run also sends `provider.require_parameters` to true, so
+OpenRouter ignores an upstream endpoint that cannot serve the request.
+
+OpenRouter sells a `:batch` variant that answers no chat completion request. The plugin drops that
+suffix from the request and keeps the variant name in the catalog, the report, and the file names.
+
+Before the tasks start, a run probes each listed model with one short actual request. A model that
+returns no table at `top_logprobs` = 20 is excluded and the report lists the reason. A run stops
+with `INVALID_PROVIDER` when no model passes the probe.
+
+A `.env` section sets the support size with `<prefix>.top_logprobs`, and a run sets it for every
+model with the `topLogprobs` argument or the `--top-logprobs` option. The plugin rejects a value
+that is not an integer from 1 to 64.
 
 ## Output
 
@@ -206,7 +226,7 @@ npm run typecheck
 npm test
 ```
 
-The test suite runs 34 tests, which cover the probability measures, the dataset rules, the
+The test suite runs 35 tests, which cover the probability measures, the dataset rules, the
 environment file, one full mock session, the tool definitions, the prompts, the plugin entry
 point, and the HTTP client of a provider against a local server.
 
@@ -216,7 +236,7 @@ point, and the HTTP client of a provider against a local server.
 - Tool versions: TypeScript 5.9.3.
 - Platform: Windows 11 x64.
 - Random seed: 20260815.
-- Plugin version: 0.3.1.
+- Plugin version: 0.4.0.
 
 ## Licence
 

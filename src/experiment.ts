@@ -50,9 +50,12 @@ import { buildTaskRecord, computeSessionMetrics, resolveTolerance } from "./metr
 import {
   applyProviderEnvironments,
   createProviderClient,
+  expandProviderModels,
   MOCK_PROVIDER_KEY,
   loadProviderCatalog,
+  probeLogprobsSupport,
   resolveEnvironmentPrefix,
+  resolveRequestedKeys,
   resolveProviderApiKey,
   selectProviders,
 } from "./providers.js";
@@ -172,21 +175,26 @@ export class ExperimentService {
     if (tasks.length === 0) {
       throw new ExperimentError("INVALID_ARGUMENT", "The run selected no task.");
     }
-    const providers = selectProviders(catalog, requestedKeys, dryRun);
-    if (providers.length === 0) {
+    const selectedProviders = selectProviders(
+      expandProviderModels(catalog),
+      resolveRequestedKeys(catalog, requestedKeys),
+      dryRun,
+    );
+    if (selectedProviders.length === 0) {
       throw new ExperimentError("INVALID_PROVIDER", "The run selected no provider.");
     }
-    const setupWarnings = checkProviderCredentials(providers, environments, environmentState,
-      dryRun);
+    const setupWarnings = checkProviderCredentials(
+      selectedProviders,
+      environments,
+      environmentState,
+      dryRun,
+    );
     if (environmentState.migratedFrom !== undefined) {
       setupWarnings.push(
         `The run copied the old environment file ${environmentState.migratedFrom} to ` +
           `${environmentState.filePath ?? ""}. The inputs directory is the new home.`,
       );
     }
-    const clients: ProviderClient[] = providers.map((provider) =>
-      createProviderClient(provider, undefined, resolveProviderApiKey(provider, environments)),
-    );
     const randomSeed = request.randomSeed ?? DEFAULT_RANDOM_SEED;
     const toleranceNats = resolveTolerance(request.toleranceNats ?? DEFAULT_TOLERANCE_NATS);
     const maxConcurrency = clampInteger(
@@ -197,8 +205,47 @@ export class ExperimentService {
     );
     const supportCount = clampEntryCount(
       request.topLogprobsCount ??
-        Math.max(...providers.map((provider) => provider.topLogprobsCount ?? TOP_LOGPROBS_COUNT)),
+        Math.max(
+          ...selectedProviders.map((provider) => provider.topLogprobsCount ?? TOP_LOGPROBS_COUNT),
+        ),
     );
+    const candidateClients: ProviderClient[] = selectedProviders.map((provider) =>
+      createProviderClient(provider, undefined, resolveProviderApiKey(provider, environments)),
+    );
+    const providers: ProviderDefinition[] = [];
+    const clients: ProviderClient[] = [];
+    if (dryRun) {
+      providers.push(...selectedProviders);
+      clients.push(...candidateClients);
+    } else {
+      const outcomes = await Promise.all(
+        candidateClients.map((client) => probeLogprobsSupport(client, supportCount, signal)),
+      );
+      for (let index = 0; index < selectedProviders.length; index += 1) {
+        const provider = selectedProviders[index];
+        const client = candidateClients[index];
+        const outcome = outcomes[index];
+        if (provider === undefined || client === undefined || outcome === undefined) {
+          continue;
+        }
+        if (outcome.supported) {
+          providers.push(provider);
+          clients.push(client);
+        } else {
+          setupWarnings.push(
+            `The model ${provider.model} was excluded because the probe failed: ` +
+              `${outcome.reason ?? "no reason given"}.`,
+          );
+        }
+      }
+      if (providers.length === 0) {
+        const reasons = setupWarnings.join(" ");
+        throw new ExperimentError(
+          "INVALID_PROVIDER",
+          "No selected model returned a logprobs table at the requested support size. " + reasons,
+        );
+      }
+    }
     const options: RunOptions = {
       providerKeys: providers.map((provider) => provider.key),
       taskIds: tasks.map((task) => task.id),
@@ -255,6 +302,7 @@ export class ExperimentService {
       const metrics = computeSessionMetrics({
         sessionCode,
         datasetId: dataset.datasetId,
+        datasetLanguage: dataset.language,
         records,
         toleranceNats,
         repetitionCount,
