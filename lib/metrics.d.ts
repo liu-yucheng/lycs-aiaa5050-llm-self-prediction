@@ -89,6 +89,7 @@ export declare function computeProviderMetrics(records: readonly TaskRecord[], p
 export declare function computeSessionMetrics(options: {
     readonly sessionCode: string;
     readonly datasetId: string;
+    readonly datasetLanguage?: string;
     readonly records: readonly TaskRecord[];
     readonly toleranceNats: number;
     readonly repetitionCount: number;

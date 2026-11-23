@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.4.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html" aria-current="page">Design</a>
@@ -67,7 +67,8 @@
     runs several jobs at once, with a default limit of three.</p>
 
   <h2>3. Dataset</h2>
-  <p>The dataset holds 128 tasks in eight categories. One category holds 16 tasks.</p>
+  <p>The dataset holds 128 tasks in eight categories: 64 Simplified Chinese tasks and 64 US English
+    tasks. One category holds 16 tasks.</p>
   <table>
     <thead>
       <tr><th>Category</th><th class="numeric">Tasks</th><th>Example prefix</th><th>Reference token</th></tr>
@@ -75,7 +76,7 @@
     <tbody>
       <tr>
         <td>poetry</td>
-        <td>床前明月光，疑是地上 <span class="muted">(T001)</span></td>
+        <td>床前明月光，疑是地上 <span class="muted">(Z001)</span></td>
         <td>霜</td>
       </tr>
       <tr><td>idiom</td><td class="numeric">16</td><td>画蛇添足，多此一 <span class="muted">(T017)</span></td><td>举</td></tr>
@@ -120,7 +121,7 @@
   <h2>4. The two requests</h2>
   <h3>Actual prediction</h3>
   <p>The request sets <code>max_tokens</code> to 1, <code>logprobs</code> to true, and
-    <code>top_logprobs</code> to 64. The system message asks for one next word, and the user message
+    <code>top_logprobs</code> to 20. The system message asks for one next word, and the user message
     gives the prefix. The plugin reads <code>choices[0].logprobs.content[0].top_logprobs</code>.</p>
   <h3>Self prediction</h3>
   <p>The request adds one tool, <code>submit_next_token_log_probabilities</code>, and it forces that

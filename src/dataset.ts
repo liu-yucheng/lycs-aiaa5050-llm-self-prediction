@@ -41,6 +41,11 @@ export function validateDataset(value: unknown): Dataset {
     identifiers.add(task.id);
     tasks.push(task);
   }
+  const rawLanguages = value["languages"];
+  const languages =
+    Array.isArray(rawLanguages) && rawLanguages.every((entry) => typeof entry === "string")
+      ? (rawLanguages as string[])
+      : undefined;
   const taskCount = value["taskCount"];
   if (typeof taskCount === "number" && taskCount !== tasks.length) {
     throw new ExperimentError(
@@ -48,7 +53,14 @@ export function validateDataset(value: unknown): Dataset {
       `The task count ${taskCount} does not match the ${tasks.length} tasks.`,
     );
   }
-  return { datasetId, language, description, taskCount: tasks.length, tasks };
+  return {
+    datasetId,
+    language,
+    ...(languages === undefined ? {} : { languages }),
+    description,
+    taskCount: tasks.length,
+    tasks,
+  };
 }
 
 /**
@@ -63,6 +75,8 @@ function validateTask(value: unknown): Task {
   }
   const id = readString(value, "id");
   const category = readString(value, "category");
+  const rawLanguage = value["language"];
+  const language = typeof rawLanguage === "string" ? rawLanguage.trim() : "";
   const prefix = readString(value, "prefix");
   const referenceToken = readString(value, "referenceToken");
   if (prefix.trim() === "") {
@@ -77,7 +91,13 @@ function validateTask(value: unknown): Task {
       `The task ${id} already ends with its reference token.`,
     );
   }
-  return { id, category, prefix, referenceToken };
+  return {
+    id,
+    category,
+    ...(language === "" ? {} : { language }),
+    prefix,
+    referenceToken,
+  };
 }
 
 /**

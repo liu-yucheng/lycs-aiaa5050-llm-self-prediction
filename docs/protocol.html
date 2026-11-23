@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.4.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -37,7 +37,7 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
 
   <h2>2. Actual-prediction request</h2>
   <pre><code>{
-  "model": "deepseek-chat",
+  "model": "deepseek/deepseek-v4.1-flash-1017",
   "messages": [
     {
       "role": "system",
@@ -50,22 +50,27 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
   ],
   "max_tokens": 1,
   "logprobs": true,
-  "top_logprobs": 5,
+  "top_logprobs": 20,
+  "reasoning": { "enabled": false },
+  "provider": { "require_parameters": true },
   "stream": false
 }</code></pre>
   <p>The reply table comes from <code>choices[0].logprobs.content[0].top_logprobs</code>. Each entry
     holds a <code>token</code> and a <code>logprob</code> in nats. A provider that omits the table is
     an invalid response.</p>
-  <p>The value of <code>top_logprobs</code> is the support size of the provider: 64 by default, a
-    catalog value, a <code>&lt;prefix&gt;.top_logprobs</code> value, or the run argument. An endpoint
-    that caps the value rejects a larger one with an HTTP 400 error.</p>
-  <p>A request to a reasoning provider adds <code>"thinking": {"type": "&lt;level&gt;"}</code>. The
-    level <code>disabled</code> lets the provider accept a forced tool choice, because a thinking
-    provider refuses one.</p>
+  <p>The value of <code>top_logprobs</code> is the support size: 20 by default, a catalog value, a
+    <code>&lt;prefix&gt;.top_logprobs</code> value, or the run argument. An endpoint that caps the
+    value rejects a larger one with an HTTP 400 error, and the probe excludes that model.</p>
+  <p>The <code>reasoning</code> field turns reasoning off, because a reasoning model spends its first
+    tokens on thinking and then returns no table for the prefix. OpenRouter refuses the switch for a
+    model that requires reasoning, and the probe excludes that model too.</p>
+  <p>The <code>provider.require_parameters</code> field asks OpenRouter to route the call only to an
+    upstream endpoint that serves the requested parameters. A direct provider endpoint adds
+    <code>"thinking": {"type": "&lt;level&gt;"}</code> instead.</p>
 
   <h2>3. Self-prediction request</h2>
   <pre><code>{
-  "model": "deepseek-chat",
+  "model": "deepseek/deepseek-v4.1-flash-1017",
   "messages": [
     {
       "role": "system",
@@ -114,25 +119,28 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
   "max_tokens": 2048,
   "stream": false
 }</code></pre>
-  <p>The ceiling of 2048 completion tokens leaves room for 64 entries. The forced choice keeps the
-    model from answering in prose.</p>
+  <p>The ceiling of 2048 completion tokens leaves room for the entry list. The forced choice keeps the
+    model from answering in prose, and a text answer that holds one JSON object is also accepted.</p>
 
   <h3>3.1 Prompt text</h3>
   <p>The system message joins these segments in this order, with no space between them:</p>
   <ol>
     <li>你正在参加一项中文下一个词自我预测实验。</li>
     <li>你要报告自己作为语言模型在看到一段句子前缀时，对紧接着出现的那个词的概率分布。</li>
-    <li>你必须调用工具提交结果，不要在正文中写答案。</li>
+    <li>优先调用工具提交结果。无法调用工具时，只在正文中写一个 JSON 对象。</li>
   </ol>
   <p>The user message joins these segments in this order:</p>
   <ol>
     <li><code>句子前缀：&lt;prefix&gt;</code>, then two newline characters.</li>
-    <li>请调用 submit_next_token_log_probabilities 工具，提交你认为最可能的 64 个词，每个词给出自然对数概率
-      logProbability。</li>
+    <li>请调用 submit_next_token_log_probabilities 工具，提交你认为最可能的
+      &lt;entry count&gt; 个词，每个词给出自然对数概率 logProbability。</li>
     <li>概率之和必须约等于 1，数值必须小于或等于 0。</li>
     <li>按概率从高到低排列。</li>
   </ol>
-  <p>The prefix comes from the task, and the entry count comes from <code>top_logprobs</code>.</p>
+  <p>The prefix comes from the task, and the entry count comes from <code>top_logprobs</code>, which
+    is 20. An English task gets the English prompt pair instead: the system message names the
+    self-prediction experiment and the JSON fallback, and the user message names the prefix, the
+    tool, and the same entry count.</p>
 
   <h2>4. Parsing the self-prediction reply</h2>
   <ol>
@@ -149,29 +157,36 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
 
   <h2>5. Dataset file</h2>
   <pre><code>{
-  "datasetId": "llm-self-prediction-zh-128-v1",
-  "language": "zh-Hans",
+  "datasetId": "llm-self-prediction-zh64-en64-v2",
+  "language": "zh-Hans, en-US",
+  "languages": ["zh-Hans", "en-US"],
   "tasks": [
     {
-      "id": "T001",
+      "id": "Z001",
+      "language": "zh-Hans",
       "category": "poetry",
       "prefix": "床前明月光，疑是地上",
       "referenceToken": "霜"
     }
   ]
 }</code></pre>
-  <p>The shipped file holds 128 tasks. The plugin reads the packaged copy and never writes to it.</p>
+  <p>The shipped file holds 64 Simplified Chinese tasks and 64 US English tasks. The plugin reads the
+    packaged copy and never writes to it.</p>
 
   <h2>6. Provider file</h2>
   <pre><code>{
   "schemaVersion": 1,
   "providers": [
     {
-      "key": "deepseek",
-      "label": "DeepSeek",
-      "baseUrl": "https://api.deepseek.com/v1",
-      "model": "deepseek-chat",
-      "apiKeyEnvironmentVariable": "DEEPSEEK_API_KEY",
+      "key": "openrouter",
+      "label": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "google/gemini-4-neon:batch",
+      "models": ["google/gemini-4-neon:batch", "qwen/qwen3.8-flash"],
+      "apiKeyEnvironmentVariable": "OPENROUTER_API_KEY",
+      "environmentPrefix": "openrouter",
+      "topLogprobsCount": 20,
+      "reasoning": "disabled",
       "enabled": true
     }
   ]
@@ -187,6 +202,19 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
         <td>An HTTP or HTTPS URL. The client adds <code>/chat/completions</code>.</td>
       </tr>
       <tr><td><code>model</code></td><td>The model name that the provider accepts.</td></tr>
+      <tr>
+        <td><code>models</code></td>
+        <td>An optional model list. The plugin expands the list into one provider per model, and one
+          model keeps one row in the report and one set of output files.</td>
+      </tr>
+      <tr>
+        <td><code>topLogprobsCount</code></td>
+        <td>The support size of the section. The default is 20.</td>
+      </tr>
+      <tr>
+        <td><code>reasoning</code></td>
+        <td><code>disabled</code> sends <code>{"enabled": false}</code> with each request.</td>
+      </tr>
       <tr>
         <td><code>apiKeyEnvironmentVariable</code></td>
         <td>The name of the variable that holds the credential. An empty name means no credential.</td>
@@ -204,9 +232,9 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
     provider:</p>
   <p>A run copies an old <code>.env</code> of the workspace root to <code>inputs/.env</code> and reports
     that copy in the warnings. The old file stays in place.</p>
-  <pre><code>deepseek.base_url=https://api.deepseek.com
-deepseek.api_key=&lt;Your API key, not mine.&gt;
-deepseek.model_to_use=deepseek-flash</code></pre>
+  <pre><code>openrouter.base_url=https://openrouter.ai/api/v1
+openrouter.api_key=&lt;Your API key.&gt;
+openrouter.models_to_use=google/gemini-4-neon:batch, qwen/qwen3.8-flash</code></pre>
   <table>
     <thead>
       <tr><th>Property</th><th>Rule</th></tr>
@@ -221,6 +249,18 @@ deepseek.model_to_use=deepseek-flash</code></pre>
         <td>Overrides <code>model</code> of the provider catalog.</td>
       </tr>
       <tr>
+        <td><code>models_to_use</code></td>
+        <td>Overrides the model list of the provider catalog. The value is a comma-separated list.</td>
+      </tr>
+      <tr>
+        <td><code>top_logprobs</code></td>
+        <td>Overrides <code>topLogprobsCount</code> of the provider catalog.</td>
+      </tr>
+      <tr>
+        <td><code>reasoning</code></td>
+        <td>Overrides <code>reasoning</code> of the provider catalog.</td>
+      </tr>
+      <tr>
         <td><code>api_key</code></td>
         <td>The credential. A value between angle brackets is a placeholder, and the run treats it
           as an absent key.</td>
@@ -228,9 +268,9 @@ deepseek.model_to_use=deepseek-flash</code></pre>
     </tbody>
   </table>
   <p>The section name comes from the <code>environmentPrefix</code> field of the catalog, so the
-    provider <code>glm</code> uses the section <code>zhipu</code>. The process environment is the
-    fallback: <code>DEEPSEEK_API_KEY</code>, <code>DASHSCOPE_API_KEY</code>, and
-    <code>ZHIPU_API_KEY</code>. The plugin writes no key to a session file.</p>
+    provider <code>openrouter</code> uses the section <code>openrouter</code>. The process environment
+    is the fallback, and <code>OPENROUTER_API_KEY</code> serves every model of the section. The plugin
+    writes no key to a session file.</p>
 
   <h2>8. Session manifest</h2>
   <p><code>session.json</code> records the session code, the dataset identifier, the dataset digest,
