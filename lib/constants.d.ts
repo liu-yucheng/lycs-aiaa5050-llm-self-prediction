@@ -6,7 +6,7 @@
 /** The Cordis plugin name and the npm package name. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The plugin version. Keep it equal to the version in `package.json`. */
-export declare const PLUGIN_VERSION = "0.2.0";
+export declare const PLUGIN_VERSION = "0.3.0";
 /** The host tool names. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 export declare const TOOL_STATUS = "llm_self_prediction_status";
@@ -29,6 +29,14 @@ export declare const DEFAULT_OUTPUT_DIRECTORY_NAME = ".outputs";
 export declare const DATASET_FILE_NAME = "dataset-zh-128.json";
 /** The file name of the bundled provider catalog. */
 export declare const PROVIDER_FILE_NAME = "providers.json";
+/** The file name of the private environment file. A user fills in the API keys. */
+export declare const ENV_FILE_NAME = ".env";
+/** The file name of the public environment example file. The plugin copies it to the private one. */
+export declare const ENV_EXAMPLE_FILE_NAME = ".env.example";
+/** The property names of one provider section in the environment file. */
+export declare const ENV_BASE_URL_PROPERTY = "base_url";
+export declare const ENV_API_KEY_PROPERTY = "api_key";
+export declare const ENV_MODEL_PROPERTY = "model_to_use";
 /** The default number of concurrent prediction calls. */
 export declare const DEFAULT_MAX_CONCURRENCY = 3;
 /** The default number of bootstrap resamples of a confidence interval. */

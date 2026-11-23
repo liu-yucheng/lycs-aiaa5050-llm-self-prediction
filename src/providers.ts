@@ -16,6 +16,7 @@ import {
   PROVIDER_FILE_NAME,
   SLOW_GUESS_THRESHOLD_MILLISECONDS,
 } from "./constants.js";
+import { isPlaceholderValue, type ProviderEnvironment } from "./env.js";
 import { ExperimentError, errorMessage, isRecord } from "./errors.js";
 import { packagedPath, readJsonFile } from "./files.js";
 import { buildDistribution } from "./probability.js";
@@ -106,12 +107,15 @@ function validateProvider(value: unknown): ProviderDefinition {
     throw new ExperimentError("INVALID_PROVIDER", "A provider key and model must not be empty.");
   }
   const enabled = value["enabled"];
+  const environmentPrefix = value["environmentPrefix"];
+  const prefix = typeof environmentPrefix === "string" ? environmentPrefix.trim() : "";
   return {
     key: parts["key"] as string,
     label: parts["label"] as string,
     baseUrl: parts["baseUrl"] as string,
     model: parts["model"] as string,
     apiKeyEnvironmentVariable: parts["apiKeyEnvironmentVariable"] as string,
+    environmentPrefix: prefix === "" ? undefined : prefix,
     enabled: enabled !== false,
   };
 }
@@ -164,11 +168,78 @@ export function selectProviders(
  * @returns the credential, or undefined when the variable is absent or empty.
  */
 export function readProviderCredential(definition: ProviderDefinition): string | undefined {
-  if (definition.apiKeyEnvironmentVariable.trim() === "") {
+  const variable = definition.apiKeyEnvironmentVariable.trim();
+  if (variable === "") {
     return undefined;
   }
-  const value = process.env[definition.apiKeyEnvironmentVariable];
-  return value === undefined || value.trim() === "" ? undefined : value;
+  const value = process.env[variable];
+  if (value === undefined || isPlaceholderValue(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+/**
+ * Read the section name of one provider in the environment file.
+ *
+ * @param definition - the provider definition.
+ * @returns the section name, which defaults to the provider key.
+ */
+export function resolveEnvironmentPrefix(definition: ProviderDefinition): string {
+  const prefix = definition.environmentPrefix?.trim() ?? "";
+  return prefix === "" ? definition.key : prefix;
+}
+
+/**
+ * Resolve the API key of one provider.
+ *
+ * The environment file wins. The process environment is the fallback, so a shell session that
+ * already holds the variable needs no file.
+ *
+ * @param definition - the provider definition.
+ * @param environments - the section values of the environment file.
+ * @returns the key, or undefined when no usable key exists.
+ */
+export function resolveProviderApiKey(
+  definition: ProviderDefinition,
+  environments: ReadonlyMap<string, ProviderEnvironment>,
+): string | undefined {
+  const section = environments.get(resolveEnvironmentPrefix(definition));
+  const override = section?.apiKey;
+  if (override !== undefined && !isPlaceholderValue(override)) {
+    return override;
+  }
+  return readProviderCredential(definition);
+}
+
+/**
+ * Apply the environment file to a provider catalog.
+ *
+ * A section overrides the base URL and the model of the matching provider. An empty value keeps
+ * the catalog value. The function does not read or copy an API key.
+ *
+ * @param catalog - the validated catalog.
+ * @param environments - the section values of the environment file.
+ * @returns the catalog with the overrides applied.
+ */
+export function applyProviderEnvironments(
+  catalog: ProviderCatalog,
+  environments: ReadonlyMap<string, ProviderEnvironment>,
+): ProviderCatalog {
+  const providers = catalog.providers.map((definition) => {
+    const section = environments.get(resolveEnvironmentPrefix(definition));
+    if (section === undefined) {
+      return definition;
+    }
+    const baseUrl = section.baseUrl?.trim() ?? "";
+    const model = section.model?.trim() ?? "";
+    return {
+      ...definition,
+      baseUrl: baseUrl === "" ? definition.baseUrl : baseUrl,
+      model: model === "" ? definition.model : model,
+    };
+  });
+  return { ...catalog, providers };
 }
 
 /**
@@ -182,16 +253,17 @@ export function readProviderCredential(definition: ProviderDefinition): string |
 export function createProviderClient(
   definition: ProviderDefinition,
   timeoutMilliseconds: number = DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
+  apiKeyOverride?: string,
 ): ProviderClient {
   if (definition.key === MOCK_PROVIDER_KEY) {
     return new MockProviderClient(definition);
   }
-  const credential = readProviderCredential(definition);
+  const credential = apiKeyOverride ?? readProviderCredential(definition);
   if (credential === undefined) {
     throw new ExperimentError(
       "MISSING_CREDENTIAL",
-      `The provider ${definition.key} needs the environment variable ` +
-        `${definition.apiKeyEnvironmentVariable}.`,
+      `The provider ${definition.key} needs an API key in the environment file ` +
+        `or in the environment variable ${definition.apiKeyEnvironmentVariable}.`,
     );
   }
   return new OpenAiCompatibleClient(definition, credential, timeoutMilliseconds);

@@ -16,8 +16,15 @@ import {
   DEFAULT_REPETITION_COUNT,
   DEFAULT_TOLERANCE_NATS,
 } from "./constants.js";
+import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
 import { ExperimentError, errorMessage } from "./errors.js";
 import { ExperimentService } from "./experiment.js";
+import {
+  applyProviderEnvironments,
+  loadProviderCatalog,
+  resolveEnvironmentPrefix,
+  resolveProviderApiKey,
+} from "./providers.js";
 import type { RunRequest } from "./experiment.js";
 import { buildHelpText } from "./tools.js";
 
@@ -59,6 +66,8 @@ export async function runCommandLine(argv: readonly string[]): Promise<number> {
         return await showReportCommand(service, options);
       case "dataset":
         return await showDatasetCommand(options);
+      case "env":
+        return await showEnvironmentCommand();
       case "help":
         writeLine(buildCommandLineHelp());
         return EXIT_SUCCESS;
@@ -167,6 +176,37 @@ async function showReportCommand(
   const session = options.values.get("session") ?? "";
   const result = await service.report(undefined, new AbortController().signal, session);
   writeLine(result.text);
+  return EXIT_SUCCESS;
+}
+
+/**
+ * Run the env command.
+ *
+ * The command copies `.env.example` to `.env` when the private file is absent, and it reports the
+ * usable state of each provider without printing a key.
+ *
+ * @returns the exit code.
+ */
+async function showEnvironmentCommand(): Promise<number> {
+  const workspace = process.cwd();
+  const state = await ensureEnvironmentFile(workspace);
+  const values = state.filePath === undefined ? {} : await readEnvironmentFile(state.filePath);
+  const environments = buildProviderEnvironments(values);
+  const catalog = applyProviderEnvironments(await loadProviderCatalog(), environments);
+  writeLine(`Environment file: ${state.filePath ?? "absent"}`);
+  writeLine(`Example file: ${state.examplePath ?? "absent"}`);
+  writeLine(`Created by this command: ${state.created ? "yes" : "no"}`);
+  writeLine("");
+  writeLine("| Provider | Section | Model | API key |");
+  writeLine("| --- | --- | --- | --- |");
+  for (const provider of catalog.providers) {
+    const section = resolveEnvironmentPrefix(provider);
+    const key = resolveProviderApiKey(provider, environments);
+    writeLine(`| ${provider.label} | ${section} | ${provider.model} | ${key === undefined ?
+      "missing" : "set"} |`);
+  }
+  writeLine("");
+  writeLine("Fill in each placeholder value of the environment file, then run the experiment.");
   return EXIT_SUCCESS;
 }
 
@@ -297,6 +337,7 @@ export function buildCommandLineHelp(): string {
     "  status    List the recent sessions.",
     "  report    Print one session report.",
     "  dataset   Summarize the bundled dataset.",
+    "  env       Show the environment file and the API key state.",
     "  help      Print this text.",
     "",
     "Run options:",
