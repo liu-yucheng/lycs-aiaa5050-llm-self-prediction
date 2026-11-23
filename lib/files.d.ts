@@ -90,3 +90,20 @@ export declare function packagedPath(relativePath: string): string;
  * @returns the absolute output root.
  */
 export declare function resolveOutputRoot(workspace: string, outputRoot: string): string;
+/**
+ * Resolve an input file of a workspace.
+ *
+ * A workspace copy wins over the packaged copy. The function does not create a file.
+ *
+ * @param workspace - the absolute workspace directory.
+ * @param fileName - the file name inside the inputs directory.
+ * @returns the absolute path of the file to read.
+ */
+export declare function resolveInputPath(workspace: string, fileName: string): Promise<string>;
+/**
+ * Resolve the inputs directory of a workspace.
+ *
+ * @param workspace - the absolute workspace directory.
+ * @returns the absolute inputs directory.
+ */
+export declare function resolveInputsDirectory(workspace: string): string;

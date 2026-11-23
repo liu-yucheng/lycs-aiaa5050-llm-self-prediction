@@ -57,7 +57,8 @@ export function apply(ctx: PluginContext, config?: unknown): void {
     };
   }, "llm-self-prediction tools");
   ctx.logger?.info(
-    `${PLUGIN_NAME}: the plugin is ready with output root "${outputRoot || ".outputs"}".`,
+    `${PLUGIN_NAME}: the plugin is ready with the input directory "inputs" and the output root ` +
+      `"${outputRoot || "outputs"}".`,
   );
 }
 

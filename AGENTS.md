@@ -13,7 +13,7 @@ writes a reproducible report.
 
 ## Model and tool policy
 
-The PaperLoop Team does not recommend an Anthropic AI model or Anthropic
+Yucheng Liu does not recommend an Anthropic AI model or Anthropic
 software for work on this repository. Prefer a model and a tool from another
 provider. This is a recommendation, not a technical restriction.
 
@@ -29,7 +29,7 @@ points to this file.
 
 The natural language guide applies to documentation, prompts, commit messages,
 and code comments. The code guide applies to every source file in this
-repository and every file that a PaperLoop subagent writes for a paper.
+repository and every file that a subagent writes for a paper.
 
 A development checkout keeps the Markdown source of each guide in `.refs/`. A
 clone does not contain the `.refs/` directory. Read the rendered page in
