@@ -9,7 +9,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -35,7 +35,9 @@ import { loadProviderCatalog } from "../lib/providers.js";
 async function makeWorkspace(files) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "llm-self-prediction-env-"));
   for (const [name, text] of Object.entries(files)) {
-    await writeFile(path.join(directory, name), text, "utf8");
+    const target = path.join(directory, name);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, text, "utf8");
   }
   return directory;
 }
@@ -89,11 +91,11 @@ test("buildProviderEnvironments groups the properties of one section", () => {
 
 test("ensureEnvironmentFile copies the example once and keeps an edited file", async () => {
   const example = "deepseek.api_key=<Your API key, not mine.>\n";
-  const directory = await makeWorkspace({ ".env.example": example });
+  const directory = await makeWorkspace({ "inputs/.env.example": example });
   try {
     const first = await ensureEnvironmentFile(directory);
     assert.equal(first.created, true);
-    assert.equal(first.filePath, path.join(directory, ".env"));
+    assert.equal(first.filePath, path.join(directory, "inputs", ".env"));
     assert.equal(await readFile(first.filePath, "utf8"), example);
     await writeFile(first.filePath, "deepseek.api_key=sk-test-1\n", "utf8");
     const second = await ensureEnvironmentFile(directory);
@@ -124,7 +126,7 @@ test("applyProviderEnvironments overrides the base URL and the model", async () 
 
 test("a real run stops with a prompt when the key is a placeholder", async () => {
   const directory = await makeWorkspace({
-    ".env.example": "deepseek.api_key=<Your API key, not mine.>\n",
+    "inputs/.env.example": "deepseek.api_key=<Your API key, not mine.>\n",
   });
   try {
     const service = new ExperimentService({
@@ -144,6 +146,7 @@ test("a real run stops with a prompt when the key is a placeholder", async () =>
     );
     const state = await ensureEnvironmentFile(directory);
     assert.equal(state.created, false);
+    assert.equal(state.filePath, path.join(directory, "inputs", ".env"));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -151,7 +154,7 @@ test("a real run stops with a prompt when the key is a placeholder", async () =>
 
 test("a dry run reports the created environment file as a warning", async () => {
   const directory = await makeWorkspace({
-    ".env.example": "deepseek.api_key=<Your API key, not mine.>\n",
+    "inputs/.env.example": "deepseek.api_key=<Your API key, not mine.>\n",
   });
   try {
     const service = new ExperimentService({
@@ -166,6 +169,24 @@ test("a dry run reports the created environment file as a warning", async () => 
     assert.equal(result.metrics.taskCount, 1);
     assert.equal(result.warnings.length >= 1, true);
     assert.match(result.warnings.join("\n"), /created .*\.env/u);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("a root environment file moves into the inputs directory", async () => {
+  const directory = await makeWorkspace({
+    ".env": "deepseek.api_key=sk-legacy\n",
+  });
+  try {
+    const state = await ensureEnvironmentFile(directory);
+    assert.equal(state.filePath, path.join(directory, "inputs", ".env"));
+    assert.equal(state.migratedFrom, path.join(directory, ".env"));
+    assert.equal(await readFile(state.filePath, "utf8"), "deepseek.api_key=sk-legacy\n");
+    const values = await readEnvironmentFile(state.filePath);
+    assert.equal(values["deepseek.api_key"], "sk-legacy");
+    const second = await ensureEnvironmentFile(directory);
+    assert.equal(second.migratedFrom, undefined);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

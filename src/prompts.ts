@@ -127,20 +127,23 @@ export function parseSelfPredictionArguments(argumentsValue: unknown): Probabili
   const entries: ProbabilityEntry[] = [];
   for (const rawEntry of rawEntries) {
     if (!isRecord(rawEntry)) {
-      throw new ExperimentError("INVALID_RESPONSE", "One self-prediction entry is not an object.");
+      continue;
     }
     const token = rawEntry["token"];
     const logProbability = rawEntry["logProbability"];
     if (typeof token !== "string" || token.trim() === "") {
-      throw new ExperimentError("INVALID_RESPONSE", "One self-prediction entry has no token.");
+      continue;
     }
     if (typeof logProbability !== "number" || !Number.isFinite(logProbability)) {
-      throw new ExperimentError(
-        "INVALID_RESPONSE",
-        `The entry ${JSON.stringify(token)} has no finite log probability.`,
-      );
+      continue;
     }
     entries.push({ token, logProbability });
+  }
+  if (entries.length === 0) {
+    throw new ExperimentError(
+      "INVALID_RESPONSE",
+      "Every self-prediction entry is invalid: a token and a finite log probability are required.",
+    );
   }
   return entries;
 }

@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html" aria-current="page">Overview</a>
       <a href="design.html">Design</a>
@@ -64,9 +64,11 @@ plugin_manager install_bundle target=&lt;absolute path of this package&gt;
 use lycs-aiaa5050-llm-self-prediction to run an experiment</code></pre>
   <p>A dry run needs no credential and no network.</p>
   <pre><code>node lib/cli.js run --dry-run --limit=3 --repetitions=2</code></pre>
-  <p>A real run needs an API key. The first run copies the public example file
-    <code>.env.example</code> to the private file <code>.env</code> and stops with a prompt that
-    names the keys to fill in. The command below shows the path and the state of each key:</p>
+  <p>A real run needs an API key. The workspace holds two directories: <code>inputs/</code> for the
+    private file <code>.env</code>, the example file, and optional replacements of the dataset and the
+    provider catalog, and <code>outputs/</code> for one directory of each session. The first run copies
+    the public example file to <code>inputs/.env</code> and stops with a prompt that names the keys to
+    fill in. The command below shows the path and the state of each key:</p>
   <pre><code>node lib/cli.js env</code></pre>
 
   <h2>The five tools</h2>

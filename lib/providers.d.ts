@@ -91,7 +91,7 @@ export declare function createProviderClient(definition: ProviderDefinition, tim
  * @param requestBody - the request body.
  * @returns the parsed answer.
  */
-export declare function parseProviderReply(request: PredictionRequest, raw: unknown, startedAt: number, endpoint: string, requestBody: unknown): PredictionAnswer;
+export declare function parseProviderReply(request: PredictionRequest, raw: unknown, startedAt: number, endpoint: string, requestBody: unknown, providerKey?: string): PredictionAnswer;
 /**
  * Build one deterministic probability table for the mock provider.
  *

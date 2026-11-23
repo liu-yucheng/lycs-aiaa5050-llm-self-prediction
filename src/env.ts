@@ -19,14 +19,25 @@ import {
   ENV_EXAMPLE_FILE_NAME,
   ENV_FILE_NAME,
   ENV_MODEL_PROPERTY,
+  ENV_THINKING_PROPERTY,
+  ENV_TOP_LOGPROBS_PROPERTY,
+  INPUTS_DIRECTORY_NAME,
 } from "./constants.js";
-import { packagedPath, pathExists, readTextFile } from "./files.js";
+import {
+  ensureDirectory,
+  packagedPath,
+  pathExists,
+  readTextFile,
+  resolveInputsDirectory,
+} from "./files.js";
 
 /** The override values of one provider section. */
 export interface ProviderEnvironment {
   readonly baseUrl?: string;
   readonly model?: string;
   readonly apiKey?: string;
+  readonly topLogprobsCount?: number;
+  readonly thinking?: string;
 }
 
 /** The state of the environment file of one directory. */
@@ -34,6 +45,7 @@ export interface EnvironmentFileState {
   readonly directory: string;
   readonly filePath?: string;
   readonly examplePath?: string;
+  readonly migratedFrom?: string;
   readonly created: boolean;
 }
 
@@ -120,7 +132,8 @@ export async function readEnvironmentFile(
  * Group the parsed values by provider section.
  *
  * A key has the form `<prefix>.<property>`. The builder accepts the properties `base_url`,
- * `model_to_use`, and `api_key`. It ignores any other property and any key without a dot.
+ * `model_to_use`, `api_key`, `top_logprobs`, and `thinking`. It ignores any other property and any
+ * key without a dot.
  *
  * @param values - the parsed values of one environment file.
  * @returns the section values in file order.
@@ -146,6 +159,16 @@ export function buildProviderEnvironments(
       environments.set(prefix, { ...current, model: value });
     } else if (property === ENV_API_KEY_PROPERTY) {
       environments.set(prefix, { ...current, apiKey: value });
+    } else if (property === ENV_TOP_LOGPROBS_PROPERTY) {
+      const count = Number.parseInt(value.trim(), 10);
+      if (Number.isInteger(count) && count >= 1 && count <= 64) {
+        environments.set(prefix, { ...current, topLogprobsCount: count });
+      }
+    } else if (property === ENV_THINKING_PROPERTY) {
+      const thinking = value.trim().toLowerCase();
+      if (thinking !== "") {
+        environments.set(prefix, { ...current, thinking });
+      }
     }
   }
   return environments;
@@ -173,8 +196,9 @@ export function describeEnvironmentKey(prefix: string, property: string): string
  * @returns the state of the environment file.
  */
 export async function ensureEnvironmentFile(
-  directory: string,
+  workspace: string,
 ): Promise<EnvironmentFileState> {
+  const directory = resolveInputsDirectory(workspace);
   const filePath = path.join(directory, ENV_FILE_NAME);
   const examplePath = path.join(directory, ENV_EXAMPLE_FILE_NAME);
   if (await pathExists(filePath)) {
@@ -186,11 +210,21 @@ export async function ensureEnvironmentFile(
       created: false,
     };
   }
+  const legacyPath = path.join(workspace, ENV_FILE_NAME);
+  if (await pathExists(legacyPath)) {
+    await ensureDirectory(directory);
+    const text = await readTextFile(legacyPath);
+    const body = text.endsWith("\n") ? text : `${text}\n`;
+    await writeFile(filePath, body, { encoding: "utf8", mode: 0o600 });
+    return { directory, filePath, created: false, migratedFrom: legacyPath };
+  }
   if (await pathExists(examplePath)) {
+    await ensureDirectory(directory);
     return copyExample(directory, examplePath);
   }
-  const packagedExample = packagedPath(ENV_EXAMPLE_FILE_NAME);
+  const packagedExample = packagedPath(path.join(INPUTS_DIRECTORY_NAME, ENV_EXAMPLE_FILE_NAME));
   if (await pathExists(packagedExample)) {
+    await ensureDirectory(directory);
     return copyExample(directory, packagedExample);
   }
   return { directory, created: false };

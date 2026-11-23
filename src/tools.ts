@@ -604,7 +604,8 @@ export function buildHelpText(): string {
     "Each session directory holds `session.json`, `tasks.json`, `metrics.json`, `report.md`,",
     "`summary.csv`, `tasks.csv`, `raw/`, and `records/`. The plugin never edits a raw reply.",
     "",
-    `The actual request uses top ${TOP_LOGPROBS_COUNT} log probabilities.`,
+    `The actual request uses top ${TOP_LOGPROBS_COUNT} log probabilities unless a provider ` +
+      `section or the run argument sets a smaller support.`,
   ].join("\n");
 }
 
@@ -625,6 +626,7 @@ export function buildRunRequest(args: unknown): RunRequest {
     outputDirectory: readOptionalString(record["outputDirectory"], "outputDirectory"),
     randomSeed: readOptionalInteger(record["seed"], "seed"),
     maxConcurrency: readOptionalInteger(record["maxConcurrency"], "maxConcurrency"),
+    topLogprobsCount: readOptionalInteger(record["topLogprobs"], "topLogprobs"),
     dryRun: record["dryRun"] === true,
   };
   return request;

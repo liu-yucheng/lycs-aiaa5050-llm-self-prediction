@@ -1,4 +1,4 @@
-# Copyright (C) 2026 The PaperLoop Team. Released under GNU AGPL 3.0 License.
+# Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
 # GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt .
 
 # [ Begin custom .gitignore . ]
@@ -10,6 +10,9 @@
 # The private environment file stays local. The example file is public.
 **/.env
 !**/.env.example
+
+# The session outputs stay local.
+outputs/
 
 # VSCode custom configs.
 **/.vscode/

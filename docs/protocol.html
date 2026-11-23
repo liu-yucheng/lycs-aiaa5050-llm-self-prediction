@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -50,12 +50,18 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
   ],
   "max_tokens": 1,
   "logprobs": true,
-  "top_logprobs": 64,
+  "top_logprobs": 5,
   "stream": false
 }</code></pre>
   <p>The reply table comes from <code>choices[0].logprobs.content[0].top_logprobs</code>. Each entry
     holds a <code>token</code> and a <code>logprob</code> in nats. A provider that omits the table is
     an invalid response.</p>
+  <p>The value of <code>top_logprobs</code> is the support size of the provider: 64 by default, a
+    catalog value, a <code>&lt;prefix&gt;.top_logprobs</code> value, or the run argument. An endpoint
+    that caps the value rejects a larger one with an HTTP 400 error.</p>
+  <p>A request to a reasoning provider adds <code>"thinking": {"type": "&lt;level&gt;"}</code>. The
+    level <code>disabled</code> lets the provider accept a forced tool choice, because a thinking
+    provider refuses one.</p>
 
   <h2>3. Self-prediction request</h2>
   <pre><code>{
@@ -193,8 +199,11 @@ authorization: Bearer $PROVIDER_API_KEY</code></pre>
   </table>
 
   <h2>7. Environment file</h2>
-  <p>The private file <code>.env</code> sits in the workspace, and the public file
-    <code>.env.example</code> ships with the plugin. Both use one section for each provider:</p>
+  <p>The private file <code>.env</code> sits in the <code>inputs/</code> directory of the workspace,
+    and the public file <code>.env.example</code> ships with the plugin. Both use one section for each
+    provider:</p>
+  <p>A run copies an old <code>.env</code> of the workspace root to <code>inputs/.env</code> and reports
+    that copy in the warnings. The old file stays in place.</p>
   <pre><code>deepseek.base_url=https://api.deepseek.com
 deepseek.api_key=&lt;Your API key, not mine.&gt;
 deepseek.model_to_use=deepseek-flash</code></pre>

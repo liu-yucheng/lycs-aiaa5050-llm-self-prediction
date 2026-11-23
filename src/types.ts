@@ -33,6 +33,8 @@ export interface ProviderDefinition {
   readonly model: string;
   readonly apiKeyEnvironmentVariable: string;
   readonly environmentPrefix?: string;
+  readonly topLogprobsCount?: number;
+  readonly thinking?: string;
   readonly enabled: boolean;
 }
 
