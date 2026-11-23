@@ -10,6 +10,7 @@ export interface RunRequest {
     readonly outputDirectory?: string;
     readonly randomSeed?: number;
     readonly maxConcurrency?: number;
+    readonly topLogprobsCount?: number;
     readonly dryRun?: boolean;
 }
 /** The status of one session. */

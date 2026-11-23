@@ -11,12 +11,14 @@
 import { pathToFileURL } from "node:url";
 
 import { loadDataset } from "./dataset.js";
+import { DATASET_FILE_NAME, PROVIDER_FILE_NAME } from "./constants.js";
 import {
   DEFAULT_RANDOM_SEED,
   DEFAULT_REPETITION_COUNT,
   DEFAULT_TOLERANCE_NATS,
 } from "./constants.js";
 import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
+import { resolveInputPath } from "./files.js";
 import { ExperimentError, errorMessage } from "./errors.js";
 import { ExperimentService } from "./experiment.js";
 import {
@@ -105,6 +107,7 @@ async function runExperimentCommand(
     toleranceNats: readNumberOption(options, "tolerance", DEFAULT_TOLERANCE_NATS),
     outputDirectory: options.values.get("output") ?? "",
     randomSeed: readIntegerOption(options, "seed", DEFAULT_RANDOM_SEED),
+    topLogprobsCount: readOptionalIntegerOption(options, "top-logprobs"),
     dryRun: options.flags.has("dry-run"),
   };
   const result = await service.run(undefined, request, new AbortController().signal);
@@ -192,7 +195,8 @@ async function showEnvironmentCommand(): Promise<number> {
   const state = await ensureEnvironmentFile(workspace);
   const values = state.filePath === undefined ? {} : await readEnvironmentFile(state.filePath);
   const environments = buildProviderEnvironments(values);
-  const catalog = applyProviderEnvironments(await loadProviderCatalog(), environments);
+  const providerPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
+  const catalog = applyProviderEnvironments(await loadProviderCatalog(providerPath), environments);
   writeLine(`Environment file: ${state.filePath ?? "absent"}`);
   writeLine(`Example file: ${state.examplePath ?? "absent"}`);
   writeLine(`Created by this command: ${state.created ? "yes" : "no"}`);
@@ -218,7 +222,8 @@ async function showEnvironmentCommand(): Promise<number> {
  */
 async function showDatasetCommand(options: OptionSet): Promise<number> {
   const sample = Math.max(0, readIntegerOption(options, "sample", 8));
-  const dataset = await loadDataset();
+  const datasetPath = await resolveInputPath(process.cwd(), DATASET_FILE_NAME);
+  const dataset = await loadDataset(datasetPath);
   const categories = new Map<string, number>();
   for (const task of dataset.tasks) {
     categories.set(task.category, (categories.get(task.category) ?? 0) + 1);
@@ -304,6 +309,23 @@ function readIntegerOption(options: OptionSet, name: string, fallback: number): 
 }
 
 /**
+ * Read one optional integer option.
+ *
+ * @param options - the parsed options.
+ * @param name - the option name.
+ * @returns the integer, or undefined when the option is absent.
+ */
+function readOptionalIntegerOption(
+  options: OptionSet,
+  name: string,
+): number | undefined {
+  if (!options.values.has(name)) {
+    return undefined;
+  }
+  return readIntegerOption(options, name, 0);
+}
+
+/**
  * Read one number option.
  *
  * @param options - the parsed options.
@@ -346,9 +368,11 @@ export function buildCommandLineHelp(): string {
     "  --limit=N           The maximum task count. The default is 0, which selects every task.",
     `  --repetitions=N     The repetition count of each mode. The default is ${DEFAULT_REPETITION_COUNT}.`,
     "  --tolerance=X       The separation tolerance in nats. The default is 0.05.",
-    "  --output=DIR        The output root. The default is .outputs in the workspace.",
+    "  --output=DIR        The output root. The default is outputs in the workspace.",
     "  --seed=N            The random seed. The default is 20260815.",
     "  --concurrency=N     The maximum count of concurrent jobs.",
+    "  --top-logprobs=N    The support size of both modes, from 1 to 64.",
+    "                      The default is the provider section value, else 64.",
     "  --dry-run           Use the mock provider and no network access.",
     "",
     "Status options: --limit=N",

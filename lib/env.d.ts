@@ -3,12 +3,15 @@ export interface ProviderEnvironment {
     readonly baseUrl?: string;
     readonly model?: string;
     readonly apiKey?: string;
+    readonly topLogprobsCount?: number;
+    readonly thinking?: string;
 }
 /** The state of the environment file of one directory. */
 export interface EnvironmentFileState {
     readonly directory: string;
     readonly filePath?: string;
     readonly examplePath?: string;
+    readonly migratedFrom?: string;
     readonly created: boolean;
 }
 /**
@@ -41,7 +44,8 @@ export declare function readEnvironmentFile(filePath: string): Promise<Record<st
  * Group the parsed values by provider section.
  *
  * A key has the form `<prefix>.<property>`. The builder accepts the properties `base_url`,
- * `model_to_use`, and `api_key`. It ignores any other property and any key without a dot.
+ * `model_to_use`, `api_key`, `top_logprobs`, and `thinking`. It ignores any other property and any
+ * key without a dot.
  *
  * @param values - the parsed values of one environment file.
  * @returns the section values in file order.
@@ -65,4 +69,4 @@ export declare function describeEnvironmentKey(prefix: string, property: string)
  * @param directory - the directory that holds the experiment.
  * @returns the state of the environment file.
  */
-export declare function ensureEnvironmentFile(directory: string): Promise<EnvironmentFileState>;
+export declare function ensureEnvironmentFile(workspace: string): Promise<EnvironmentFileState>;

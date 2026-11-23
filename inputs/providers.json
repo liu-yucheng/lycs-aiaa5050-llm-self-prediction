@@ -9,7 +9,9 @@
       "model": "deepseek-chat",
       "apiKeyEnvironmentVariable": "DEEPSEEK_API_KEY",
       "enabled": true,
-      "environmentPrefix": "deepseek"
+      "environmentPrefix": "deepseek",
+      "topLogprobsCount": 20,
+      "thinking": "disabled"
     },
     {
       "key": "qwen",
@@ -18,7 +20,9 @@
       "model": "qwen-flash",
       "apiKeyEnvironmentVariable": "DASHSCOPE_API_KEY",
       "enabled": true,
-      "environmentPrefix": "qwen"
+      "environmentPrefix": "qwen",
+      "topLogprobsCount": 5,
+      "thinking": "disabled"
     },
     {
       "key": "glm",
@@ -27,7 +31,8 @@
       "model": "glm-4.5-flash",
       "apiKeyEnvironmentVariable": "ZHIPU_API_KEY",
       "enabled": true,
-      "environmentPrefix": "zhipu"
+      "environmentPrefix": "zhipu",
+      "topLogprobsCount": 5
     },
     {
       "key": "mock",

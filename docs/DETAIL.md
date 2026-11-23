@@ -58,7 +58,10 @@ the reference token.
 
 ### 4.1 Actual prediction
 
-The request sets `max_tokens` to 1, `logprobs` to true, and `top_logprobs` to 64.
+The request sets `max_tokens` to 1, `logprobs` to true, and `top_logprobs` to the support size of
+the provider. A provider section sets the size with `<prefix>.top_logprobs`, and a run sets one size
+for every provider with the `topLogprobs` argument. The default is 64, which the catalog value
+reduces for an endpoint with a lower cap.
 The system message asks for one next word, and the user message gives the prefix.
 The reply table is `choices[0].logprobs.content[0].top_logprobs`.
 
@@ -66,8 +69,12 @@ The reply table is `choices[0].logprobs.content[0].top_logprobs`.
 
 The request adds one tool, `submit_next_token_log_probabilities`, and it forces that tool with
 `tool_choice`.
-The tool takes one list of at most 64 entries, and each entry holds a token and a natural-log
-probability.
+The tool takes one list of entries of the same support size, and each entry holds a token and a
+natural-log probability.
+A section value of `<prefix>.thinking=disabled` turns thinking off, because a reasoning model
+refuses a forced tool choice while it thinks.
+An entry without a token or without a finite log probability is dropped, and the answer fails only
+when every entry is invalid.
 The prompt names the prefix, the token count, and the rule that the probabilities sum to one.
 The plugin reads the arguments of the first tool call.
 A text reply that holds the same JSON object is also accepted, and the raw reply keeps both forms.
@@ -178,8 +185,13 @@ seed.
 
 ## 13. Environment file and API keys
 
-The plugin reads the private file `.env` in the workspace. The public file `.env.example` ships with
-the plugin and holds one section for each provider. A section has three properties:
+The workspace keeps two directories. `inputs/` holds the private file `.env`, the public file
+`.env.example`, and optional replacements of the dataset and the provider catalog. `outputs/` holds
+one directory for each session. The plugin reads `inputs/.env` first, and the packaged file is the
+fallback. A workspace file wins over the packaged file of the same name.
+
+The public file `.env.example` ships with the plugin and holds one section for each provider.
+A section has three properties:
 
 - `base_url` overrides the base URL of the provider catalog.
 - `model_to_use` overrides the model name of the provider catalog.
@@ -193,6 +205,10 @@ prompt that names the keys to fill in. A process environment variable is the fal
 that already exports a key needs no file. A value between angle brackets is a placeholder, and the
 run treats it as an absent key. The plugin writes no key to a session file, and `.gitignore` keeps
 the private file out of the repository.
+
+A run copies an old `.env` of the workspace root to `inputs/.env` and reports that copy in the
+warnings. The old file stays in place, because the plugin does not move a file that holds a
+credential.
 
 The command `node lib/cli.js env` prints the path of each file and the state of each key, without
 printing a key.
@@ -212,7 +228,7 @@ The test suite covers the probability measures against known values, the dataset
 mock session with its files, the verdict at two tolerances, the tool definitions, the prompt and
 tool-argument parsers, the plugin entry point, and the HTTP client against a local server.
 
-The suite runs 31 tests.
+The suite runs 34 tests.
 The environment tests cover the parser, the sections, the copy of the example, and the prompt of a
 missing key.
 The entry-point test calls `apply` with a stub host context and runs the registered run tool.
