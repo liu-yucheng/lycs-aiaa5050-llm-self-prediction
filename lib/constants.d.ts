@@ -6,7 +6,7 @@
 /** The Cordis plugin name and the npm package name. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The plugin version. Keep it equal to the version in `package.json`. */
-export declare const PLUGIN_VERSION = "0.3.0";
+export declare const PLUGIN_VERSION = "0.3.1";
 /** The host tool names. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 export declare const TOOL_STATUS = "llm_self_prediction_status";
@@ -23,8 +23,10 @@ export declare const DEFAULT_REPETITION_COUNT = 4;
 export declare const PROBABILITY_FLOOR = 1e-12;
 /** The default tolerance in nats for the "indistinguishable" verdict. */
 export declare const DEFAULT_TOLERANCE_NATS = 0.05;
+/** The name of the directory that holds the inputs of a workspace. */
+export declare const INPUTS_DIRECTORY_NAME = "inputs";
 /** The default name of the output directory below the workspace. */
-export declare const DEFAULT_OUTPUT_DIRECTORY_NAME = ".outputs";
+export declare const DEFAULT_OUTPUT_DIRECTORY_NAME = "outputs";
 /** The file name of the bundled dataset. */
 export declare const DATASET_FILE_NAME = "dataset-zh-128.json";
 /** The file name of the bundled provider catalog. */
@@ -37,6 +39,9 @@ export declare const ENV_EXAMPLE_FILE_NAME = ".env.example";
 export declare const ENV_BASE_URL_PROPERTY = "base_url";
 export declare const ENV_API_KEY_PROPERTY = "api_key";
 export declare const ENV_MODEL_PROPERTY = "model_to_use";
+/** The property names of the optional request tuning of one provider section. */
+export declare const ENV_TOP_LOGPROBS_PROPERTY = "top_logprobs";
+export declare const ENV_THINKING_PROPERTY = "thinking";
 /** The default number of concurrent prediction calls. */
 export declare const DEFAULT_MAX_CONCURRENCY = 3;
 /** The default number of bootstrap resamples of a confidence interval. */

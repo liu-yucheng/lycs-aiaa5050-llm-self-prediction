@@ -43,7 +43,7 @@ Each page covers one part of the experiment:
 
 - DeepSeek Harness 0.2.0 or later.
 - Node.js 20.11 or later.
-- The private file `.env` with one API key for each provider that the run uses.
+- The private file `inputs/.env` with one API key for each provider that the run uses.
   The mock provider needs no key.
 
 ## Install
@@ -59,10 +59,24 @@ The row accepts two settings:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `outputRoot` | empty | The output root. An empty value uses `.outputs` in the workspace. |
+| `outputRoot` | empty | The output root. An empty value uses `outputs` in the workspace. |
 | `maxConcurrency` | 3 | The maximum count of concurrent task jobs. |
 
 A change of the source needs `npm run build` and a host restart, because the host keeps the module that it loaded.
+
+## Workspace layout
+
+Every path stays inside one of two directories of the workspace:
+
+| Directory | Content |
+| --- | --- |
+| `inputs/` | The private `.env`, the example `.env.example`, and optional dataset or provider files. |
+| `outputs/` | One directory for each session, named by the session code. |
+
+A run reads `inputs/.env` first, then `inputs/dataset-zh-128.json`, and then `inputs/providers.json`.
+A file that `inputs/` does not hold comes from the package.
+The first run copies the packaged `.env.example` to `inputs/.env` and stops with the credential prompt.
+A run also copies an old `.env` of the workspace root to `inputs/.env`, and it reports that copy.
 
 ## Run in DeepSeek Harness
 
@@ -95,7 +109,7 @@ node lib/cli.js dataset --sample=8
 node lib/cli.js env
 ```
 
-The command line writes below `.outputs` in the current directory unless `--output` names another
+The command line writes below `outputs` in the current directory unless `--output` names another
 root.
 
 ## Dataset
@@ -107,8 +121,8 @@ The dataset is read-only during a run.
 
 ## Credentials
 
-The plugin reads the private file `.env` in the workspace.
-The public file `.env.example` ships with the plugin and holds one section for each provider:
+The plugin reads the private file `inputs/.env` in the workspace.
+The public file `inputs/.env.example` ships with the plugin and holds one section for each provider:
 
 ```text
 deepseek.base_url=https://api.deepseek.com
@@ -119,8 +133,8 @@ deepseek.model_to_use=deepseek-flash
 A section overrides the base URL and the model of the catalog, and it carries the API key.
 A property that the section omits keeps the value of `inputs/providers.json`.
 
-When `.env` is absent, the first run copies `.env.example` to `.env` and stops with a prompt that
-names the keys to fill in. A process environment variable is the fallback, so a shell that already
+When `inputs/.env` is absent, the first run copies `inputs/.env.example` to `inputs/.env` and stops
+with a prompt that names the keys to fill in. A process environment variable is the fallback, so a shell that already
 exports `DEEPSEEK_API_KEY` needs no file. The plugin never writes a key to a session file, and
 `.gitignore` keeps `.env` out of the repository.
 
@@ -139,9 +153,18 @@ Each provider uses an OpenAI-compatible chat-completions endpoint.
 | `glm` | `glm-4.5-flash` | `zhipu` |
 | `mock` | `mock-flash` | none |
 
-The actual request sets `logprobs` and `top_logprobs` to 64.
-The self request forces the tool `submit_next_token_log_probabilities` with one entry list of at
-most 64 token and log-probability pairs.
+The actual request sets `logprobs` to true and `top_logprobs` to the support size of the provider.
+The self request forces the tool `submit_next_token_log_probabilities` with one entry list of that
+same size.
+
+An endpoint caps `top_logprobs`, so each provider declares its own size in `inputs/providers.json`.
+A `.env` section sets it with `<prefix>.top_logprobs`, and a run sets one size for every provider
+with the `topLogprobs` argument or the `--top-logprobs` option. The plugin rejects a value that is
+not an integer from 1 to 64.
+
+A reasoning model refuses a forced tool choice while it thinks. A section value of
+`<prefix>.thinking=disabled` turns thinking off, and `low`, `high`, or `max` sets the effort level.
+The catalog sets `disabled` for the providers that support it.
 
 ## Output
 
@@ -151,8 +174,8 @@ Each run writes one session directory below the output root.
 | --- | --- |
 | `session.json` | The session code, the options, the providers, and the environment. |
 | `tasks.json` | The tasks of the session. |
-| `raw/` | Each provider reply, unedited. |
-| `raw/<task>-<mode>-r<n>.error.json` | The record of one failed call. |
+| `raw/` | Each provider reply, unedited, named `<provider>-<task>-<mode>-r<n>.json`. |
+| `raw/<provider>-<task>-<mode>-r<n>.error.json` | The record of one failed call. |
 | `records/<provider>-<task>.json` | The parsed answers, the pair metrics, and the warnings. |
 | `metrics.json` | The aggregate metrics and the verdict of each provider. |
 | `report.md` | The readable report. |
@@ -183,7 +206,7 @@ npm run typecheck
 npm test
 ```
 
-The test suite runs 31 tests, which cover the probability measures, the dataset rules, the
+The test suite runs 34 tests, which cover the probability measures, the dataset rules, the
 environment file, one full mock session, the tool definitions, the prompts, the plugin entry
 point, and the HTTP client of a provider against a local server.
 
@@ -193,7 +216,7 @@ point, and the HTTP client of a provider against a local server.
 - Tool versions: TypeScript 5.9.3.
 - Platform: Windows 11 x64.
 - Random seed: 20260815.
-- Plugin version: 0.3.0.
+- Plugin version: 0.3.1.
 
 ## Licence
 

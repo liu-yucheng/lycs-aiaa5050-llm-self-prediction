@@ -23,6 +23,7 @@ import {
   TOP_LOGPROBS_COUNT,
 } from "./constants.js";
 import { computeDatasetHash, loadDataset, selectTasks } from "./dataset.js";
+import { DATASET_FILE_NAME, PROVIDER_FILE_NAME } from "./constants.js";
 import type { Agent, Logger } from "./dsh.js";
 import type { EnvironmentFileState, ProviderEnvironment } from "./env.js";
 import {
@@ -39,6 +40,7 @@ import {
   listChildDirectories,
   readJsonFile,
   readTextFile,
+  resolveInputPath,
   resolveOutputRoot,
   safeFileSegment,
   writeJsonFile,
@@ -78,6 +80,7 @@ export interface RunRequest {
   readonly outputDirectory?: string;
   readonly randomSeed?: number;
   readonly maxConcurrency?: number;
+  readonly topLogprobsCount?: number;
   readonly dryRun?: boolean;
 }
 
@@ -146,14 +149,16 @@ export class ExperimentService {
       workspace,
       requestedRoot === "" ? this.options.outputRoot() : requestedRoot,
     );
-    const dataset = await loadDataset();
+    const datasetPath = await resolveInputPath(workspace, DATASET_FILE_NAME);
+    const dataset = await loadDataset(datasetPath);
     const environmentState = await ensureEnvironmentFile(workspace);
     const environmentValues =
       environmentState.filePath === undefined
         ? {}
         : await readEnvironmentFile(environmentState.filePath);
     const environments = buildProviderEnvironments(environmentValues);
-    const catalog = applyProviderEnvironments(await loadProviderCatalog(), environments);
+    const providerPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
+    const catalog = applyProviderEnvironments(await loadProviderCatalog(providerPath), environments);
     const dryRun = request.dryRun === true;
     const requestedKeys = dryRun ? [dryRunProviderKey(catalog)] : (request.providerKeys ?? []);
     const repetitionCount = clampInteger(
@@ -173,6 +178,12 @@ export class ExperimentService {
     }
     const setupWarnings = checkProviderCredentials(providers, environments, environmentState,
       dryRun);
+    if (environmentState.migratedFrom !== undefined) {
+      setupWarnings.push(
+        `The run copied the old environment file ${environmentState.migratedFrom} to ` +
+          `${environmentState.filePath ?? ""}. The inputs directory is the new home.`,
+      );
+    }
     const clients: ProviderClient[] = providers.map((provider) =>
       createProviderClient(provider, undefined, resolveProviderApiKey(provider, environments)),
     );
@@ -184,6 +195,10 @@ export class ExperimentService {
       16,
       "maxConcurrency",
     );
+    const supportCount = clampEntryCount(
+      request.topLogprobsCount ??
+        Math.max(...providers.map((provider) => provider.topLogprobsCount ?? TOP_LOGPROBS_COUNT)),
+    );
     const options: RunOptions = {
       providerKeys: providers.map((provider) => provider.key),
       taskIds: tasks.map((task) => task.id),
@@ -192,7 +207,7 @@ export class ExperimentService {
       outputDirectory: outputRoot,
       randomSeed,
       maxConcurrency,
-      topLogprobsCount: TOP_LOGPROBS_COUNT,
+      topLogprobsCount: supportCount,
       dryRun,
     };
     const sessionCode = createSessionCode(startedAt, randomSeed);
@@ -233,6 +248,7 @@ export class ExperimentService {
         clients,
         repetitionCount,
         maxConcurrency,
+        supportCount,
         signal,
       );
       const generatedAt = new Date().toISOString();
@@ -242,7 +258,7 @@ export class ExperimentService {
         records,
         toleranceNats,
         repetitionCount,
-        topLogprobsCount: TOP_LOGPROBS_COUNT,
+        topLogprobsCount: supportCount,
         randomSeed,
         generatedAt,
         taskCount: tasks.length,
@@ -315,6 +331,7 @@ export class ExperimentService {
     clients: readonly ProviderClient[],
     repetitionCount: number,
     maxConcurrency: number,
+    supportCount: number,
     signal: AbortSignal,
   ): Promise<TaskRecord[]> {
     interface Job {
@@ -339,7 +356,13 @@ export class ExperimentService {
         }
         const job = jobs[index] as Job;
         signal.throwIfAborted();
-        const record = await this.runOneTask(directory, job.task, job.client, repetitionCount);
+        const record = await this.runOneTask(
+          directory,
+          job.task,
+          job.client,
+          repetitionCount,
+          supportCount,
+        );
         records[index] = record;
         completed += 1;
         if (completed % 16 === 0 || completed === jobs.length) {
@@ -371,6 +394,7 @@ export class ExperimentService {
     task: Task,
     client: ProviderClient,
     repetitionCount: number,
+    supportCount: number,
   ): Promise<TaskRecord> {
     const actual: PredictionAnswer[] = [];
     const self: PredictionAnswer[] = [];
@@ -379,7 +403,7 @@ export class ExperimentService {
       for (const mode of ["actual", "self"] as const) {
         try {
           const answer = await client.predict(
-            { mode, task, repetition, topLogprobsCount: TOP_LOGPROBS_COUNT },
+            { mode, task, repetition, topLogprobsCount: supportCount },
             new AbortController().signal,
           );
           const target = path.join(directory, "raw", safeFileSegment(answer.rawFileName));
@@ -393,7 +417,11 @@ export class ExperimentService {
           const message = `${mode} r${repetition}: ${errorMessage(error)}`;
           errors.push(message);
           await writeJsonFile(
-            path.join(directory, "raw", `${task.id}-${mode}-r${repetition}.error.json`),
+            path.join(
+              directory,
+              "raw",
+              `${client.definition.key}-${task.id}-${mode}-r${repetition}.error.json`,
+            ),
             { taskId: task.id, mode, repetition, error: errorMessage(error) },
           );
         }
@@ -512,7 +540,9 @@ export class ExperimentService {
    * @returns the dataset summary.
    */
   public async datasetSummary(): Promise<DatasetSummary> {
-    const dataset: Dataset = await loadDataset();
+    const workspace = await this.options.resolveWorkspace(undefined, new AbortController().signal);
+    const datasetPath = await resolveInputPath(workspace, DATASET_FILE_NAME);
+    const dataset: Dataset = await loadDataset(datasetPath);
     const categories: Record<string, number> = {};
     for (const task of dataset.tasks) {
       categories[task.category] = (categories[task.category] ?? 0) + 1;

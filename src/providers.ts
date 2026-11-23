@@ -109,6 +109,9 @@ function validateProvider(value: unknown): ProviderDefinition {
   const enabled = value["enabled"];
   const environmentPrefix = value["environmentPrefix"];
   const prefix = typeof environmentPrefix === "string" ? environmentPrefix.trim() : "";
+  const topLogprobsCount = value["topLogprobsCount"];
+  const thinking = value["thinking"];
+  const thinkingValue = typeof thinking === "string" ? thinking.trim() : "";
   return {
     key: parts["key"] as string,
     label: parts["label"] as string,
@@ -116,6 +119,12 @@ function validateProvider(value: unknown): ProviderDefinition {
     model: parts["model"] as string,
     apiKeyEnvironmentVariable: parts["apiKeyEnvironmentVariable"] as string,
     environmentPrefix: prefix === "" ? undefined : prefix,
+    topLogprobsCount:
+      typeof topLogprobsCount === "number" && Number.isInteger(topLogprobsCount) &&
+      topLogprobsCount >= 1 && topLogprobsCount <= 64
+        ? topLogprobsCount
+        : undefined,
+    thinking: thinkingValue === "" ? undefined : thinkingValue,
     enabled: enabled !== false,
   };
 }
@@ -237,6 +246,11 @@ export function applyProviderEnvironments(
       ...definition,
       baseUrl: baseUrl === "" ? definition.baseUrl : baseUrl,
       model: model === "" ? definition.model : model,
+      topLogprobsCount: section.topLogprobsCount ?? definition.topLogprobsCount,
+      thinking:
+        section.thinking === undefined || section.thinking.trim() === ""
+          ? definition.thinking
+          : section.thinking,
     };
   });
   return { ...catalog, providers };
@@ -289,6 +303,7 @@ function buildAnswer(
   startedAt: number,
   endpoint: string,
   requestBody: unknown,
+  providerKey?: string,
 ): PredictionAnswer {
   const elapsedMilliseconds = Date.now() - startedAt;
   const distribution = buildDistribution(entries);
@@ -300,7 +315,9 @@ function buildAnswer(
     token,
     distribution,
     raw,
-    rawFileName: `${request.task.id}-${request.mode}-r${request.repetition}.json`,
+    rawFileName: `${providerKey === undefined ? "" : `${providerKey}-`}${request.task.id}-${
+      request.mode
+    }-r${request.repetition}.json`,
     endpoint,
     requestBody,
   };
@@ -352,13 +369,13 @@ class OpenAiCompatibleClient implements ProviderClient {
         : this.buildSelfBody(request);
     const startedAt = Date.now();
     const raw = await this.post(endpoint, body, signal);
-    return parseProviderReply(request, raw, startedAt, endpoint, body);
+    return parseProviderReply(request, raw, startedAt, endpoint, body, this.definition.key);
   }
 
   /** Build the body of one actual-prediction request. */
   private buildActualBody(request: PredictionRequest): Record<string, unknown> {
     const prompt = buildActualPredictionPrompt(request.task);
-    return {
+    const body: Record<string, unknown> = {
       model: this.definition.model,
       messages: [
         { role: "system", content: prompt.system },
@@ -369,13 +386,30 @@ class OpenAiCompatibleClient implements ProviderClient {
       top_logprobs: request.topLogprobsCount,
       stream: false,
     };
+    this.applyThinking(body);
+    return body;
+  }
+
+  /**
+   * Merge the thinking parameter of the provider into a request body.
+   *
+   * A provider that thinks by default rejects a forced tool choice. A section value of `disabled`
+   * turns thinking off, and a value of `low`, `high`, or `max` sets the effort level.
+   *
+   * @param body - the request body to extend in place.
+   */
+  private applyThinking(body: Record<string, unknown>): void {
+    const thinking = this.definition.thinking?.trim() ?? "";
+    if (thinking !== "") {
+      body["thinking"] = { type: thinking };
+    }
   }
 
   /** Build the body of one self-prediction request with the forced tool. */
   private buildSelfBody(request: PredictionRequest): Record<string, unknown> {
     const prompt = buildSelfPredictionPrompt(request.task, request.topLogprobsCount);
     const tool = buildSelfPredictionTool(request.topLogprobsCount);
-    return {
+    const body: Record<string, unknown> = {
       model: this.definition.model,
       messages: [
         { role: "system", content: prompt.system },
@@ -386,6 +420,8 @@ class OpenAiCompatibleClient implements ProviderClient {
       max_tokens: 2048,
       stream: false,
     };
+    this.applyThinking(body);
+    return body;
   }
 
   /** Send one HTTP request and read the JSON reply. */
@@ -447,6 +483,7 @@ export function parseProviderReply(
   startedAt: number,
   endpoint: string,
   requestBody: unknown,
+  providerKey?: string,
 ): PredictionAnswer {
   if (!isRecord(raw)) {
     throw new ExperimentError("INVALID_RESPONSE", "The provider reply is not a JSON object.");
@@ -459,11 +496,20 @@ export function parseProviderReply(
   if (request.mode === "actual") {
     const entries = readLogprobEntries(choice);
     const token = readLogprobToken(choice);
-    return buildAnswer(request, entries, token, raw, startedAt, endpoint, requestBody);
+    return buildAnswer(request, entries, token, raw, startedAt, endpoint, requestBody, providerKey);
   }
   const entries = readSelfPredictionEntries(choice);
   const distribution = buildDistribution(entries);
-  return buildAnswer(request, entries, distribution.topToken, raw, startedAt, endpoint, requestBody);
+  return buildAnswer(
+    request,
+    entries,
+    distribution.topToken,
+    raw,
+    startedAt,
+    endpoint,
+    requestBody,
+    providerKey,
+  );
 }
 
 /**
@@ -619,6 +665,7 @@ class MockProviderClient implements ProviderClient {
       startedAt,
       "mock://local/chat/completions",
       { mode: request.mode, taskId: request.task.id, repetition: request.repetition },
+      this.definition.key,
     );
     if (held !== request.topLogprobsCount) {
       return { ...answer, warning: `The mock table holds ${held} entries.` };

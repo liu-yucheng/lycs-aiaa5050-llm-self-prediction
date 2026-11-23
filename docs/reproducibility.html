@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.3.1</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -100,7 +100,7 @@
       <tr><th>Item</th><th>Value</th></tr>
     </thead>
     <tbody>
-      <tr><td>Plugin version</td><td>0.3.0</td></tr>
+      <tr><td>Plugin version</td><td>0.3.1</td></tr>
       <tr><td>Node.js of the command line</td><td>26.13.0</td></tr>
       <tr><td>Node.js of the harness host</td><td>24.21.0</td></tr>
       <tr><td>TypeScript</td><td>5.9.3</td></tr>
@@ -126,7 +126,7 @@
   </ul>
 
   <h2>6. Tests</h2>
-  <p>The test suite runs 31 tests with the Node.js test runner:</p>
+  <p>The test suite runs 34 tests with the Node.js test runner:</p>
   <table>
     <thead>
       <tr><th>File</th><th>Coverage</th></tr>
@@ -175,6 +175,12 @@ npm test</code></pre>
       <tr><th>Version</th><th>Change</th></tr>
     </thead>
     <tbody>
+      <tr>
+        <td>0.3.1</td>
+        <td>The unified <code>inputs/</code> and <code>outputs/</code> layout. The environment file
+          moves to <code>inputs/</code>, an old root file is copied into it, and a session writes
+          below <code>outputs/</code>.</td>
+      </tr>
       <tr>
         <td>0.3.0</td>
         <td>The private environment file <code>.env</code> with the public example

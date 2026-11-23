@@ -13,6 +13,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DEFAULT_OUTPUT_DIRECTORY_NAME, INPUTS_DIRECTORY_NAME } from "./constants.js";
 import { ExperimentError } from "./errors.js";
 
 /**
@@ -186,7 +187,34 @@ export function packagedPath(relativePath: string): string {
  */
 export function resolveOutputRoot(workspace: string, outputRoot: string): string {
   if (outputRoot.trim() === "") {
-    return path.join(workspace, ".outputs");
+    return path.join(workspace, DEFAULT_OUTPUT_DIRECTORY_NAME);
   }
   return path.isAbsolute(outputRoot) ? outputRoot : path.join(workspace, outputRoot);
+}
+
+/**
+ * Resolve an input file of a workspace.
+ *
+ * A workspace copy wins over the packaged copy. The function does not create a file.
+ *
+ * @param workspace - the absolute workspace directory.
+ * @param fileName - the file name inside the inputs directory.
+ * @returns the absolute path of the file to read.
+ */
+export async function resolveInputPath(workspace: string, fileName: string): Promise<string> {
+  const workspacePath = path.join(workspace, INPUTS_DIRECTORY_NAME, fileName);
+  if (await pathExists(workspacePath)) {
+    return workspacePath;
+  }
+  return packagedPath(path.join(INPUTS_DIRECTORY_NAME, fileName));
+}
+
+/**
+ * Resolve the inputs directory of a workspace.
+ *
+ * @param workspace - the absolute workspace directory.
+ * @returns the absolute inputs directory.
+ */
+export function resolveInputsDirectory(workspace: string): string {
+  return path.join(workspace, INPUTS_DIRECTORY_NAME);
 }

@@ -2,7 +2,7 @@
 // GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
 
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -97,6 +97,59 @@ test("the verdict changes with the tolerance", async () => {
       new AbortController().signal,
     );
     assert.equal(strict.metrics.providers[0].verdict, "separated");
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("a run writes below the outputs directory of the workspace", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "llm-self-prediction-"));
+  try {
+    const service = createService(workspace);
+    const result = await service.run(
+      undefined,
+      { dryRun: true, limit: 1, repetitions: 1 },
+      new AbortController().signal,
+    );
+    assert.equal(
+      result.outputDirectory,
+      path.join(workspace, "outputs", result.sessionCode),
+    );
+    const entries = await readdir(path.join(workspace, "outputs"));
+    assert.deepEqual(entries, [result.sessionCode]);
+    await assert.rejects(readdir(path.join(workspace, ".outputs")));
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("a workspace inputs directory replaces the bundled dataset", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "llm-self-prediction-"));
+  try {
+    const dataset = {
+      datasetId: "workspace-override",
+      language: "zh-Hans",
+      description: "Two tasks that prove the workspace input wins.",
+      taskCount: 2,
+      tasks: [
+        { id: "W001", category: "poetry", prefix: "床前明月光", referenceToken: "，", },
+        { id: "W002", category: "daily", prefix: "今天天气", referenceToken: "好", },
+      ],
+    };
+    await mkdir(path.join(workspace, "inputs"), { recursive: true });
+    await writeFile(
+      path.join(workspace, "inputs", "dataset-zh-128.json"),
+      `${JSON.stringify(dataset, undefined, 2)}\n`,
+      "utf8",
+    );
+    const service = createService(workspace);
+    const result = await service.run(
+      undefined,
+      { dryRun: true, repetitions: 1 },
+      new AbortController().signal,
+    );
+    assert.equal(result.metrics.datasetId, "workspace-override");
+    assert.equal(result.metrics.taskCount, 2);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
