@@ -2,9 +2,11 @@
 export interface ProviderEnvironment {
     readonly baseUrl?: string;
     readonly model?: string;
+    readonly models?: readonly string[];
     readonly apiKey?: string;
     readonly topLogprobsCount?: number;
     readonly thinking?: string;
+    readonly reasoning?: string;
 }
 /** The state of the environment file of one directory. */
 export interface EnvironmentFileState {

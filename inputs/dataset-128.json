@@ -1,0 +1,908 @@
+{
+  "datasetId": "llm-self-prediction-zh64-en64-v2",
+  "language": "zh-Hans, en-US",
+  "languages": [
+    "zh-Hans",
+    "en-US"
+  ],
+  "description": "One hundred twenty-eight next-token tasks: 64 Simplified Chinese and 64 US English sentences, eight per category in each language. Each task gives the text before the target position and a human reference token. The reference token is a sanity label; it does not enter a metric.",
+  "taskCount": 128,
+  "tasks": [
+    {
+      "id": "Z001",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "床前明月光，疑是地上",
+      "referenceToken": "霜"
+    },
+    {
+      "id": "Z002",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "白日依山尽，黄河入海",
+      "referenceToken": "流"
+    },
+    {
+      "id": "Z003",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "春眠不觉晓，处处闻啼",
+      "referenceToken": "鸟"
+    },
+    {
+      "id": "Z004",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "举头望明月，低头思故",
+      "referenceToken": "乡"
+    },
+    {
+      "id": "Z005",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "锄禾日当午，汗滴禾下",
+      "referenceToken": "土"
+    },
+    {
+      "id": "Z006",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "两个黄鹂鸣翠柳，一行白鹭上青",
+      "referenceToken": "天"
+    },
+    {
+      "id": "Z007",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "停车坐爱枫林晚，霜叶红于二月",
+      "referenceToken": "花"
+    },
+    {
+      "id": "Z008",
+      "language": "zh-Hans",
+      "category": "poetry",
+      "prefix": "海内存知己，天涯若比",
+      "referenceToken": "邻"
+    },
+    {
+      "id": "Z009",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "画蛇添足，多此一",
+      "referenceToken": "举"
+    },
+    {
+      "id": "Z010",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "守株待兔，不如主动出",
+      "referenceToken": "击"
+    },
+    {
+      "id": "Z011",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "亡羊补牢，为时未",
+      "referenceToken": "晚"
+    },
+    {
+      "id": "Z012",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "掩耳盗铃，自欺欺",
+      "referenceToken": "人"
+    },
+    {
+      "id": "Z013",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "井底之蛙，目光短",
+      "referenceToken": "浅"
+    },
+    {
+      "id": "Z014",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "拔苗助长，欲速则不",
+      "referenceToken": "达"
+    },
+    {
+      "id": "Z015",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "刻舟求剑，不知变",
+      "referenceToken": "通"
+    },
+    {
+      "id": "Z016",
+      "language": "zh-Hans",
+      "category": "idiom",
+      "prefix": "塞翁失马，焉知非",
+      "referenceToken": "福"
+    },
+    {
+      "id": "Z017",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "早上闹钟响了三遍，他才从床上坐",
+      "referenceToken": "起来"
+    },
+    {
+      "id": "Z018",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "地铁到站前，她提前把背包拉链拉",
+      "referenceToken": "好"
+    },
+    {
+      "id": "Z019",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "出门时天有点阴，他顺手拿了一把",
+      "referenceToken": "伞"
+    },
+    {
+      "id": "Z020",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "洗衣机响了，她起身去阳台晾",
+      "referenceToken": "衣服"
+    },
+    {
+      "id": "Z021",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "快递放在门口，他弯腰把纸箱搬进",
+      "referenceToken": "屋"
+    },
+    {
+      "id": "Z022",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "手机只剩百分之三的电，他赶紧找充电",
+      "referenceToken": "器"
+    },
+    {
+      "id": "Z023",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "钥匙落在办公室，他只好在门外等",
+      "referenceToken": "人"
+    },
+    {
+      "id": "Z024",
+      "language": "zh-Hans",
+      "category": "daily",
+      "prefix": "楼道灯坏了，他摸着扶手慢慢下",
+      "referenceToken": "楼"
+    },
+    {
+      "id": "Z025",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "锅里水开了，她把面条下进",
+      "referenceToken": "去"
+    },
+    {
+      "id": "Z026",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "早餐摊前排着队，老板熟练地摊着煎",
+      "referenceToken": "饼"
+    },
+    {
+      "id": "Z027",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "他往碗里加了一勺辣椒",
+      "referenceToken": "油"
+    },
+    {
+      "id": "Z028",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "米饭蒸好后，她掀开锅盖闻到一阵",
+      "referenceToken": "香味"
+    },
+    {
+      "id": "Z029",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "西瓜切开，露出鲜红的果",
+      "referenceToken": "肉"
+    },
+    {
+      "id": "Z030",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "汤有点淡，他又撒了一小撮",
+      "referenceToken": "盐"
+    },
+    {
+      "id": "Z031",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "烤箱叮的一声，面包烤得金黄酥",
+      "referenceToken": "脆"
+    },
+    {
+      "id": "Z032",
+      "language": "zh-Hans",
+      "category": "food",
+      "prefix": "他剥开橘子，掰下一瓣放进嘴",
+      "referenceToken": "里"
+    },
+    {
+      "id": "Z033",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "乌云压得很低，眼看就要下",
+      "referenceToken": "雨"
+    },
+    {
+      "id": "Z034",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "雪下了一夜，屋顶白茫茫一",
+      "referenceToken": "片"
+    },
+    {
+      "id": "Z035",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "太阳落山后，气温一下子降了下",
+      "referenceToken": "来"
+    },
+    {
+      "id": "Z036",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "春风吹过，河边的柳树抽出新",
+      "referenceToken": "芽"
+    },
+    {
+      "id": "Z037",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "台风过境，路边的大树被连根拔",
+      "referenceToken": "起"
+    },
+    {
+      "id": "Z038",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "雷声在头顶炸开，雨点砸在窗户",
+      "referenceToken": "上"
+    },
+    {
+      "id": "Z039",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "清晨的草地上挂满了露",
+      "referenceToken": "珠"
+    },
+    {
+      "id": "Z040",
+      "language": "zh-Hans",
+      "category": "weather",
+      "prefix": "秋天的银杏叶落了一地，像铺了层金",
+      "referenceToken": "毯"
+    },
+    {
+      "id": "Z041",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "手机系统提示更新，他点了稍后提",
+      "referenceToken": "醒"
+    },
+    {
+      "id": "Z042",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "电脑突然蓝屏，他只好长按电源键重",
+      "referenceToken": "启"
+    },
+    {
+      "id": "Z043",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "她把文件拖进共享文件夹，点了上",
+      "referenceToken": "传"
+    },
+    {
+      "id": "Z044",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "网速太慢，视频一直在缓",
+      "referenceToken": "冲"
+    },
+    {
+      "id": "Z045",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "他给路由器换了根新的网",
+      "referenceToken": "线"
+    },
+    {
+      "id": "Z046",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "代码跑完测试，终端打印出绿色的通",
+      "referenceToken": "过"
+    },
+    {
+      "id": "Z047",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "数据库连接超时，日志里全是报",
+      "referenceToken": "错"
+    },
+    {
+      "id": "Z048",
+      "language": "zh-Hans",
+      "category": "technology",
+      "prefix": "他用手机扫了二维码，页面跳转到支付",
+      "referenceToken": "页"
+    },
+    {
+      "id": "Z049",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "早高峰的地铁站里，人流排到了楼梯",
+      "referenceToken": "口"
+    },
+    {
+      "id": "Z050",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "社区贴出通知，明天上午停水两",
+      "referenceToken": "小时"
+    },
+    {
+      "id": "Z051",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "学校门口拉起了警戒线，家长在旁焦急等",
+      "referenceToken": "待"
+    },
+    {
+      "id": "Z052",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "消防车鸣着笛赶到，火势很快被控制",
+      "referenceToken": "住"
+    },
+    {
+      "id": "Z053",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "招聘会上，毕业生排着队投递简",
+      "referenceToken": "历"
+    },
+    {
+      "id": "Z054",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "医院走廊里坐满了等待叫号的病",
+      "referenceToken": "人"
+    },
+    {
+      "id": "Z055",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "志愿者把物资搬下车，挨家挨户地送",
+      "referenceToken": "到"
+    },
+    {
+      "id": "Z056",
+      "language": "zh-Hans",
+      "category": "news",
+      "prefix": "台风预警升级，沿海渔船全部回港避",
+      "referenceToken": "风"
+    },
+    {
+      "id": "Z057",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "他推开门，屋里一片漆",
+      "referenceToken": "黑"
+    },
+    {
+      "id": "Z058",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "她翻开日记本，第一页只写了一行",
+      "referenceToken": "字"
+    },
+    {
+      "id": "Z059",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "火车缓缓启动，站台上的人挥了挥",
+      "referenceToken": "手"
+    },
+    {
+      "id": "Z060",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "老人从抽屉里取出一个泛黄的信",
+      "referenceToken": "封"
+    },
+    {
+      "id": "Z061",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "小孩蹲在路边，盯着蚂蚁搬运面",
+      "referenceToken": "包屑"
+    },
+    {
+      "id": "Z062",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "他沿着小路一直走，直到看见远处的灯",
+      "referenceToken": "光"
+    },
+    {
+      "id": "Z063",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "她咬着嘴唇，半天没说出一句",
+      "referenceToken": "话"
+    },
+    {
+      "id": "Z064",
+      "language": "zh-Hans",
+      "category": "story",
+      "prefix": "雨夜里，巷子尽头的灯忽明忽",
+      "referenceToken": "暗"
+    },
+    {
+      "id": "E001",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "Roses are red, violets are",
+      "referenceToken": "blue"
+    },
+    {
+      "id": "E002",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "To be or not to",
+      "referenceToken": "be"
+    },
+    {
+      "id": "E003",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "Twinkle, twinkle, little",
+      "referenceToken": "star"
+    },
+    {
+      "id": "E004",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "Mary had a little",
+      "referenceToken": "lamb"
+    },
+    {
+      "id": "E005",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "The road not",
+      "referenceToken": "taken"
+    },
+    {
+      "id": "E006",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "Shall I compare thee to a summer's",
+      "referenceToken": "day"
+    },
+    {
+      "id": "E007",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "I wandered lonely as a",
+      "referenceToken": "cloud"
+    },
+    {
+      "id": "E008",
+      "language": "en-US",
+      "category": "poetry",
+      "prefix": "Once upon a midnight dreary, while I pondered, weak and",
+      "referenceToken": "weary"
+    },
+    {
+      "id": "E009",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "Let us break the",
+      "referenceToken": "ice"
+    },
+    {
+      "id": "E010",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "Do not spill the",
+      "referenceToken": "beans"
+    },
+    {
+      "id": "E011",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "She is under the",
+      "referenceToken": "weather"
+    },
+    {
+      "id": "E012",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "That test was a piece of",
+      "referenceToken": "cake"
+    },
+    {
+      "id": "E013",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "It happens once in a blue",
+      "referenceToken": "moon"
+    },
+    {
+      "id": "E014",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "It is raining cats and",
+      "referenceToken": "dogs"
+    },
+    {
+      "id": "E015",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "You hit the nail on the",
+      "referenceToken": "head"
+    },
+    {
+      "id": "E016",
+      "language": "en-US",
+      "category": "idiom",
+      "prefix": "He let the cat out of the",
+      "referenceToken": "bag"
+    },
+    {
+      "id": "E017",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "I brush my teeth with a",
+      "referenceToken": "toothbrush"
+    },
+    {
+      "id": "E018",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "She opened the door and walked",
+      "referenceToken": "in"
+    },
+    {
+      "id": "E019",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "He poured a cup of",
+      "referenceToken": "coffee"
+    },
+    {
+      "id": "E020",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "The alarm clock rang at seven in the",
+      "referenceToken": "morning"
+    },
+    {
+      "id": "E021",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "I need to charge my",
+      "referenceToken": "phone"
+    },
+    {
+      "id": "E022",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "We waited at the stop for the",
+      "referenceToken": "bus"
+    },
+    {
+      "id": "E023",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "Please turn off the",
+      "referenceToken": "light"
+    },
+    {
+      "id": "E024",
+      "language": "en-US",
+      "category": "daily",
+      "prefix": "He tied his",
+      "referenceToken": "shoes"
+    },
+    {
+      "id": "E025",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "I would like a slice of",
+      "referenceToken": "pizza"
+    },
+    {
+      "id": "E026",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "She added salt and",
+      "referenceToken": "pepper"
+    },
+    {
+      "id": "E027",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "The bread is in the",
+      "referenceToken": "oven"
+    },
+    {
+      "id": "E028",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "He drank a glass of",
+      "referenceToken": "water"
+    },
+    {
+      "id": "E029",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "We ordered fried",
+      "referenceToken": "rice"
+    },
+    {
+      "id": "E030",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "The soup needs more",
+      "referenceToken": "salt"
+    },
+    {
+      "id": "E031",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "Cut the cake into",
+      "referenceToken": "slices"
+    },
+    {
+      "id": "E032",
+      "language": "en-US",
+      "category": "food",
+      "prefix": "I eat an apple every",
+      "referenceToken": "day"
+    },
+    {
+      "id": "E033",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "The sky is dark and it will",
+      "referenceToken": "rain"
+    },
+    {
+      "id": "E034",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "It is cold, so wear a",
+      "referenceToken": "coat"
+    },
+    {
+      "id": "E035",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "The sun rises in the",
+      "referenceToken": "east"
+    },
+    {
+      "id": "E036",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "A strong wind blew the",
+      "referenceToken": "leaves"
+    },
+    {
+      "id": "E037",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "The forecast says",
+      "referenceToken": "snow"
+    },
+    {
+      "id": "E038",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "Take an umbrella, it might",
+      "referenceToken": "rain"
+    },
+    {
+      "id": "E039",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "The temperature dropped below",
+      "referenceToken": "zero"
+    },
+    {
+      "id": "E040",
+      "language": "en-US",
+      "category": "weather",
+      "prefix": "Fog covered the",
+      "referenceToken": "road"
+    },
+    {
+      "id": "E041",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "I saved the file to the",
+      "referenceToken": "disk"
+    },
+    {
+      "id": "E042",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "The battery is almost",
+      "referenceToken": "dead"
+    },
+    {
+      "id": "E043",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "Press any key to",
+      "referenceToken": "continue"
+    },
+    {
+      "id": "E044",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "The server returned a 404",
+      "referenceToken": "error"
+    },
+    {
+      "id": "E045",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "Please enter your",
+      "referenceToken": "password"
+    },
+    {
+      "id": "E046",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "The software update will",
+      "referenceToken": "install"
+    },
+    {
+      "id": "E047",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "Click the button to",
+      "referenceToken": "start"
+    },
+    {
+      "id": "E048",
+      "language": "en-US",
+      "category": "technology",
+      "prefix": "The database stores the",
+      "referenceToken": "records"
+    },
+    {
+      "id": "E049",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "The president signed the",
+      "referenceToken": "bill"
+    },
+    {
+      "id": "E050",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "The team won the",
+      "referenceToken": "game"
+    },
+    {
+      "id": "E051",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "Heavy rain caused",
+      "referenceToken": "flooding"
+    },
+    {
+      "id": "E052",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "The company reported higher",
+      "referenceToken": "profits"
+    },
+    {
+      "id": "E053",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "Police arrested the",
+      "referenceToken": "suspect"
+    },
+    {
+      "id": "E054",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "The market closed",
+      "referenceToken": "higher"
+    },
+    {
+      "id": "E055",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "The train derailed near the",
+      "referenceToken": "station"
+    },
+    {
+      "id": "E056",
+      "language": "en-US",
+      "category": "news",
+      "prefix": "The city opened a new",
+      "referenceToken": "hospital"
+    },
+    {
+      "id": "E057",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "Once upon a",
+      "referenceToken": "time"
+    },
+    {
+      "id": "E058",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "The dragon guarded the",
+      "referenceToken": "cave"
+    },
+    {
+      "id": "E059",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "She found a key under the",
+      "referenceToken": "mat"
+    },
+    {
+      "id": "E060",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "The knight drew his",
+      "referenceToken": "sword"
+    },
+    {
+      "id": "E061",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "They lived happily ever",
+      "referenceToken": "after"
+    },
+    {
+      "id": "E062",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "The old man told a",
+      "referenceToken": "story"
+    },
+    {
+      "id": "E063",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "The ship sailed across the",
+      "referenceToken": "sea"
+    },
+    {
+      "id": "E064",
+      "language": "en-US",
+      "category": "story",
+      "prefix": "He opened the treasure",
+      "referenceToken": "chest"
+    }
+  ]
+}

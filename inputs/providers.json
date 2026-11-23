@@ -1,38 +1,26 @@
 {
   "schemaVersion": 1,
-  "description": "Default provider definitions for the 2026 self-prediction experiment. Each provider uses an OpenAI-compatible chat completions endpoint. The environmentPrefix field names the section of the .env file that overrides the base URL, the model, and the API key.",
+  "description": "Default provider definitions for the 2026 self-prediction experiment. The openrouter entry names one OpenAI-compatible endpoint and a model list. The plugin expands the list into one provider per model. The environmentPrefix field names the section of the .env file that overrides the base URL, the model list, and the API key.",
   "providers": [
     {
-      "key": "deepseek",
-      "label": "DeepSeek",
-      "baseUrl": "https://api.deepseek.com/v1",
-      "model": "deepseek-chat",
-      "apiKeyEnvironmentVariable": "DEEPSEEK_API_KEY",
+      "key": "openrouter",
+      "label": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "google/gemini-4-neon:batch",
+      "models": [
+        "google/gemini-4-neon:batch",
+        "openai/gpt-6.2-sol:batch",
+        "deepseek/deepseek-v4.1-flash-1017:batch",
+        "anthropic/claude-opus-5.5:batch",
+        "x-ai/grok-4.7:batch",
+        "qwen/qwen3.8-flash",
+        "z-ai/glm-5.3-flash:batch"
+      ],
+      "apiKeyEnvironmentVariable": "OPENROUTER_API_KEY",
       "enabled": true,
-      "environmentPrefix": "deepseek",
+      "environmentPrefix": "openrouter",
       "topLogprobsCount": 20,
-      "thinking": "disabled"
-    },
-    {
-      "key": "qwen",
-      "label": "Qwen",
-      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      "model": "qwen-flash",
-      "apiKeyEnvironmentVariable": "DASHSCOPE_API_KEY",
-      "enabled": true,
-      "environmentPrefix": "qwen",
-      "topLogprobsCount": 5,
-      "thinking": "disabled"
-    },
-    {
-      "key": "glm",
-      "label": "GLM",
-      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
-      "model": "glm-4.5-flash",
-      "apiKeyEnvironmentVariable": "ZHIPU_API_KEY",
-      "enabled": true,
-      "environmentPrefix": "zhipu",
-      "topLogprobsCount": 5
+      "reasoning": "disabled"
     },
     {
       "key": "mock",

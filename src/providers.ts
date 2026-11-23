@@ -112,6 +112,13 @@ function validateProvider(value: unknown): ProviderDefinition {
   const topLogprobsCount = value["topLogprobsCount"];
   const thinking = value["thinking"];
   const thinkingValue = typeof thinking === "string" ? thinking.trim() : "";
+  const reasoning = value["reasoning"];
+  const reasoningValue = typeof reasoning === "string" ? reasoning.trim().toLowerCase() : "";
+  const rawModels = value["models"];
+  const models =
+    Array.isArray(rawModels) && rawModels.every((entry) => typeof entry === "string")
+      ? rawModels.map((entry) => entry.trim()).filter((entry) => entry !== "")
+      : undefined;
   return {
     key: parts["key"] as string,
     label: parts["label"] as string,
@@ -125,6 +132,8 @@ function validateProvider(value: unknown): ProviderDefinition {
         ? topLogprobsCount
         : undefined,
     thinking: thinkingValue === "" ? undefined : thinkingValue,
+    reasoning: reasoningValue === "" ? undefined : reasoningValue,
+    ...(models === undefined || models.length === 0 ? {} : { models }),
     enabled: enabled !== false,
   };
 }
@@ -157,14 +166,17 @@ export function selectProviders(
   if (keys.length > 0) {
     const requested = new Set(keys);
     for (const key of requested) {
-      if (!catalog.providers.some((provider) => provider.key === key)) {
+      const known = catalog.providers.some(
+        (provider) => provider.key === key || provider.model === key,
+      );
+      if (!known) {
         throw new ExperimentError("INVALID_PROVIDER", `The provider catalog has no key ${key}.`);
       }
     }
     return catalog.providers.filter(
       (provider) =>
-        requested.has(provider.key) && (includeDisabled || provider.enabled || provider.key ===
-          MOCK_PROVIDER_KEY),
+        (requested.has(provider.key) || requested.has(provider.model)) &&
+        (includeDisabled || provider.enabled || provider.key === MOCK_PROVIDER_KEY),
     );
   }
   return catalog.providers.filter((provider) => provider.enabled);
@@ -246,14 +258,158 @@ export function applyProviderEnvironments(
       ...definition,
       baseUrl: baseUrl === "" ? definition.baseUrl : baseUrl,
       model: model === "" ? definition.model : model,
+      models:
+        section.models === undefined || section.models.length === 0
+          ? definition.models
+          : section.models,
       topLogprobsCount: section.topLogprobsCount ?? definition.topLogprobsCount,
       thinking:
         section.thinking === undefined || section.thinking.trim() === ""
           ? definition.thinking
           : section.thinking,
+      reasoning:
+        section.reasoning === undefined || section.reasoning.trim() === ""
+          ? definition.reasoning
+          : section.reasoning,
     };
   });
   return { ...catalog, providers };
+}
+
+/**
+ * Resolve the requested keys to the keys of the expanded catalog.
+ *
+ * A request that names a provider with a model list selects every model of that list.
+ *
+ * @param catalog - the catalog before the model expansion.
+ * @param keys - the requested provider keys or model identifiers.
+ * @returns the keys of the expanded catalog.
+ */
+export function resolveRequestedKeys(
+  catalog: ProviderCatalog,
+  keys: readonly string[],
+): string[] {
+  const resolved: string[] = [];
+  for (const key of keys) {
+    const parent = catalog.providers.find((provider) => provider.key === key);
+    const models = parent?.models ?? [];
+    if (parent === undefined || models.length === 0) {
+      resolved.push(key);
+      continue;
+    }
+    for (const model of models) {
+      resolved.push(buildModelProviderKey(parent.key, model));
+    }
+  }
+  return resolved;
+}
+
+/**
+ * Build the model identifier of one chat request.
+ *
+ * OpenRouter lists a `:batch` variant that answers no chat completion request. The plugin drops
+ * that suffix for the request and keeps the variant name in the catalog, the report, and the file
+ * names.
+ *
+ * @param model - the model identifier of the catalog.
+ * @returns the identifier to send to the endpoint.
+ */
+export function resolveRequestModel(model: string): string {
+  const suffix = ":batch";
+  const trimmed = model.trim();
+  return trimmed.endsWith(suffix) ? trimmed.slice(0, -suffix.length) : trimmed;
+}
+
+/**
+ * Build a file-name-safe provider key from one model identifier.
+ *
+ * @param providerKey - the key of the provider that lists the model.
+ * @param model - the model identifier.
+ * @returns the key, which holds only letters, digits, dots, underscores, and hyphens.
+ */
+export function buildModelProviderKey(providerKey: string, model: string): string {
+  const modelKey = model.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+  return modelKey === "" ? providerKey : `${providerKey}-${modelKey}`;
+}
+
+/**
+ * Expand each provider that lists model identifiers into one provider per model.
+ *
+ * One environment section supplies the model list, so one OpenRouter section yields one provider
+ * per model and every model keeps its own metrics and its own output files.
+ *
+ * @param catalog - the validated catalog.
+ * @returns the catalog with one provider per model.
+ */
+export function expandProviderModels(catalog: ProviderCatalog): ProviderCatalog {
+  const providers: ProviderDefinition[] = [];
+  for (const definition of catalog.providers) {
+    const models = definition.models ?? [];
+    if (models.length === 0) {
+      providers.push(definition);
+      continue;
+    }
+    for (const rawModel of models) {
+      const model = rawModel.trim();
+      if (model === "") {
+        continue;
+      }
+      providers.push({
+        key: buildModelProviderKey(definition.key, model),
+        label: model,
+        baseUrl: definition.baseUrl,
+        model,
+        apiKeyEnvironmentVariable: definition.apiKeyEnvironmentVariable,
+        environmentPrefix: definition.environmentPrefix,
+        topLogprobsCount: definition.topLogprobsCount,
+        thinking: definition.thinking,
+        reasoning: definition.reasoning,
+        enabled: definition.enabled,
+      });
+    }
+  }
+  return { ...catalog, providers };
+}
+
+/** The task that the capability probe sends to one model. */
+const PROBE_TASK: Task = {
+  id: "PROBE",
+  category: "probe",
+  language: "zh-Hans",
+  prefix: "床前明月光，疑是地上",
+  referenceToken: "霜",
+};
+
+/** The outcome of one capability probe. */
+export interface ProbeOutcome {
+  readonly supported: boolean;
+  readonly reason?: string;
+}
+
+/**
+ * Probe whether one model returns a logprobs table at the requested support size.
+ *
+ * The experiment uses only the models that answer this probe, as the design requires.
+ *
+ * @param client - the client of the model.
+ * @param topLogprobsCount - the requested support size.
+ * @param signal - the cancellation signal of the run.
+ * @returns the outcome, with a reason when the model does not support the request.
+ */
+export async function probeLogprobsSupport(
+  client: ProviderClient,
+  topLogprobsCount: number,
+  signal: AbortSignal,
+): Promise<ProbeOutcome> {
+  try {
+    await client.predict(
+      { mode: "actual", task: PROBE_TASK, repetition: 1, topLogprobsCount },
+      signal,
+    );
+    return { supported: true };
+  } catch (error) {
+    return { supported: false, reason: errorMessage(error) };
+  }
 }
 
 /**
@@ -376,7 +532,7 @@ class OpenAiCompatibleClient implements ProviderClient {
   private buildActualBody(request: PredictionRequest): Record<string, unknown> {
     const prompt = buildActualPredictionPrompt(request.task);
     const body: Record<string, unknown> = {
-      model: this.definition.model,
+      model: resolveRequestModel(this.definition.model),
       messages: [
         { role: "system", content: prompt.system },
         { role: "user", content: prompt.user },
@@ -384,9 +540,11 @@ class OpenAiCompatibleClient implements ProviderClient {
       max_tokens: 1,
       logprobs: true,
       top_logprobs: request.topLogprobsCount,
+      provider: { require_parameters: true },
       stream: false,
     };
     this.applyThinking(body);
+    this.applyReasoning(body);
     return body;
   }
 
@@ -405,12 +563,27 @@ class OpenAiCompatibleClient implements ProviderClient {
     }
   }
 
+  /**
+   * Merge the reasoning switch of the provider into a request body.
+   *
+   * A reasoning model spends its first tokens on thinking, so the first content token does not
+   * follow the prefix. The switch turns reasoning off for a clean next-token prediction.
+   *
+   * @param body - the request body to extend in place.
+   */
+  private applyReasoning(body: Record<string, unknown>): void {
+    const reasoning = this.definition.reasoning?.trim().toLowerCase() ?? "";
+    if (reasoning === "disabled") {
+      body["reasoning"] = { enabled: false };
+    }
+  }
+
   /** Build the body of one self-prediction request with the forced tool. */
   private buildSelfBody(request: PredictionRequest): Record<string, unknown> {
     const prompt = buildSelfPredictionPrompt(request.task, request.topLogprobsCount);
     const tool = buildSelfPredictionTool(request.topLogprobsCount);
     const body: Record<string, unknown> = {
-      model: this.definition.model,
+      model: resolveRequestModel(this.definition.model),
       messages: [
         { role: "system", content: prompt.system },
         { role: "user", content: prompt.user },
@@ -418,9 +591,11 @@ class OpenAiCompatibleClient implements ProviderClient {
       tools: [{ type: "function", function: tool }],
       tool_choice: { type: "function", function: { name: tool.name } },
       max_tokens: 2048,
+      provider: { require_parameters: true },
       stream: false,
     };
     this.applyThinking(body);
+    this.applyReasoning(body);
     return body;
   }
 

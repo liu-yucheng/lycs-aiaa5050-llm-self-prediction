@@ -12,6 +12,8 @@
 export interface Task {
   readonly id: string;
   readonly category: string;
+  /** The language tag of the task, such as zh-Hans or en-US. */
+  readonly language?: string;
   readonly prefix: string;
   readonly referenceToken: string;
 }
@@ -20,6 +22,8 @@ export interface Task {
 export interface Dataset {
   readonly datasetId: string;
   readonly language: string;
+  /** The language tags that the dataset declares. */
+  readonly languages?: readonly string[];
   readonly description: string;
   readonly taskCount: number;
   readonly tasks: readonly Task[];
@@ -31,10 +35,14 @@ export interface ProviderDefinition {
   readonly label: string;
   readonly baseUrl: string;
   readonly model: string;
+  /** The model identifiers that the provider expands into. */
+  readonly models?: readonly string[];
   readonly apiKeyEnvironmentVariable: string;
   readonly environmentPrefix?: string;
   readonly topLogprobsCount?: number;
   readonly thinking?: string;
+  /** The reasoning switch: `disabled` turns reasoning off. */
+  readonly reasoning?: string;
   readonly enabled: boolean;
 }
 
@@ -155,6 +163,8 @@ export interface ProviderMetrics {
   readonly separatedFraction: number;
   readonly verdict: Verdict;
   readonly categories: Readonly<Record<string, MetricSummary>>;
+  /** The summary of each declared language tag. */
+  readonly languages: Readonly<Record<string, MetricSummary>>;
   readonly warnings: readonly string[];
 }
 
@@ -162,6 +172,8 @@ export interface ProviderMetrics {
 export interface SessionMetrics {
   readonly sessionCode: string;
   readonly datasetId: string;
+  /** The language tags of the dataset, such as zh-Hans, en-US. */
+  readonly datasetLanguage: string;
   readonly generatedAt: string;
   readonly toleranceNats: number;
   readonly repetitionCount: number;

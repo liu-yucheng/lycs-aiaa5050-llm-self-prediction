@@ -42,16 +42,19 @@ test("one dry run writes a complete session with metrics and a report", async ()
     );
     assert.equal(manifest.status, "complete");
     assert.equal(manifest.options.repetitionCount, 2);
-    assert.equal(manifest.options.topLogprobsCount, 64);
+    assert.equal(manifest.options.topLogprobsCount, 20);
     assert.equal(manifest.environment.nodeVersion, process.version);
 
     const report = await readFile(result.reportPath, "utf8");
     assert.match(report, /# Next-token self-prediction report/);
     assert.match(report, /## 3\. Results/);
+    assert.match(report, /### By language/);
+    assert.match(report, /zh-Hans/);
     assert.match(report, /indistinguishable|separated|inconclusive/);
 
     const rawNames = await readdir(path.join(result.outputDirectory, "raw"));
     assert.equal(rawNames.length, 8);
+    assert.equal(rawNames.every((name) => name.startsWith("mock-")), true);
     assert.equal(
       rawNames.filter((name) => name.endsWith(".error.json")).length,
       0,
@@ -138,7 +141,7 @@ test("a workspace inputs directory replaces the bundled dataset", async () => {
     };
     await mkdir(path.join(workspace, "inputs"), { recursive: true });
     await writeFile(
-      path.join(workspace, "inputs", "dataset-zh-128.json"),
+      path.join(workspace, "inputs", "dataset-128.json"),
       `${JSON.stringify(dataset, undefined, 2)}\n`,
       "utf8",
     );
