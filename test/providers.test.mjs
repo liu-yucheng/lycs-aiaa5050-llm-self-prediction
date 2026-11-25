@@ -75,11 +75,17 @@ function selfReportReply() {
 const requests = [];
 let failureMode = false;
 let rateLimitCount = 0;
+let resetCount = 0;
 let server;
 let baseUrl = "";
 
 before(async () => {
   server = http.createServer((request, response) => {
+    if (resetCount > 0) {
+      resetCount -= 1;
+      request.socket.destroy();
+      return;
+    }
     const chunks = [];
     request.on("data", (chunk) => chunks.push(chunk));
     request.on("end", () => {
@@ -356,6 +362,14 @@ test("the environment override carries the edge host into the catalog", () => {
   const updated = applyProviderEnvironments(catalog, environments);
   assert.equal(updated.providers[0].edgeHost, "edge.example");
   assert.equal(catalog.providers[0].edgeHost, undefined);
+});
+
+test("a reset connection repeats and then succeeds", async () => {
+  resetCount = 1;
+  const client = createProviderClient(definition(), "secret", 20000);
+  const outcome = await client.requestPlainActual(task, 1);
+  assert.equal(outcome.draft.distribution.entries.length, 4);
+  assert.equal(resetCount, 0);
 });
 
 test("a rate-limited request repeats and then succeeds", async () => {
