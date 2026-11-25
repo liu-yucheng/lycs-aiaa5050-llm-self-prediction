@@ -29,6 +29,7 @@ const NAVIGATION = [
   ["measures.html", "Measures"],
   ["reference.html", "Reference"],
   ["reproducibility.html", "Reproducibility"],
+  ["results.html", "Results"],
 ];
 
 /**
