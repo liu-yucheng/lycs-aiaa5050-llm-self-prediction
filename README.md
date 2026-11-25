@@ -216,7 +216,8 @@ a separate file. The plugin never rewrites a raw file and never changes a task o
 a metric pass.
 
 A reported run of this machine used Node.js 26.13.0, TypeScript 5.9.3, and Windows 11 x64 with the
-seed 20260815.
+seed 20260815. The run `20261125T050722Z_d59ca3` applied three repetitions to each of the four
+conditions of the 64 tasks for five Hugging Face models, and it took 2467 seconds.
 
 ## Tests
 
