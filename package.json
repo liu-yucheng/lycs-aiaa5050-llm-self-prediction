@@ -1,6 +1,6 @@
 {
   "name": "lycs-aiaa5050-llm-self-prediction",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "DeepSeek Harness plugin that measures how far a model's next-token table stands from the table the same model reports about itself.",
   "type": "module",
   "main": "lib/index.js",
@@ -22,7 +22,8 @@
     "LICENSE",
     "license-2",
     "icon.svg",
-    ".env.example"
+    ".env.example",
+    "models-to-use.env"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

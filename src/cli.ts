@@ -14,12 +14,11 @@ import { pathToFileURL } from "node:url";
 
 import { COMPARISON_NAMES, PLUGIN_NAME, PLUGIN_VERSION } from "./constants.js";
 import { ExperimentService } from "./experiment.js";
-import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
-import { resolveProviderApiKey, loadProviderCatalog, applyProviderEnvironments } from "./providers.js";
+import { readConfiguration } from "./env.js";
+import { resolveProviderApiKey, applyProviderEnvironments } from "./providers.js";
+import { createProviderCatalog } from "./catalog.js";
 import { formatNumber } from "./report.js";
 import { buildHelpText } from "./tools.js";
-import { PROVIDER_FILE_NAME } from "./constants.js";
-import { resolveInputPath } from "./files.js";
 
 /** The exit code of a successful command. */
 const EXIT_SUCCESS = 0;
@@ -249,20 +248,31 @@ export async function runCommandLine(argv: readonly string[]): Promise<number> {
       return EXIT_SUCCESS;
     }
     if (command === "env") {
-      const state = await ensureEnvironmentFile(workspace);
-      writeLine(`Environment file: ${state.filePath ?? "(none)"}`);
-      writeLine(`Example file: ${state.examplePath ?? "(none)"}`);
-      writeLine(`Created by this command: ${state.created ? "yes" : "no"}`);
-      const values = state.filePath === undefined ? {} : await readEnvironmentFile(state.filePath);
-      const environments = buildProviderEnvironments(values);
-      const catalogPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
-      const catalog = applyProviderEnvironments(await loadProviderCatalog(catalogPath), environments);
+      const configuration = await readConfiguration(workspace);
+      const environment = configuration.state.environment;
+      writeLine(`Environment file: ${environment.filePath ?? "(none)"}`);
+      writeLine(`Example file: ${environment.examplePath ?? "(none)"}`);
+      writeLine(`Models file: ${configuration.state.modelsFilePath ?? "(none)"}`);
+      writeLine(`Created by this command: ${environment.created ? "yes" : "no"}`);
+      const catalog = applyProviderEnvironments(
+        createProviderCatalog(),
+        configuration.environments,
+      );
       for (const definition of catalog.providers) {
-        const key = resolveProviderApiKey(definition, environments);
+        const key = resolveProviderApiKey(definition, configuration.environments);
+        const models =
+          (definition.models ?? []).length === 0
+            ? definition.model === ""
+              ? "(no model)"
+              : definition.model
+            : (definition.models ?? []).join(", ");
         writeLine(
           `${definition.key}  ${definition.enabled ? "enabled" : "disabled"}  ` +
-            `${definition.model}  key=${key === undefined ? "missing" : "present"}`,
+            `${models}  key=${key === undefined ? "missing" : "present"}`,
         );
+      }
+      for (const problem of configuration.problems) {
+        writeLine(`Problem: ${problem}`);
       }
       return EXIT_SUCCESS;
     }

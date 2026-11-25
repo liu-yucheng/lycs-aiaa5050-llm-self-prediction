@@ -18,13 +18,14 @@ import {
   CONDITION_PLAIN_SELF,
   DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
   MAX_PROBABILITY_ENTRY_COUNT,
+  MODELS_FILE_NAME,
   PROBABILITY_FLOOR,
   REQUEST_ATTEMPT_COUNT,
   REQUEST_RETRY_DELAY_MILLISECONDS,
   SLOW_REQUEST_THRESHOLD_MILLISECONDS,
 } from "./constants.js";
 import { ExperimentError, errorMessage, isRecord } from "./errors.js";
-import { packagedPath, readJsonFile, sleep } from "./files.js";
+import { sleep } from "./files.js";
 import { buildDistribution } from "./probability.js";
 import {
   buildActualPredictionPrompt,
@@ -216,17 +217,6 @@ export function validateProviderCatalog(value: unknown): ProviderCatalog {
 }
 
 /**
- * Load one provider catalog file.
- *
- * @param filePath - the path of the file, or undefined for the packaged catalog.
- * @returns the catalog.
- */
-export async function loadProviderCatalog(filePath?: string): Promise<ProviderCatalog> {
-  const target = filePath ?? packagedPath("inputs/providers.json");
-  return validateProviderCatalog(await readJsonFile(target));
-}
-
-/**
  * Select the providers to run.
  *
  * @param catalog - the catalog.
@@ -378,7 +368,10 @@ export function buildModelProviderKey(providerKey: string, model: string): strin
 export function expandProviderModels(catalog: ProviderCatalog): ProviderDefinition[] {
   const expanded: ProviderDefinition[] = [];
   for (const provider of catalog.providers) {
-    const models = provider.models ?? [provider.model];
+    const models = (provider.models ?? []).map((model) => model.trim()).filter((model) => model !== "");
+    if (models.length === 0 && provider.model.trim() !== "") {
+      models.push(provider.model.trim());
+    }
     for (const model of models) {
       expanded.push({ ...provider, model });
     }
@@ -402,7 +395,14 @@ export function resolveRequestedKeys(
 ): ProviderDefinition[] {
   const expanded = expandProviderModels(catalog);
   if (keys.length === 0) {
-    return expanded.filter((provider) => provider.enabled);
+    const enabled = expanded.filter((provider) => provider.enabled);
+    if (enabled.length === 0) {
+      throw new ExperimentError(
+        "INVALID_PROVIDER",
+        `The catalog holds no model. Add one <section>.models_to_use= line to ${MODELS_FILE_NAME}.`,
+      );
+    }
+    return enabled;
   }
   const selected: ProviderDefinition[] = [];
   for (const key of keys) {
@@ -417,6 +417,14 @@ export function resolveRequestedKeys(
       (provider) => provider.key === key && (includeDisabled || provider.enabled),
     );
     if (byProvider.length === 0) {
+      const provider = catalog.providers.find((entry) => entry.key === key);
+      if (provider !== undefined) {
+        throw new ExperimentError(
+          "INVALID_PROVIDER",
+          `The provider ${key} holds no model. Add one ${key}.models_to_use= line to ` +
+            `${MODELS_FILE_NAME}.`,
+        );
+      }
       throw new ExperimentError(
         "INVALID_PROVIDER",
         `The catalog holds no enabled provider or model ${key}.`,
@@ -487,6 +495,15 @@ export function readServedTable(
 }
 
 /**
+ * The log probability below which an entry is a placeholder.
+ *
+ * Some endpoints list the alternative tokens and fill their log probability with a large negative
+ * sentinel. Such an entry carries no measurement, so the reader drops it. Only the chosen token
+ * keeps a real value.
+ */
+const SENTINEL_LOG_PROBABILITY = -1000;
+
+/**
  * Read the top entry list of one logprobs entry.
  *
  * @param value - the raw value.
@@ -507,6 +524,9 @@ function readTopLogprobs(value: unknown): ProbabilityEntry[] {
       continue;
     }
     if (typeof logProbability !== "number" || !Number.isFinite(logProbability)) {
+      continue;
+    }
+    if (logProbability < SENTINEL_LOG_PROBABILITY) {
       continue;
     }
     entries.push({ token, logProbability });
@@ -589,9 +609,6 @@ function applySwitches(
   }
   if (definition.reasoning !== undefined && definition.reasoning.trim() !== "") {
     body["reasoning"] = { enabled: definition.reasoning.trim().toLowerCase() === "enabled" };
-  }
-  if (definition.baseUrl.includes("openrouter.ai")) {
-    body["provider"] = { require_parameters: true };
   }
   return body;
 }
@@ -1517,6 +1534,9 @@ export function buildPredictionRecord(
     rawFileNames,
     endpoint: draft.endpoint,
     requestBody: draft.requestBody,
-    warning: draft.warning,
+    warning:
+      draft.distribution.supportSize <= 1
+        ? "The table holds the chosen token only."
+        : draft.warning,
   };
 }
