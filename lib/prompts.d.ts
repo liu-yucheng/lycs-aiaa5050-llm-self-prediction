@@ -20,8 +20,15 @@ export declare function buildActualPredictionPrompt(task: Task): PromptPair;
 /**
  * Build the prompt of one next-token self-prediction.
  *
- * The model reports the distribution that it believes it produced for the same prefix. The
- * prompt states the requested table size, the natural-log unit, and the normalization rule.
+ * The model reports the distribution that it believes it produced for the same prefix. A serving
+ * tokenizer keeps some words whole and cuts other words into a short first piece. A report that
+ * names the whole word only loses a large amount of probability when the served first token is
+ * that piece, so the prompt asks for a hedge over the cut length. Entry 1 is the whole word, and
+ * the other entries are the first letters of the same word. The model sets the mass from its
+ * belief about the cut, because the cut is not derivable from the word or from its length.
+ *
+ * A Chinese word is a short run of characters, and the serving tokenizer usually keeps it whole.
+ * The Chinese prompt therefore asks for one entry only.
  *
  * @param task - the task whose prefix the model reads.
  * @param entryCount - the requested table size.

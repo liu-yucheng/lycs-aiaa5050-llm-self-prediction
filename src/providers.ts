@@ -32,6 +32,14 @@ import type { PredictionAnswer, ProbabilityEntry, ProviderCatalog, ProviderDefin
 /** The mock provider key. */
 export const MOCK_PROVIDER_KEY = "mock";
 
+/**
+ * The sampling temperature of every request.
+ *
+ * A value of zero asks every provider for its most likely token. It applies to every provider and
+ * every model, so a repeated run of one task stays comparable across models.
+ */
+export const REQUEST_TEMPERATURE = 0;
+
 /** The candidate tokens of the mock provider. */
 const MOCK_TOKENS: readonly string[] = [
   "的", "了", "是", "在", "和", "有", "人", "我", "他", "她", "们", "这", "那", "不", "也", "就",
@@ -540,11 +548,12 @@ class OpenAiCompatibleClient implements ProviderClient {
       max_tokens: 1,
       logprobs: true,
       top_logprobs: request.topLogprobsCount,
-      provider: { require_parameters: true },
+      temperature: REQUEST_TEMPERATURE,
       stream: false,
     };
     this.applyThinking(body);
     this.applyReasoning(body);
+    this.applyOpenRouterHints(body);
     return body;
   }
 
@@ -578,6 +587,20 @@ class OpenAiCompatibleClient implements ProviderClient {
     }
   }
 
+  /**
+   * Merge the routing hint of OpenRouter into a request body.
+   *
+   * OpenRouter can skip a model whose route does not carry the requested parameters. Other
+   * providers reject the unknown field, so the hint stays with OpenRouter.
+   *
+   * @param body - the request body to extend in place.
+   */
+  private applyOpenRouterHints(body: Record<string, unknown>): void {
+    if (this.definition.baseUrl.includes("openrouter.ai")) {
+      body["provider"] = { require_parameters: true };
+    }
+  }
+
   /** Build the body of one self-prediction request with the forced tool. */
   private buildSelfBody(request: PredictionRequest): Record<string, unknown> {
     const prompt = buildSelfPredictionPrompt(request.task, request.topLogprobsCount);
@@ -591,11 +614,12 @@ class OpenAiCompatibleClient implements ProviderClient {
       tools: [{ type: "function", function: tool }],
       tool_choice: { type: "function", function: { name: tool.name } },
       max_tokens: 2048,
-      provider: { require_parameters: true },
+      temperature: REQUEST_TEMPERATURE,
       stream: false,
     };
     this.applyThinking(body);
     this.applyReasoning(body);
+    this.applyOpenRouterHints(body);
     return body;
   }
 

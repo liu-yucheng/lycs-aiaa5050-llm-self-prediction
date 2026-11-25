@@ -2,6 +2,13 @@ import { type ProviderEnvironment } from "./env.js";
 import type { PredictionAnswer, ProbabilityEntry, ProviderCatalog, ProviderDefinition, Task } from "./types.js";
 /** The mock provider key. */
 export declare const MOCK_PROVIDER_KEY = "mock";
+/**
+ * The sampling temperature of every request.
+ *
+ * A value of zero asks every provider for its most likely token. It applies to every provider and
+ * every model, so a repeated run of one task stays comparable across models.
+ */
+export declare const REQUEST_TEMPERATURE = 0;
 /** One prediction request. */
 export interface PredictionRequest {
     readonly mode: "actual" | "self";
