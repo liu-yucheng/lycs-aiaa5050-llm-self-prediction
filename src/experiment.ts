@@ -326,7 +326,7 @@ export class ExperimentService {
         if (!support.supported) {
           warnings.push(
             `The model ${client.providerKey} reports no top-${topLogprobsCount} table and is ` +
-              `left out: ${support.reason ?? "the probe table holds one entry"}.`,
+              `left out: ${(support.reason ?? "the probe table holds one entry").replace(/\.$/u, "")}.`,
           );
           continue;
         }

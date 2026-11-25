@@ -7,7 +7,7 @@
 /** The package name of the plugin. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The semantic version of the plugin. */
-export declare const PLUGIN_VERSION = "0.7.0";
+export declare const PLUGIN_VERSION = "0.7.1";
 /** The name of the tool that runs the experiment. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 /** The name of the tool that lists the sessions. */
@@ -80,6 +80,8 @@ export declare const ENV_TOP_LOGPROBS_PROPERTY = "top_logprobs";
 export declare const ENV_THINKING_PROPERTY = "thinking";
 /** The environment property that sets the `reasoning` switch of one provider. */
 export declare const ENV_REASONING_PROPERTY = "reasoning";
+/** The attempt count of one served table request. */
+export declare const SERVED_TABLE_ATTEMPT_COUNT = 3;
 /** The attempt count of one request that a rate limit or a server fault can repeat. */
 export declare const REQUEST_ATTEMPT_COUNT = 4;
 /** The delay before the first retry of one request. The delay grows with each attempt. */

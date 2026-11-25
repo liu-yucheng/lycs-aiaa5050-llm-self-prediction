@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Method · 20261125T065931Z_48d684</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">NTP</span>
+      <span class="brand-text"><span data-lang="en">Can LLMs predict their own next token predictions?</span><span data-lang="zh" hidden>大模型能预测自己的下一个词块吗？</span></span>
+    </div>
+    <nav class="nav"><a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+<a href="method.html" class="active"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+<a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+<a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+<a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+<a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+<a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a></nav>
+    <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
+      <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
+    </button>
+  </div>
+</header>
+<main class="page">
+  <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261125T065931Z_48d684</code></p>
+  <h1><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></h1>
+  <p class="lede"><span data-lang="en">The dataset, the prompts, the parser, the divergence, and the statistics.</span><span data-lang="zh" hidden>数据集、提示词、解析器、散度和统计方法。</span></p>
+  
+<h2><span data-lang="en">Dataset</span><span data-lang="zh" hidden>数据集</span></h2>
+<p><span data-lang="en">The run reads 2 dataset files from inputs/testing-dataset/. Each file holds next-token tasks in one language. Each task gives a prefix and the token that a human reader expects.</span><span data-lang="zh" hidden>本运行从 inputs/testing-dataset/ 读取 2 个数据集文件。每个文件保存一种语言的下一个词块任务。每个任务给出前缀，以及人类读者预期的词块。</span></p>
+<table>
+<thead><tr><th><span data-lang="en">Dataset</span><span data-lang="zh" hidden>数据集</span></th><th><span data-lang="en">Language</span><span data-lang="zh" hidden>语言</span></th><th><span data-lang="en">Tasks</span><span data-lang="zh" hidden>任务数</span></th></tr></thead>
+<tbody>
+<tr><td><code>llm-self-prediction-zh32</code></td><td>zh-Hans</td><td class="number">32</td></tr>
+<tr><td><code>llm-self-prediction-en32</code></td><td>en-US</td><td class="number">32</td></tr>
+</tbody>
+</table>
+<p><span data-lang="en">The run keeps the reference token for the record. No metric uses the reference token.</span><span data-lang="zh" hidden>运行保存参考词块以备记录。任何指标都不使用参考词块。</span></p>
+<table>
+<thead><tr><th><span data-lang="en">Category</span><span data-lang="zh" hidden>类别</span></th><th><span data-lang="en">Tasks</span><span data-lang="zh" hidden>任务数</span></th></tr></thead>
+<tbody>
+<tr><td>poetry</td><td class="number">8</td></tr>
+<tr><td>idiom</td><td class="number">8</td></tr>
+<tr><td>daily</td><td class="number">8</td></tr>
+<tr><td>food</td><td class="number">8</td></tr>
+<tr><td>weather</td><td class="number">8</td></tr>
+<tr><td>technology</td><td class="number">8</td></tr>
+<tr><td>news</td><td class="number">8</td></tr>
+<tr><td>story</td><td class="number">8</td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">Prompts</span><span data-lang="zh" hidden>提示词</span></h2>
+<p><span data-lang="en">The plain actual condition sends the task with the log-probability request. The interface returns the top entries of the served distribution. The plain self condition sends the same task and asks for a JSON object with the entries of the model own distribution.</span><span data-lang="zh" hidden>普通实际条件发送任务，并请求对数概率。接口返回实际分布的前若干条目。普通自我条件发送同样的任务，要求模型用 JSON 对象写出自己分布的各条目。</span></p>
+<aside class="callout"><span data-lang="en">The self condition asks for one token of one or more characters. A tokenizer can cut a word into pieces, and the model does not see the tokenizer. The prompt therefore permits the model to list the leading pieces and to give the rest of the probability to the whole word.</span><span data-lang="zh" hidden>自我条件要求一个词块，可以是一个或多个字符。分词器会把一个词切成片段，而模型看不到分词器。因此提示词允许模型列出前导片段，并把其余概率给整个词。</span></aside>
+<p><span data-lang="en">The run parses the reply as text. It accepts a code fence, an object, or an array. It keeps the raw reply unchanged in the intermediate directory and stores the parsed table next to the record.</span><span data-lang="zh" hidden>运行按文本解析回复。它接受代码围栏、对象或数组。原始回复原样保存在中间目录，解析后的表格与记录一起保存。</span></p>
+<h2><span data-lang="en">Divergence</span><span data-lang="zh" hidden>散度</span></h2>
+<p><span data-lang="en">For two distributions p and q over the union of their supports, the symmetric divergence is one half of the forward divergence plus one half of the reverse divergence.</span><span data-lang="zh" hidden>对于支撑集并集上的两个分布 p 与 q，对称散度是前向散度的一半加反向散度的一半。</span></p>
+<pre class="formula">D(p || q) = Σ p(t) · ln( p(t) / q(t) )
+D_sym(p, q) = 0.5 · D(p || q) + 0.5 · D(q || p)</pre>
+<p><span data-lang="en">A token that one side omits receives a probability floor of 1e-12 before the normalization. One omitted token therefore contributes a large value, and a missing token in the served table counts against the self report.</span><span data-lang="zh" hidden>一方没有给出的词块在归一化之前得到 1e-12 的概率下限。因此一个缺失的词块会带来很大的数值，接口表格里缺失的词块会对自我报告不利。</span></p>
+<h2><span data-lang="en">Statistics</span><span data-lang="zh" hidden>统计</span></h2>
+<p><span data-lang="en">Each comparison pairs every repetition of the actual condition with every repetition of the predicted condition. The run then takes the mean over the tasks, and it bootstraps the interval of that mean with 3 repetitions per condition and a random seed that the report states.</span><span data-lang="zh" hidden>每个比较把实际条件的每次重复与预测条件的每次重复配对。运行再对任务取均值，并用报告的随机种子对均值做自助法区间估计。</span></p>
+<p><span data-lang="en">A verdict is separated when the lower end of the interval stays above 0.05 nats. A verdict is indistinguishable when the upper end stays below 0.05 nats. Any other interval is inconclusive.</span><span data-lang="zh" hidden>当区间下端高于 0.05 奈特时，判定为有差异。当区间上端低于 0.05 奈特时，判定为不可区分。其他区间判定为不确定。</span></p>
+<h2><span data-lang="en">Recorded conditions</span><span data-lang="zh" hidden>记录的条件</span></h2>
+<ol>
+<li><span data-lang="en">The model name, the provider, the plugin version, and the Node.js version.</span><span data-lang="zh" hidden>模型名、提供方、插件版本和 Node.js 版本。</span></li>
+<li><span data-lang="en">The random seed and the tolerance of the run.</span><span data-lang="zh" hidden>运行的随机种子和容差。</span></li>
+<li><span data-lang="en">Each raw request and each raw reply, one file for each call.</span><span data-lang="zh" hidden>每个原始请求和每个原始回复，每次调用一个文件。</span></li>
+<li><span data-lang="en">The elapsed time of each call, and a warning above 10 seconds.</span><span data-lang="zh" hidden>每次调用的耗时，超过 10 秒时给出警告。</span></li>
+</ol>
+
+</main>
+<footer class="page-footer">
+  <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.7.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.7.0 生成。随机种子 20260815。</span></p>
+  <p><span data-lang="en">This page is a record of one run. The files below the run directory hold every number.</span><span data-lang="zh" hidden>本页记录一次运行。运行目录下的文件保存每一个数字。</span></p>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>

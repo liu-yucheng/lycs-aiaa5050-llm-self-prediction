@@ -233,6 +233,30 @@ function barRow(
 }
 
 /**
+ * Render one band of numbered protocol steps.
+ *
+ * @param steps - the steps to render, in order.
+ * @returns the HTML block.
+ */
+function flowStrip(
+  steps: readonly {
+    readonly icon: string;
+    readonly titleEnglish: string;
+    readonly titleChinese: string;
+    readonly detailEnglish: string;
+    readonly detailChinese: string;
+  }[],
+): string {
+  const items = steps.map(
+    (step, index) =>
+      `<li><span class="step">${String(index + 1).padStart(2, "0")} ${step.icon}</span>` +
+      `<span class="title">${bilingual(step.titleEnglish, step.titleChinese)}</span>` +
+      `<span class="detail">${bilingual(step.detailEnglish, step.detailChinese)}</span></li>`,
+  );
+  return `<ol class="flow">${items.join("")}</ol>`;
+}
+
+/**
  * Build the shared page shell.
  *
  * @param options - the page options.
@@ -538,6 +562,43 @@ function renderMethodPage(options: DemoOptions): string {
       `<tr><td>${entry.name}</td><td class="number">${entry.count}</td></tr>`,
   );
   const body = `
+${flowStrip([
+  {
+    icon: "📝",
+    titleEnglish: "Pick a task",
+    titleChinese: "选择任务",
+    detailEnglish: "A prefix of one sentence and the token that a human reader expects.",
+    detailChinese: "一句句子的前缀，以及人类读者预期的词块。",
+  },
+  {
+    icon: "📡",
+    titleEnglish: "Read the served table",
+    titleChinese: "读取接口表格",
+    detailEnglish: "One request with max_tokens 1 and top_logprobs 20 gives the ground truth.",
+    detailChinese: "一次请求，max_tokens 为 1，top_logprobs 为 20，得到基准。",
+  },
+  {
+    icon: "🗣️",
+    titleEnglish: "Ask for the own table",
+    titleChinese: "索取自身表格",
+    detailEnglish: "The model writes a JSON table of its own distribution as text.",
+    detailChinese: "模型用文本写出自己分布的 JSON 表格。",
+  },
+  {
+    icon: "🔁",
+    titleEnglish: "Inject and repeat",
+    titleChinese: "注入并重复",
+    detailEnglish: "Each table enters the other context, and the run measures again.",
+    detailChinese: "两个表格分别进入对方的上下文，运行再次测量。",
+  },
+  {
+    icon: "📐",
+    titleEnglish: "Compare and judge",
+    titleChinese: "比较与判定",
+    detailEnglish: "Symmetric divergence, a bootstrap interval, and a verdict per comparison.",
+    detailChinese: "对称散度、自助法区间，以及每个比较的判定。",
+  },
+])}
 ${heading(2, "Dataset", "数据集")}
 ${paragraph(
   `The run reads ${dataset.datasetIds.length} dataset files from inputs/testing-dataset/. Each ` +
@@ -1501,6 +1562,18 @@ tbody tr:hover { background: #f7f4ec; }
 .bar.predicted { background: var(--predicted); }
 .bar.missing { background: #c9c2b4; }
 .bar.share { background: var(--accent); }
+.flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+}
+.flow li { background: #fff; border: 1px solid #e3dccd; border-top: 3px solid var(--accent); border-radius: 4px; padding: 10px 12px; }
+.flow .step { font-family: "Cascadia Mono", Consolas, monospace; color: var(--accent); font-size: 12px; }
+.flow .title { display: block; font-weight: 600; margin: 2px 0 4px; }
+.flow .detail { color: #5a5346; font-size: 14px; }
 .token-cell { font-family: var(--mono); white-space: pre; }
 .share { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 
