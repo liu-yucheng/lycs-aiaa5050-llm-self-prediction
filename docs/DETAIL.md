@@ -82,14 +82,25 @@ A section value of `<prefix>.thinking=disabled` turns thinking off, because a re
 refuses a forced tool choice while it thinks.
 An entry without a token or without a finite log probability is dropped, and the answer fails only
 when every entry is invalid.
-The prompt names the prefix, the token count, and the rule that the probabilities sum to one.
+The prompt names the prefix and the token count, and it states the rule that the probabilities sum
+to one.
+The English prompt also names the whole word that the model expects and the first one to four
+letters of that word.
+A serving tokenizer keeps some English words whole and cuts other words into a short first piece, so
+the report hedges over that cut and the model sets the mass from its belief about the cut.
+The Chinese prompt asks for one entry with a `logProbability` of 0, because the serving tokenizer
+keeps a Chinese word whole.
 The plugin reads the arguments of the first tool call.
 A text reply that holds the same JSON object is also accepted, and the raw reply keeps both forms.
 
 ### 4.3 Inference parameters
 
-The plugin sends no sampling parameter, so each provider uses its recommended default.
-A provider that needs a fixed temperature can set one in `inputs/providers.json`.
+The plugin sends `temperature=0` on every request, for every provider and every model.
+The value is the constant `REQUEST_TEMPERATURE` in `src/providers.ts`, and the run body of both
+modes carries it.
+A temperature of zero asks for the most likely token, so a repeated run of one task stays
+comparable across models.
+The plugin sends no top-p value and no other sampling parameter.
 
 ## 5. Parsing rules
 

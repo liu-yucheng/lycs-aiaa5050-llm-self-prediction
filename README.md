@@ -236,7 +236,7 @@ point, and the HTTP client of a provider against a local server.
 - Tool versions: TypeScript 5.9.3.
 - Platform: Windows 11 x64.
 - Random seed: 20260815.
-- Plugin version: 0.4.0.
+- Plugin version: 0.5.0.
 
 ## Licence
 

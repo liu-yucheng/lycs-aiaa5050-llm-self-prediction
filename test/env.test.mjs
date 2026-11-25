@@ -124,13 +124,17 @@ test("applyProviderEnvironments overrides the base URL and the model list", asyn
   assert.deepEqual(openrouter.models, ["alpha/one:batch", "beta/two"]);
   assert.equal(resolveProviderApiKey(openrouter, environments), undefined);
   const expanded = expandProviderModels(merged);
-  assert.deepEqual(
-    expanded.providers.map((provider) => provider.key),
-    ["openrouter-alpha-one-batch", "openrouter-beta-two", "mock"],
+  // The catalog also ships a Hugging Face provider, so the assertion covers the other entries.
+  const listed = expanded.providers.filter(
+    (provider) => !provider.key.startsWith("huggingface-"),
   );
   assert.deepEqual(
-    expanded.providers.map((provider) => provider.model),
-    ["alpha/one:batch", "beta/two", "mock-flash"],
+    listed.map((provider) => provider.key),
+    ["openrouter-alpha-one-batch", "openrouter-beta-two", "deepseek-deepseek-flash", "mock"],
+  );
+  assert.deepEqual(
+    listed.map((provider) => provider.model),
+    ["alpha/one:batch", "beta/two", "deepseek-flash", "mock-flash"],
   );
 });
 
