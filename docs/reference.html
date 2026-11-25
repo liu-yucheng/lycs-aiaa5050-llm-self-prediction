@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reference — Next-token self-prediction</title>
-<meta name="description" content="Tool arguments, command line, settings, output layout, and failure behavior.">
+<title>Reference — plugin documentation</title>
+<meta name="description" content="Tool arguments, command line, settings, environment keys, and output layout.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.5.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -24,253 +24,90 @@
 
 <main>
   <h1>Reference</h1>
-  <p class="lede">The five tools, the command line, the two settings, and every file that a session
-    writes.</p>
+  <p class="lede">The tool arguments, the command line, the settings, the environment keys, and
 
-  <h2>1. Tools</h2>
+    the output layout.</p>
+
+<h2>The tool arguments</h2>
   <table>
     <thead>
-      <tr><th>Tool</th><th>Arguments</th><th>Output</th></tr>
+      <tr><th>Argument</th><th>Type</th><th>Meaning</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td><code>llm_self_prediction_run</code></td>
-        <td><code>providers</code>, <code>tasks</code>, <code>limit</code>, <code>repetitions</code>,
-          <code>toleranceNats</code>, <code>outputDirectory</code>, <code>seed</code>,
-          <code>maxConcurrency</code>, <code>topLogprobs</code>, <code>dryRun</code></td>
-        <td>The session code, the directory, the report path, the task count, the pair count, the
-          verdict of each model, and the warnings. A probe result of every excluded model is one
-          warning.</td>
-      </tr>
-      <tr>
-        <td><code>llm_self_prediction_status</code></td>
-        <td><code>limit</code></td>
-        <td>The recent sessions, newest first, with the status, the task count, the failure count,
-          and the verdicts.</td>
-      </tr>
-      <tr>
-        <td><code>llm_self_prediction_report</code></td>
-        <td><code>session</code></td>
-        <td>The session code, the report path, and the Markdown text.</td>
-      </tr>
-      <tr>
-        <td><code>llm_self_prediction_dataset</code></td>
-        <td><code>sample</code></td>
-        <td>The dataset identifier, the language, the task count, the category counts, and the first
-          tasks.</td>
-      </tr>
-      <tr>
-        <td><code>llm_self_prediction_help</code></td>
-        <td>none</td>
-        <td>The experiment summary, the provider table, and the run steps.</td>
-      </tr>
+      <tr><td><code>providers</code></td><td>string array</td><td>Provider keys or model keys. Empty selects every enabled model.</td></tr>
+      <tr><td><code>tasks</code></td><td>string array</td><td>Task identifiers in the selected order. Empty selects every task.</td></tr>
+      <tr><td><code>repetitions</code></td><td>integer 1 to 10</td><td>The repetition count of each condition. Default 3.</td></tr>
+      <tr><td><code>toleranceNats</code></td><td>number</td><td>The verdict tolerance in nats. Default 0.05.</td></tr>
+      <tr><td><code>outputDirectory</code></td><td>string</td><td>The output root. Empty uses the plugin setting.</td></tr>
+      <tr><td><code>seed</code></td><td>integer</td><td>The bootstrap seed. Default 20260815.</td></tr>
+      <tr><td><code>maxConcurrency</code></td><td>integer 1 to 16</td><td>The number of tasks that run at the same time.</td></tr>
+      <tr><td><code>topLogprobsCount</code></td><td>integer 2 to 64</td><td>The requested table size. Default 20.</td></tr>
+      <tr><td><code>dryRun</code></td><td>boolean</td><td>Use the mock provider and no network.</td></tr>
     </tbody>
   </table>
 
-  <h2>2. Run arguments</h2>
-  <table>
-    <thead>
-      <tr><th>Argument</th><th>Type</th><th>Default</th><th>Meaning</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>providers</code></td>
-        <td>string array</td>
-        <td>every enabled provider</td>
-        <td>The provider keys of the run.</td>
-      </tr>
-      <tr>
-        <td><code>tasks</code></td>
-        <td>string array</td>
-        <td>every task</td>
-        <td>The task identifiers of the run, in dataset order.</td>
-      </tr>
-      <tr>
-        <td><code>limit</code></td>
-        <td>integer</td>
-        <td>0</td>
-        <td>The maximum task count. A value of 0 selects every task.</td>
-      </tr>
-      <tr>
-        <td><code>repetitions</code></td>
-        <td>integer</td>
-        <td>4</td>
-        <td>The count of answers of each mode for one task.</td>
-      </tr>
-      <tr>
-        <td><code>toleranceNats</code></td>
-        <td>number</td>
-        <td>0.05</td>
-        <td>The separation tolerance in nats.</td>
-      </tr>
-      <tr>
-        <td><code>outputDirectory</code></td>
-        <td>string</td>
-        <td>the configured root</td>
-        <td>The output root of the session directory.</td>
-      </tr>
-      <tr>
-        <td><code>seed</code></td>
-        <td>integer</td>
-        <td>20260815</td>
-        <td>The seed of the bootstrap and of the session code.</td>
-      </tr>
-      <tr>
-        <td><code>maxConcurrency</code></td>
-        <td>integer</td>
-        <td>3</td>
-        <td>The maximum count of concurrent task jobs, from 1 to 16.</td>
-      </tr>
-      <tr>
-        <td><code>topLogprobs</code></td>
-        <td>integer</td>
-        <td>20</td>
-        <td>The support size of both modes, from 1 to 64. The value overrides every provider
-          section. A model must return that many entries during the probe, or the run excludes
-          it.</td>
-      </tr>
-      <tr>
-        <td><code>dryRun</code></td>
-        <td>boolean</td>
-        <td>false</td>
-        <td>Use the mock provider and no network access.</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>The <code>providers</code> argument holds either provider keys such as <code>openrouter</code>
-    or model identifiers such as <code>qwen/qwen3.8-flash</code>.</p>
-  <p>A run expands every model list, probes each model, and keeps the models that return a
-    <code>logprobs</code> table at the support size. A run stops with <code>INVALID_PROVIDER</code>
-    when no model passes the probe, and the message lists the reason of each model.</p>
-  <p>An unknown argument is ignored. An argument of the wrong type stops the run with the message
-    <code>The argument NAME is not ...</code>.</p>
+<h2>The command line</h2>
+  <pre><code>node lib/cli.js run [options]
+node lib/cli.js status [--limit=5]
+node lib/cli.js report [--session=&lt;xid&gt;]
+node lib/cli.js dataset [--sample=8]
+node lib/cli.js env
+node lib/cli.js help
 
-  <h2>3. Command line</h2>
-  <pre><code>node lib/cli.js run --dry-run --limit=3 --repetitions=2
-node lib/cli.js run --providers=qwen/qwen3.8-flash --limit=8 --tolerance=0.02
-node lib/cli.js status --limit=5
-node lib/cli.js report --session=20261122T133644Z-20260815-60375c
-node lib/cli.js dataset --sample=8
-node lib/cli.js env</code></pre>
-  <table>
-    <thead>
-      <tr><th>Command</th><th>Options</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>run</code></td>
-        <td><code>--providers</code>, <code>--tasks</code>, <code>--limit</code>, <code>--repetitions</code>,
-          <code>--tolerance</code>, <code>--output</code>, <code>--seed</code>, <code>--concurrency</code>,
-          <code>--top-logprobs</code>, <code>--dry-run</code></td>
-      </tr>
-      <tr><td><code>status</code></td><td><code>--limit</code>, <code>--output</code></td></tr>
-      <tr><td><code>report</code></td><td><code>--session</code>, <code>--output</code></td></tr>
-      <tr><td><code>dataset</code></td><td><code>--sample</code></td></tr>
-      <tr>
-        <td><code>env</code></td>
-        <td>none. The command copies the example file when the private file is absent.</td>
-      </tr>
-      <tr><td><code>help</code></td><td>none</td></tr>
-    </tbody>
-  </table>
-  <p>An option accepts both forms <code>--name=value</code> and <code>--name value</code>. The exit
-    code is 0 for a success, 1 for a handled error, and 2 for a usage error.</p>
+# run options
+--providers=&lt;keys&gt; --tasks=&lt;ids&gt; --repetitions=&lt;n&gt; --tolerance=&lt;nats&gt;
+--output=&lt;directory&gt; --seed=&lt;n&gt; --concurrency=&lt;n&gt; --entries=&lt;n&gt; --dry-run</code></pre>
 
-  <h2>4. Settings</h2>
-  <p>The bundle patch mounts one row with the id <code>aiaa5050-llm-self-prediction</code>.</p>
+<h2>The plugin settings</h2>
   <table>
     <thead>
-      <tr><th>Setting</th><th>Default</th><th>Meaning</th></tr>
+      <tr><th>Setting</th><th>Type</th><th>Meaning</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td><code>outputRoot</code></td>
-        <td>empty</td>
-        <td>The output root. An empty value uses <code>outputs</code> in the workspace. A relative
-          value resolves against the workspace.</td>
-      </tr>
-      <tr>
-        <td><code>maxConcurrency</code></td>
-        <td>3</td>
-        <td>The maximum count of concurrent task jobs, clamped to 1 through 16.</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>A setting of the wrong type falls back to its default, so a bad row never stops the plugin from
-    loading.</p>
-
-  <h2>5. Output layout</h2>
-  <p>Every path below sits in <code>outputs/&lt;session code&gt;/</code> of the workspace, unless the
-    <code>outputRoot</code> setting or the <code>--output</code> option names another root.</p>
-  <table>
-    <thead>
-      <tr><th>Path</th><th>Content</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>session.json</code></td>
-        <td>The session code, the options, the providers, the environment, and the status.</td>
-      </tr>
-      <tr><td><code>tasks.json</code></td><td>The tasks of the session.</td></tr>
-      <tr>
-        <td><code>raw/&lt;provider&gt;-&lt;task&gt;-&lt;mode&gt;-r&lt;n&gt;.json</code></td>
-        <td>One provider reply, unedited.</td>
-      </tr>
-      <tr>
-        <td><code>raw/&lt;provider&gt;-&lt;task&gt;-&lt;mode&gt;-r&lt;n&gt;.error.json</code></td>
-        <td>The record of one failed call.</td>
-      </tr>
-      <tr>
-        <td><code>records/&lt;provider&gt;-&lt;task&gt;.json</code></td>
-        <td>The parsed answers, the pairs, the baselines, the warnings, and the errors.</td>
-      </tr>
-      <tr><td><code>metrics.json</code></td><td>The aggregate metrics and the verdict of each provider.</td></tr>
-      <tr><td><code>report.md</code></td><td>The readable report.</td></tr>
-      <tr><td><code>summary.csv</code></td><td>One row for each provider.</td></tr>
-      <tr><td><code>tasks.csv</code></td><td>One row for each task and provider.</td></tr>
-    </tbody>
-  </table>
-  <p>The session code has the form <code>&lt;UTC time&gt;-&lt;seed&gt;-&lt;six hex characters&gt;</code>,
-    for example <code>20261122T133644Z-20260815-60375c</code>.</p>
-
-  <h2>6. Failure behavior</h2>
-  <table>
-    <thead>
-      <tr><th>Situation</th><th>Result</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>A provider has no usable key</td>
-        <td>The run stops before the first call with <code>MISSING_CREDENTIAL</code>, and the prompt
-          names the environment keys to fill in.</td>
-      </tr>
-      <tr>
-        <td>A call fails, times out, or returns an invalid reply</td>
-        <td>One error file, one warning, and one missing answer. The run continues.</td>
-      </tr>
-      <tr>
-        <td>Every call of a task fails</td>
-        <td>The record holds the errors, and the task contributes no pair.</td>
-      </tr>
-      <tr>
-        <td>The user cancels the run</td>
-        <td>The manifest records the status <code>failed</code> and the reason.</td>
-      </tr>
-      <tr>
-        <td>The dataset file is malformed</td>
-        <td>The run stops with <code>INVALID_DATASET</code> and the offending task.</td>
-      </tr>
+      <tr><td><code>outputRoot</code></td><td>string</td><td>The output root. Empty uses <code>outputs/</code> in the workspace.</td></tr>
+      <tr><td><code>maxConcurrency</code></td><td>integer 1 to 16</td><td>The default worker count of one run.</td></tr>
     </tbody>
   </table>
 
-  <p><a href="reproducibility.html">Next: what the run records and what it cannot claim →</a></p>
+<h2>The environment keys</h2>
+<p>The file <code>inputs/.env</code> holds one section for each provider. The example file <code>inputs/.env.example</code> lists every key. A placeholder in angle brackets counts as an absent key.</p>
+
+<h2>The output layout</h2>
+  <pre><code>outputs/&lt;xid&gt;/
+  run.json                     the manifest: status, options, providers, versions
+  tasks.json                   the selected tasks
+  intermediate/&lt;providerKey&gt;/&lt;taskId&gt;/&lt;condition&gt;-r&lt;n&gt;-call&lt;k&gt;.json
+  results/metrics.json         the three comparisons, the summaries, the verdicts
+  results/records.json         one task record for each task and model
+  results/records/&lt;providerKey&gt;/&lt;taskId&gt;.json
+  results/report.md            the Markdown report
+  results/summary.csv          one row for each provider and comparison
+  results/tasks.csv            one row for each task and comparison
+  results/environment.json     the recorded versions and the elapsed time
+  results/task-summary.json    the compact table that the explorer reads
+  demos/index.html             the demonstration website
+  demos/assets/                the style sheet, the script, and the data files</code></pre>
+
+<h2>The failure modes</h2>
+  <table>
+    <thead>
+      <tr><th>Code</th><th>Cause</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>INVALID_ARGUMENT</code></td><td>An argument is absent, malformed, or names an unknown task.</td></tr>
+      <tr><td><code>INVALID_DATASET</code></td><td>A dataset file breaks a validation rule.</td></tr>
+      <tr><td><code>INVALID_PROVIDER</code></td><td>The catalog holds no such provider, or no model reports a table.</td></tr>
+      <tr><td><code>MISSING_CREDENTIAL</code></td><td>No API key is available for a selected provider.</td></tr>
+      <tr><td><code>PROVIDER_FAILURE</code></td><td>The endpoint returned an error status or no JSON body.</td></tr>
+      <tr><td><code>INVALID_RESPONSE</code></td><td>The reply holds no usable table.</td></tr>
+      <tr><td><code>MISSING_SESSION</code></td><td>The requested run or report is absent.</td></tr>
+    </tbody>
+  </table>
 </main>
 
-<footer class="site-footer">
-  <div class="inner">
-    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
-      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
-  </div>
+<footer>
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+    The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
 </html>

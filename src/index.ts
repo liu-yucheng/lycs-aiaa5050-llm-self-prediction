@@ -39,8 +39,8 @@ export function apply(ctx: PluginContext, config?: unknown): void {
     ctx.workingDirectory ?? ctx.get<WorkingDirectoryService>("workingDirectory");
   const service = new ExperimentService({
     resolveWorkspace: async (agent, signal): Promise<string> => {
-      if (directoryService !== undefined && agent !== undefined) {
-        return directoryService.ensure(agent, signal);
+      if (directoryService !== undefined && agent?.id !== undefined) {
+        return directoryService.ensure({ id: agent.id }, signal);
       }
       return process.cwd();
     },
@@ -57,8 +57,8 @@ export function apply(ctx: PluginContext, config?: unknown): void {
     };
   }, "llm-self-prediction tools");
   ctx.logger?.info(
-    `${PLUGIN_NAME}: the plugin is ready with the input directory "inputs" and the output root ` +
-      `"${outputRoot || "outputs"}".`,
+    `${PLUGIN_NAME}: the plugin is ready with the dataset directory "inputs/testing-dataset" ` +
+      `and the output root "${outputRoot || "outputs"}".`,
   );
 }
 

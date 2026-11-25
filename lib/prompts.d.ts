@@ -1,55 +1,77 @@
 import type { ProbabilityEntry, Task } from "./types.js";
-/** One system message and one user message. */
-export interface PromptPair {
-    readonly system: string;
-    readonly user: string;
-}
-/** The tool definition that the request sends to the provider. */
-export interface ProviderToolDefinition {
-    readonly name: string;
-    readonly description: string;
-    readonly parameters: Record<string, unknown>;
+/** One table as the plugin writes it into a message or into a file. */
+export interface TableDocument {
+    /** The entries in report order. */
+    readonly entries: readonly ProbabilityEntry[];
 }
 /**
- * Build the prompt of one actual next-token prediction.
+ * Report whether one task is an English task.
+ *
+ * @param task - the task to inspect.
+ * @returns true when the language tag starts with `en`.
+ */
+export declare function isEnglishTask(task: Task): boolean;
+/**
+ * Build the user message of one actual next-token prediction.
  *
  * @param task - the task whose prefix the model reads.
  * @returns the system message and the user message.
  */
-export declare function buildActualPredictionPrompt(task: Task): PromptPair;
+export declare function buildActualPredictionPrompt(task: Task): {
+    system: string;
+    user: string;
+};
 /**
- * Build the prompt of one next-token self-prediction.
+ * Build the user message of one self-prediction request.
  *
- * The model reports the distribution that it believes it produced for the same prefix. A serving
- * tokenizer keeps some words whole and cuts other words into a short first piece. A report that
- * names the whole word only loses a large amount of probability when the served first token is
- * that piece, so the prompt asks for a hedge over the cut length. Entry 1 is the whole word, and
- * the other entries are the first letters of the same word. The model sets the mass from its
- * belief about the cut, because the cut is not derivable from the word or from its length.
- *
- * A Chinese word is a short run of characters, and the serving tokenizer usually keeps it whole.
- * The Chinese prompt therefore asks for one entry only.
+ * The model reports the table that it believes its own inference stack produces for the prefix.
+ * The check runs before the model reads any served table.
  *
  * @param task - the task whose prefix the model reads.
  * @param entryCount - the requested table size.
  * @returns the system message and the user message.
  */
-export declare function buildSelfPredictionPrompt(task: Task, entryCount: number): PromptPair;
+export declare function buildSelfPredictionPrompt(task: Task, entryCount: number): {
+    system: string;
+    user: string;
+};
 /**
- * Build the forced tool definition of one self-prediction answer.
+ * Build the message that injects one served table into the conversation.
  *
- * @param entryCount - the maximum number of table entries.
- * @returns the tool definition.
+ * @param table - the served table.
+ * @returns the message text.
  */
-export declare function buildSelfPredictionTool(entryCount: number): ProviderToolDefinition;
+export declare function buildInjectedTableMessage(table: TableDocument): string;
 /**
- * Parse the arguments of one self-prediction tool call.
+ * Build the user message that follows one injected table in the injected self-prediction condition.
  *
- * The parser accepts one JSON object with an `entries` array. A value that is not a JSON string
- * is converted to JSON first, because a provider may return a parsed object.
- *
- * @param argumentsValue - the raw arguments of the tool call.
- * @returns the probability entries in the reported order.
- * @throws ExperimentError when the arguments hold no valid entry.
+ * @param task - the task whose prefix the model reads.
+ * @param entryCount - the requested table size.
+ * @returns the user message.
  */
-export declare function parseSelfPredictionArguments(argumentsValue: unknown): ProbabilityEntry[];
+export declare function buildInjectedSelfPredictionPrompt(task: Task, entryCount: number): string;
+/**
+ * Build the user message that follows one self table in the injected actual-prediction condition.
+ *
+ * @param task - the task whose prefix the model reads.
+ * @returns the user message.
+ */
+export declare function buildInjectedActualPrompt(task: Task): string;
+/**
+ * Format one table as the canonical JSON document.
+ *
+ * @param table - the table to format.
+ * @returns the JSON text with two-space indentation.
+ */
+export declare function formatTableJson(table: TableDocument): string;
+/**
+ * Parse one self report from the text of a model reply.
+ *
+ * The parser accepts one JSON object or one JSON array. It ignores a code fence and any text
+ * around the JSON value. Each entry must hold a token and a finite log probability.
+ *
+ * @param text - the reply text.
+ * @returns the entries in report order.
+ * @throws ExperimentError when the text holds no valid entry.
+ */
+export declare function parseSelfReport(text: string): ProbabilityEntry[];

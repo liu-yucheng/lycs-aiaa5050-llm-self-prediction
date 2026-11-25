@@ -1,0 +1,232 @@
+{
+  "datasetId": "llm-self-prediction-zh32",
+  "language": "zh-Hans",
+  "description": "Thirty-two Simplified Chinese next-token tasks, four per category. Each task gives the text before the target position and a human reference token. The reference token is a sanity label. It does not enter a metric.",
+  "taskCount": 32,
+  "tasks": [
+    {
+      "id": "Z001",
+      "category": "poetry",
+      "language": "zh-Hans",
+      "prefix": "床前明月光，疑是地上",
+      "referenceToken": "霜"
+    },
+    {
+      "id": "Z002",
+      "category": "poetry",
+      "language": "zh-Hans",
+      "prefix": "白日依山尽，黄河入海",
+      "referenceToken": "流"
+    },
+    {
+      "id": "Z003",
+      "category": "poetry",
+      "language": "zh-Hans",
+      "prefix": "春眠不觉晓，处处闻啼",
+      "referenceToken": "鸟"
+    },
+    {
+      "id": "Z004",
+      "category": "poetry",
+      "language": "zh-Hans",
+      "prefix": "举头望明月，低头思故",
+      "referenceToken": "乡"
+    },
+    {
+      "id": "Z009",
+      "category": "idiom",
+      "language": "zh-Hans",
+      "prefix": "画蛇添足，多此一",
+      "referenceToken": "举"
+    },
+    {
+      "id": "Z010",
+      "category": "idiom",
+      "language": "zh-Hans",
+      "prefix": "守株待兔，不如主动出",
+      "referenceToken": "击"
+    },
+    {
+      "id": "Z011",
+      "category": "idiom",
+      "language": "zh-Hans",
+      "prefix": "亡羊补牢，为时未",
+      "referenceToken": "晚"
+    },
+    {
+      "id": "Z012",
+      "category": "idiom",
+      "language": "zh-Hans",
+      "prefix": "掩耳盗铃，自欺欺",
+      "referenceToken": "人"
+    },
+    {
+      "id": "Z017",
+      "category": "daily",
+      "language": "zh-Hans",
+      "prefix": "早上闹钟响了三遍，他才从床上坐",
+      "referenceToken": "起来"
+    },
+    {
+      "id": "Z018",
+      "category": "daily",
+      "language": "zh-Hans",
+      "prefix": "地铁到站前，她提前把背包拉链拉",
+      "referenceToken": "好"
+    },
+    {
+      "id": "Z019",
+      "category": "daily",
+      "language": "zh-Hans",
+      "prefix": "出门时天有点阴，他顺手拿了一把",
+      "referenceToken": "伞"
+    },
+    {
+      "id": "Z020",
+      "category": "daily",
+      "language": "zh-Hans",
+      "prefix": "洗衣机响了，她起身去阳台晾",
+      "referenceToken": "衣服"
+    },
+    {
+      "id": "Z025",
+      "category": "food",
+      "language": "zh-Hans",
+      "prefix": "锅里水开了，她把面条下进",
+      "referenceToken": "去"
+    },
+    {
+      "id": "Z026",
+      "category": "food",
+      "language": "zh-Hans",
+      "prefix": "早餐摊前排着队，老板熟练地摊着煎",
+      "referenceToken": "饼"
+    },
+    {
+      "id": "Z027",
+      "category": "food",
+      "language": "zh-Hans",
+      "prefix": "他往碗里加了一勺辣椒",
+      "referenceToken": "油"
+    },
+    {
+      "id": "Z028",
+      "category": "food",
+      "language": "zh-Hans",
+      "prefix": "米饭蒸好后，她掀开锅盖闻到一阵",
+      "referenceToken": "香味"
+    },
+    {
+      "id": "Z033",
+      "category": "weather",
+      "language": "zh-Hans",
+      "prefix": "乌云压得很低，眼看就要下",
+      "referenceToken": "雨"
+    },
+    {
+      "id": "Z034",
+      "category": "weather",
+      "language": "zh-Hans",
+      "prefix": "雪下了一夜，屋顶白茫茫一",
+      "referenceToken": "片"
+    },
+    {
+      "id": "Z035",
+      "category": "weather",
+      "language": "zh-Hans",
+      "prefix": "太阳落山后，气温一下子降了下",
+      "referenceToken": "来"
+    },
+    {
+      "id": "Z036",
+      "category": "weather",
+      "language": "zh-Hans",
+      "prefix": "春风吹过，河边的柳树抽出新",
+      "referenceToken": "芽"
+    },
+    {
+      "id": "Z041",
+      "category": "technology",
+      "language": "zh-Hans",
+      "prefix": "手机系统提示更新，他点了稍后提",
+      "referenceToken": "醒"
+    },
+    {
+      "id": "Z042",
+      "category": "technology",
+      "language": "zh-Hans",
+      "prefix": "电脑突然蓝屏，他只好长按电源键重",
+      "referenceToken": "启"
+    },
+    {
+      "id": "Z043",
+      "category": "technology",
+      "language": "zh-Hans",
+      "prefix": "她把文件拖进共享文件夹，点了上",
+      "referenceToken": "传"
+    },
+    {
+      "id": "Z044",
+      "category": "technology",
+      "language": "zh-Hans",
+      "prefix": "网速太慢，视频一直在缓",
+      "referenceToken": "冲"
+    },
+    {
+      "id": "Z049",
+      "category": "news",
+      "language": "zh-Hans",
+      "prefix": "早高峰的地铁站里，人流排到了楼梯",
+      "referenceToken": "口"
+    },
+    {
+      "id": "Z050",
+      "category": "news",
+      "language": "zh-Hans",
+      "prefix": "社区贴出通知，明天上午停水两",
+      "referenceToken": "小时"
+    },
+    {
+      "id": "Z051",
+      "category": "news",
+      "language": "zh-Hans",
+      "prefix": "学校门口拉起了警戒线，家长在旁焦急等",
+      "referenceToken": "待"
+    },
+    {
+      "id": "Z052",
+      "category": "news",
+      "language": "zh-Hans",
+      "prefix": "消防车鸣着笛赶到，火势很快被控制",
+      "referenceToken": "住"
+    },
+    {
+      "id": "Z057",
+      "category": "story",
+      "language": "zh-Hans",
+      "prefix": "他推开门，屋里一片漆",
+      "referenceToken": "黑"
+    },
+    {
+      "id": "Z058",
+      "category": "story",
+      "language": "zh-Hans",
+      "prefix": "她翻开日记本，第一页只写了一行",
+      "referenceToken": "字"
+    },
+    {
+      "id": "Z059",
+      "category": "story",
+      "language": "zh-Hans",
+      "prefix": "火车缓缓启动，站台上的人挥了挥",
+      "referenceToken": "手"
+    },
+    {
+      "id": "Z060",
+      "category": "story",
+      "language": "zh-Hans",
+      "prefix": "老人从抽屉里取出一个泛黄的信",
+      "referenceToken": "封"
+    }
+  ]
+}

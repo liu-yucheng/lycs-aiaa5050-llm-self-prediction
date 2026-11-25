@@ -1,95 +1,82 @@
-import type { BaselinePairMetrics, ConfidenceInterval, MetricSummary, PairMetrics, PredictionAnswer, ProviderDefinition, ProviderMetrics, SessionMetrics, Task, TaskRecord, Verdict } from "./types.js";
+import type { ComparisonMetrics, ComparisonName, ComparisonSummary, ConditionName, ConfidenceInterval, PredictionRecord, ProviderResult, SessionMetrics, Task, TaskRecord, TokenDistribution, Verdict } from "./types.js";
 /**
- * Compute the metrics of one actual-versus-self pair.
+ * Compute one comparison of two tables.
  *
- * @param actual - the actual prediction.
- * @param self - the self prediction.
- * @returns the pair metrics.
+ * @param actual - the actual table.
+ * @param predicted - the predicted table.
+ * @param actualRepetition - the repetition number of the actual table.
+ * @param predictedRepetition - the repetition number of the predicted table.
+ * @returns the comparison metrics.
  */
-export declare function computePairMetrics(actual: PredictionAnswer, self: PredictionAnswer): PairMetrics;
+export declare function computeComparisonMetrics(actual: TokenDistribution, predicted: TokenDistribution, actualRepetition: number, predictedRepetition: number): ComparisonMetrics;
 /**
- * Compute the metrics of one pair of the same prediction mode.
+ * Summarize one list of comparisons without a confidence interval.
  *
- * @param first - the first prediction.
- * @param second - the second prediction.
- * @returns the baseline pair metrics.
+ * @param comparison - the comparison name.
+ * @param values - the comparisons.
+ * @returns the summary with a zero-width interval.
  */
-export declare function computeBaselinePairMetrics(first: PredictionAnswer, second: PredictionAnswer): BaselinePairMetrics;
+export declare function summarizeComparisons(comparison: ComparisonName, values: readonly ComparisonMetrics[]): ComparisonSummary;
 /**
- * Compute the summary of one set of pair metrics.
- *
- * @param pairs - the pair metrics.
- * @returns the summary; an empty list gives zeros.
- */
-export declare function summarizePairs(pairs: readonly PairMetrics[]): MetricSummary;
-/**
- * Build the record of one task and one provider.
- *
- * A missing side gives an empty pair list and keeps the error text. The function never invents an
- * answer for a failed call.
+ * Build one task record.
  *
  * @param task - the task.
- * @param provider - the provider definition.
- * @param actual - the successful actual predictions.
- * @param self - the successful self predictions.
- * @param errors - the failure texts of this task and provider.
+ * @param providerKey - the expanded provider key.
+ * @param providerLabel - the display label.
+ * @param model - the model name.
+ * @param predictions - the predictions of each condition.
+ * @param errors - the errors of the task.
  * @returns the task record.
  */
-export declare function buildTaskRecord(task: Task, provider: ProviderDefinition, actual: readonly PredictionAnswer[], self: readonly PredictionAnswer[], errors: readonly string[]): TaskRecord;
+export declare function buildTaskRecord(task: Task, providerKey: string, providerLabel: string, model: string, predictions: Readonly<Record<ConditionName, readonly PredictionRecord[]>>, errors: readonly string[]): TaskRecord;
 /**
- * Create one deterministic pseudo-random number generator.
+ * Create one deterministic random number generator.
  *
  * @param seed - the seed.
- * @returns a function that returns a value in `[0, 1)`.
+ * @returns a function that returns a value in the range from zero to one.
  */
 export declare function createRandomGenerator(seed: number): () => number;
 /**
- * Compute one bootstrap confidence interval of a mean.
+ * Compute one bootstrap confidence interval of the mean.
  *
  * @param values - the observed values.
- * @param options - the sample count, the seed, and the confidence level.
- * @returns the interval; an empty list gives a zero interval.
+ * @param options - the resample count, the seed, and the confidence level.
+ * @returns the interval.
  */
 export declare function bootstrapConfidenceInterval(values: readonly number[], options?: {
-    readonly sampleCount?: number;
-    readonly randomSeed?: number;
-    readonly confidenceLevel?: number;
+    sampleCount?: number;
+    randomSeed?: number;
+    confidenceLevel?: number;
 }): ConfidenceInterval;
 /**
- * Decide the verdict of one provider.
+ * Decide the verdict of one comparison.
  *
- * The null hypothesis says that the symmetric divergence is above the tolerance. The alternative
- * says that it is below the tolerance. A confidence interval that lies below the tolerance
- * supports the alternative, one that lies above supports the null, and one that crosses the
- * tolerance leaves the question open.
- *
- * @param summary - the provider summary.
- * @param interval - the confidence interval of the mean symmetric divergence.
- * @param toleranceNats - the tolerance in nats.
+ * @param interval - the interval of the mean symmetric divergence.
+ * @param toleranceNats - the tolerance.
+ * @param pairCount - the number of compared pairs.
  * @returns the verdict.
  */
-export declare function decideVerdict(summary: MetricSummary, interval: ConfidenceInterval, toleranceNats: number): Verdict;
+export declare function decideVerdict(interval: ConfidenceInterval, toleranceNats: number, pairCount: number): Verdict;
 /**
- * Aggregate the task records of one provider.
+ * Compute the result of one model.
  *
- * @param records - the records of one provider.
- * @param provider - the provider definition.
- * @param toleranceNats - the tolerance in nats.
- * @param randomSeed - the seed of the confidence interval.
- * @returns the provider metrics.
+ * @param records - the task records of the model.
+ * @param toleranceNats - the tolerance.
+ * @param randomSeed - the seed of the intervals.
+ * @param sampleCount - the resample count of the intervals.
+ * @returns the provider result.
  */
-export declare function computeProviderMetrics(records: readonly TaskRecord[], provider: ProviderDefinition, toleranceNats: number, randomSeed: number): ProviderMetrics;
+export declare function computeProviderResult(records: readonly TaskRecord[], toleranceNats: number, randomSeed: number, sampleCount?: number): ProviderResult;
 /**
- * Build the metrics file of one session.
+ * Compute the metrics of one run.
  *
- * @param options - the session code, dataset, records, tolerance, repetition count, table size,
- *   seed, and generation time.
+ * @param options - the run identity, the records, and the settings.
  * @returns the session metrics.
  */
 export declare function computeSessionMetrics(options: {
-    readonly sessionCode: string;
-    readonly datasetId: string;
-    readonly datasetLanguage?: string;
+    readonly xid: string;
+    readonly datasetIds: readonly string[];
+    readonly languages: readonly string[];
     readonly records: readonly TaskRecord[];
     readonly toleranceNats: number;
     readonly repetitionCount: number;
@@ -97,12 +84,5 @@ export declare function computeSessionMetrics(options: {
     readonly randomSeed: number;
     readonly generatedAt: string;
     readonly taskCount: number;
-    readonly providers: readonly ProviderDefinition[];
+    readonly sampleCount?: number;
 }): SessionMetrics;
-/**
- * Read the default tolerance of one run.
- *
- * @param value - the requested tolerance.
- * @returns the requested value when it is positive, else the default.
- */
-export declare function resolveTolerance(value: number | undefined): number;

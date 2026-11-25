@@ -5,6 +5,7 @@ export interface ProviderEnvironment {
     readonly models?: readonly string[];
     readonly apiKey?: string;
     readonly topLogprobsCount?: number;
+    readonly edgeHost?: string;
     readonly thinking?: string;
     readonly reasoning?: string;
 }
