@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.1</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -41,6 +41,7 @@
     <li>The plugin never rewrites a raw file.</li>
     <li>The plugin never changes a task, a prompt, or a parsing rule to make a metric pass.</li>
     <li>The plugin records a failure in the task record and continues the run.</li>
+    <li>The plugin repeats a request after HTTP 429, HTTP 5xx, or a temporary network fault, at most four attempts with a growing delay. A model that fails all attempts adds one error line.</li>
     <li>A report states only what the output files support.</li>
   </ul>
 
@@ -66,7 +67,7 @@ node lib/cli.js report --session=&lt;xid&gt;</code></pre>
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.1. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

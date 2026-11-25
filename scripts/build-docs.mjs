@@ -688,6 +688,9 @@ const reproducibilityBody = [
       "The plugin never rewrites a raw file.",
       "The plugin never changes a task, a prompt, or a parsing rule to make a metric pass.",
       "The plugin records a failure in the task record and continues the run.",
+      "The plugin repeats a request after HTTP 429, HTTP 5xx, or a temporary network fault, at most "
+        + "four attempts with a growing delay. A model that fails all attempts adds one error line.",
+
       "A report states only what the output files support.",
     ]),
   ),
