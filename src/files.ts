@@ -167,7 +167,7 @@ export function safeFileSegment(value: string): string {
 /**
  * Resolve one file of the packaged plugin directory.
  *
- * @param relativePath - the path relative to the package root, for example `inputs/providers.json`.
+ * @param relativePath - the path relative to the package root, for example `inputs/testing-dataset`.
  * @returns the absolute path of the file.
  */
 export function packagedPath(relativePath: string): string {

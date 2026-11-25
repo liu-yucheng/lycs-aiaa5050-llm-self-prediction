@@ -28,8 +28,12 @@ async function createWorkspace() {
     );
   }
   await fs.copyFile(
-    path.join(repository, "inputs", "providers.json"),
-    path.join(inputs, "providers.json"),
+    path.join(repository, ".env.example"),
+    path.join(workspace, ".env.example"),
+  );
+  await fs.copyFile(
+    path.join(repository, "models-to-use.env"),
+    path.join(workspace, "models-to-use.env"),
   );
   return workspace;
 }

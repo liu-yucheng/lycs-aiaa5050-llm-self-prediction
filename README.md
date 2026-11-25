@@ -85,16 +85,60 @@ A task holds an identifier, a category, a language, a sentence prefix, and a ref
 validator rejects a duplicate identifier and a prefix that ends with its reference token. No
 metric reads the reference token.
 
-## Credentials
+## Tested models
 
-The plugin reads `inputs/.env`. The first run copies `inputs/.env.example` to `inputs/.env` and
-stops with a prompt when a key is absent. A value in angle brackets counts as an absent key.
+The public file `models-to-use.env` holds the model list. The probe script measures the four
+requirements of the protocol before a run: an open-source model, a top-tier publisher, the latest
+version of its series, and a served table of 20 candidates at `temperature=0`.
 
 ```text
+npm run probe                       # probe every candidate of the publisher list
+node scripts/probe-models.mjs --per-org=3 --concurrency=4
+```
+
+The probe writes `outputs/probe/report.md`. The list below holds the models that passed on
+2026-11-25:
+
+| Publisher | Model | Series |
+| --- | --- | --- |
+| DeepSeek | `deepseek-ai/DeepSeek-V4.1-Flash-1017` | V4.1 Flash |
+| Qwen | `Qwen/Qwen3-Coder-Next` | Qwen3 Coder |
+| Moonshot AI | `moonshotai/Kimi-K3.1-Pro` | Kimi K3.1 |
+| Z.ai | `zai-org/GLM-5.2` | GLM-5.2 |
+| Xiaomi | `XiaomiMiMo/MiMo-V2.6-Pro-RL` | MiMo V2.6 |
+| Tencent | `tencent/Hy4` | Hunyuan 4 |
+| ByteDance | `ByteDance-Seed/UI-TARS-1.5-7B` | UI-TARS 1.5 |
+| MiniMax | `MiniMaxAI/MiniMax-M3` | MiniMax M3 |
+| Meta | `meta-llama/Llama-4-Maverick-17B-128E-Instruct` | Llama 4 |
+| Google | `google/gemma-4-31B-it` | Gemma 4 |
+
+A model that fails the probe is left out of the run with a warning that names the reason. Two
+reasons are common: the endpoint makes the reasoning mode mandatory, or the endpoint serves no
+table of candidates.
+
+DeepSeek serves the chosen token only. The endpoint fills every other candidate with a
+placeholder value, so the reader keeps the chosen token and the record carries a warning. Use the
+DeepSeek provider for a pre-test of the pipeline, not for a published measurement.
+
+## Credentials
+
+The plugin reads `.env` in the workspace root. A repository also holds the public files
+`.env.example` and `models-to-use.env`. The first run copies each absent file from the packaged
+copy and stops with a prompt when a key is absent. A value in angle brackets counts as an absent
+key. Never commit `.env`.
+
+```text
+# .env, private: endpoints and keys
 huggingface.base_url=https://router.huggingface.co/v1
 huggingface.api_key=<your key>
+deepseek.base_url=https://api.deepseek.com
+deepseek.api_key=<your key>
+```
+
+```text
+# models-to-use.env, public: the tested models
 huggingface.models_to_use=Qwen/Qwen3-Coder-Next, zai-org/GLM-5.2
-huggingface.reasoning=disabled
+deepseek.models_to_use=deepseek-flash
 ```
 
 | Key | Meaning |
@@ -112,8 +156,11 @@ An edge host carries the request through a host that the network permits. The TL
 carries the edge name, and the `Host` header keeps the base URL host, so the edge still selects
 the right distribution. The edge certificate replaces the certificate of the base URL host.
 
-`inputs/providers.json` holds the provider catalog. A provider can list several models, and the
-plugin expands each model into one client.
+The plugin holds the catalog in code. It serves two providers, Hugging Face for the test and
+DeepSeek for the pre-test, and one local test provider that a dry run selects. The private
+`.env` file holds the base URL and the API key. The public `models-to-use.env` file holds the
+model list, so a workspace changes the tested models without a change of the private file. A
+provider with no model stops the run with a message that names the missing line.
 
 ## Run
 
@@ -169,9 +216,16 @@ outputs/<xid>/
 | `implementation.html` | The platform, the presets, and the run flow. |
 | `meaning.html` | What the results mean and do not mean, the limits, and the future work. |
 
-Each page is bilingual. One button switches between English and Simplified Chinese. The Result
-Explorer compares one task pair at a time and recomputes the divergence in the browser from the
-recorded tables.
+Each page is bilingual. One button switches between English and Simplified Chinese. Each page
+leads with a strip of statistic cards, colored verdict badges, and horizontal bars that mark the
+tolerance, so the numbers read before the prose.
+
+The Result Explorer shows one task pair in two panes and recomputes the divergence in the
+browser from the recorded tables. Pick a model, a comparison, a task, and one repetition for each
+side, then press Apply. The page also applies each control change at once. Reset returns to the
+first model and the default comparison. Each pane sorts its rows by its own distribution, so the
+served pane puts the largest served probability first and the predicted pane puts the largest
+predicted probability first.
 
 ## The five tools
 

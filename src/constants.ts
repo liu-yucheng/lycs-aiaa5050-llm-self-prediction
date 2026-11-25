@@ -12,7 +12,7 @@
 export const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 
 /** The semantic version of the plugin. */
-export const PLUGIN_VERSION = "0.6.1";
+export const PLUGIN_VERSION = "0.7.0";
 
 /** The name of the tool that runs the experiment. */
 export const TOOL_RUN = "llm_self_prediction_run";
@@ -98,8 +98,8 @@ export const RESULTS_DIRECTORY_NAME = "results";
 /** The directory name of the static webpages below one run directory. */
 export const DEMOS_DIRECTORY_NAME = "demos";
 
-/** The file name of the provider catalog. */
-export const PROVIDER_FILE_NAME = "providers.json";
+/** The file name of the public models file. */
+export const MODELS_FILE_NAME = "models-to-use.env";
 
 /** The file name of the private environment file. */
 export const ENV_FILE_NAME = ".env";

@@ -63,13 +63,67 @@ export declare function buildProviderEnvironments(values: Readonly<Record<string
  */
 export declare function describeEnvironmentKey(prefix: string, property: string): string;
 /**
- * Ensure the private environment file of one directory.
+ * Merge two groups of provider sections.
+ *
+ * The overlay group wins for each property that it holds. The base group keeps every other
+ * property.
+ *
+ * @param base - the base sections.
+ * @param overlay - the sections that win.
+ * @returns the merged sections.
+ */
+export declare function mergeProviderEnvironments(base: ReadonlyMap<string, ProviderEnvironment>, overlay: ReadonlyMap<string, ProviderEnvironment>): Map<string, ProviderEnvironment>;
+/** The state of the configuration of one workspace. */
+export interface ConfigurationState {
+    /** The state of the private environment file. */
+    readonly environment: EnvironmentFileState;
+    /** The path of the models file. */
+    readonly modelsFilePath?: string;
+    /** True when this command created the models file. */
+    readonly modelsFileCreated?: boolean;
+}
+/** The configuration of one workspace. */
+export interface WorkspaceConfiguration {
+    /** The state of each configuration file. */
+    readonly state: ConfigurationState;
+    /** The merged provider sections. */
+    readonly environments: Map<string, ProviderEnvironment>;
+    /** The problems that the reader found. */
+    readonly problems: readonly string[];
+}
+/**
+ * Ensure the private environment file of one workspace.
  *
  * The function returns the existing file when it is present. When the file is absent, the function
- * copies the example file of the directory, or the packaged example file, and reports that it
- * created the file. The created file holds placeholder values.
+ * copies the example file of the workspace, or the packaged example file, and reports that it
+ * created the file. The created file holds placeholder values. A file of the older `inputs/` layout
+ * moves to the workspace root.
  *
- * @param directory - the directory that holds the experiment.
+ * @param workspace - the workspace directory.
  * @returns the state of the environment file.
  */
 export declare function ensureEnvironmentFile(workspace: string): Promise<EnvironmentFileState>;
+/**
+ * Ensure the models file of one workspace.
+ *
+ * The function keeps an existing file. When the file is absent, the function copies the packaged
+ * file and reports that it created the file. A copy keeps the model lists of the package.
+ *
+ * @param workspace - the workspace directory.
+ * @returns the path of the file, and the created flag.
+ */
+export declare function ensureModelsFile(workspace: string): Promise<{
+    readonly filePath?: string;
+    readonly created: boolean;
+}>;
+/**
+ * Read the configuration of one workspace.
+ *
+ * The reader takes the base URL, the API key, and the switches from `.env`. It takes the model
+ * lists from `models-to-use.env`. The models file wins for a model list, so a workspace can change
+ * the tested models without a change of the private file.
+ *
+ * @param workspace - the workspace directory.
+ * @returns the configuration, with one problem line for each defect.
+ */
+export declare function readConfiguration(workspace: string): Promise<WorkspaceConfiguration>;

@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.7.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -71,13 +71,12 @@
 <ul>
     <li><code>thinking: disabled</code> sends <code>{"thinking": {"type": "disabled"}}</code>, which the DeepSeek endpoint reads.</li>
     <li><code>reasoning: disabled</code> sends <code>{"reasoning": {"enabled": false}}</code>, which the Hugging Face router reads.</li>
-    <li>An OpenRouter base URL also sends <code>{"provider": {"require_parameters": true}}</code>.</li>
     <li>A model that reports one entry only is left out, and the run records one warning.</li>
   </ul>
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.7.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

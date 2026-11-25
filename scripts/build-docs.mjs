@@ -243,7 +243,7 @@ const overviewBody = [
         "# a dry run needs no credential and no network",
         "node lib/cli.js run --dry-run --tasks=Z001,E001 --repetitions=1",
         "",
-        "# a real run reads the key from inputs/.env",
+        "# a real run reads the key from .env",
         "node lib/cli.js env",
         "node lib/cli.js run",
       ].join("\n"),
@@ -463,8 +463,6 @@ const protocolBody = [
         " which the DeepSeek endpoint reads.",
       "<code>reasoning: disabled</code> sends <code>{\"reasoning\": {\"enabled\": false}}</code>," +
         " which the Hugging Face router reads.",
-      "An OpenRouter base URL also sends" +
-        " <code>{\"provider\": {\"require_parameters\": true}}</code>.",
       "A model that reports one entry only is left out, and the run records one warning.",
     ]),
   ),
@@ -600,9 +598,11 @@ const referenceBody = [
   section(
     "The environment keys",
     paragraph(
-      "The file <code>inputs/.env</code> holds one section for each provider. The example file " +
-        "<code>inputs/.env.example</code> lists every key. A placeholder in angle brackets counts as " +
-        "an absent key.",
+      "The private file <code>.env</code> holds the endpoint and the key of each provider. The " +
+        "public file <code>.env.example</code> lists every key. The public file " +
+        "<code>models-to-use.env</code> holds the model list, so a workspace changes the tested " +
+        "models without a change of the private file. A placeholder in angle brackets counts as an " +
+        "absent key.",
     ),
     table(
       ["Key", "Meaning"],

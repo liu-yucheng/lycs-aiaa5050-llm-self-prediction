@@ -10,8 +10,11 @@ import path from "node:path";
 import {
   buildProviderEnvironments,
   ensureEnvironmentFile,
+  ensureModelsFile,
   isPlaceholderValue,
+  mergeProviderEnvironments,
   parseEnvironmentText,
+  readConfiguration,
   readEnvironmentFile,
 } from "../lib/env.js";
 import { applyProviderEnvironments } from "../lib/providers.js";
@@ -34,10 +37,12 @@ async function makeWorkspace(extraFiles = {}) {
       await readFile(path.join(repository, "inputs", "testing-dataset", name)),
     );
   }
-  await writeFile(
-    path.join(workspace, "inputs", "providers.json"),
-    await readFile(path.join(repository, "inputs", "providers.json")),
-  );
+  for (const name of [".env.example", "models-to-use.env"]) {
+    await writeFile(
+      path.join(workspace, name),
+      await readFile(path.join(repository, name)),
+    );
+  }
   for (const [name, content] of Object.entries(extraFiles)) {
     await writeFile(path.join(workspace, name), content);
   }
@@ -116,7 +121,7 @@ test("the environment file is copied once and an edited file is kept", async () 
   const workspace = await makeWorkspace();
   try {
     const state = await ensureEnvironmentFile(workspace);
-    assert.equal(state.filePath, path.join(workspace, "inputs", ".env"));
+    assert.equal(state.filePath, path.join(workspace, ".env"));
     assert.equal(state.created, true);
     const copied = await readFile(state.filePath, "utf8");
     assert.ok(copied.includes("api_key"));
@@ -129,14 +134,14 @@ test("the environment file is copied once and an edited file is kept", async () 
   }
 });
 
-test("a root environment file moves into the inputs directory", async () => {
-  const workspace = await makeWorkspace({ ".env": "deepseek.api_key=sk-legacy\n" });
+test("an old inputs environment file moves to the workspace root", async () => {
+  const workspace = await makeWorkspace();
+  await mkdir(path.join(workspace, "inputs"), { recursive: true });
+  await writeFile(path.join(workspace, "inputs", ".env"), "deepseek.api_key=sk-legacy\n");
   try {
     const state = await ensureEnvironmentFile(workspace);
-    assert.equal(state.filePath, path.join(workspace, "inputs", ".env"));
-    assert.equal(state.migratedFrom, path.join(workspace, ".env"));
-    const values = await readEnvironmentFile(state.filePath);
-    assert.equal(values["deepseek.api_key"], "sk-legacy");
+    assert.equal(state.filePath, path.join(workspace, ".env"));
+    assert.equal(state.migratedFrom, path.join(workspace, "inputs", ".env"));
     const second = await ensureEnvironmentFile(workspace);
     assert.equal(second.created, false);
   } finally {
@@ -145,7 +150,7 @@ test("a root environment file moves into the inputs directory", async () => {
 });
 
 test("a real run stops with a prompt when no key is available", async () => {
-  const workspace = await makeWorkspace();
+  const workspace = await makeWorkspace({ "models-to-use.env": "huggingface.models_to_use=Qwen/Qwen3-Coder-Next\n" });
   const previous = process.env["HF_TOKEN"];
   delete process.env["HF_TOKEN"];
   try {
@@ -167,12 +172,60 @@ test("a real run stops with a prompt when no key is available", async () => {
           { id: "test" },
           { providerKeys: ["huggingface"], taskIds: ["Z001"], repetitions: 1 },
         ),
-      /inputs[\\/]\.env/u,
+      /Put the key in .*[\\/]\.env/u,
     );
   } finally {
     if (previous !== undefined) {
       process.env["HF_TOKEN"] = previous;
     }
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("the models file wins for a model list and keeps the other properties", () => {
+  const base = buildProviderEnvironments({
+    "huggingface.base_url": "https://example.invalid/v1",
+    "huggingface.models_to_use": "old-one",
+    "deepseek.api_key": "sk_key",
+  });
+  const overlay = buildProviderEnvironments({
+    "huggingface.models_to_use": "new-one, new-two",
+  });
+  const merged = mergeProviderEnvironments(base, overlay);
+  const huggingface = merged.get("huggingface");
+  assert.equal(huggingface?.baseUrl, "https://example.invalid/v1");
+  assert.deepEqual(huggingface?.models, ["new-one", "new-two"]);
+  assert.equal(merged.get("deepseek")?.apiKey, "sk_key");
+});
+
+test("the models file is copied from the package once", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "llm-self-prediction-models-"));
+  try {
+    const state = await ensureModelsFile(workspace);
+    assert.equal(state.filePath, path.join(workspace, "models-to-use.env"));
+    assert.equal(state.created, true);
+    const second = await ensureModelsFile(workspace);
+    assert.equal(second.created, false);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("the configuration reader takes the keys from .env and the models from the models file", async () => {
+  const workspace = await makeWorkspace({
+    ".env": 'huggingface.api_key="hf_test"\nhuggingface.edge_host=cdn-lfs.hf.co\n',
+    "models-to-use.env": "huggingface.models_to_use=first, second\ndeepseek.models_to_use=deepseek-flash\n",
+  });
+  try {
+    const configuration = await readConfiguration(workspace);
+    assert.equal(configuration.problems.length, 0);
+    assert.equal(configuration.state.environment.filePath, path.join(workspace, ".env"));
+    const huggingface = configuration.environments.get("huggingface");
+    assert.equal(huggingface?.apiKey, "hf_test");
+    assert.equal(huggingface?.edgeHost, "cdn-lfs.hf.co");
+    assert.deepEqual(huggingface?.models, ["first", "second"]);
+    assert.deepEqual(configuration.environments.get("deepseek")?.models, ["deepseek-flash"]);
+  } finally {
     await rm(workspace, { recursive: true, force: true });
   }
 });

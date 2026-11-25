@@ -33,7 +33,7 @@ import {
 } from "./constants.js";
 import { countByCategory, loadDatasets, resolveDatasetDirectory, selectTasks } from "./dataset.js";
 import { renderDemos } from "./demos.js";
-import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
+import { readConfiguration } from "./env.js";
 import { ExperimentError } from "./errors.js";
 import {
   ensureDirectory,
@@ -50,14 +50,13 @@ import {
   applyProviderEnvironments,
   buildPredictionRecord,
   createProviderClient,
-  loadProviderCatalog,
   probeLogprobsSupport,
   resolveProviderApiKey,
   resolveRequestedKeys,
   MOCK_PROVIDER_KEY,
 } from "./providers.js";
-import { DATASET_DIRECTORY_NAME, PROVIDER_FILE_NAME } from "./constants.js";
-import { resolveInputPath } from "./files.js";
+import { createProviderCatalog } from "./catalog.js";
+import { DATASET_DIRECTORY_NAME } from "./constants.js";
 import { renderReport, renderSummaryCsv, renderTasksCsv } from "./report.js";
 import type { PredictionOutcome } from "./providers.js";
 import type {
@@ -166,9 +165,9 @@ function buildCredentialPrompt(
 ): string {
   const lines = [
     `No API key is available for ${providers.map((provider) => provider.key).join(", ")}.`,
-    `Put the key in ${path.join(workspace, "inputs", ENV_FILE_NAME)}.`,
+    `Put the key in ${path.join(workspace, ENV_FILE_NAME)}.`,
     "One line holds `<section>.api_key=<your key>`, for example `huggingface.api_key=hf_...`.",
-    `The example file ${path.join(workspace, "inputs", ENV_EXAMPLE_FILE_NAME)} shows each section.`,
+    `The example file ${path.join(workspace, ENV_EXAMPLE_FILE_NAME)} shows each section.`,
   ];
   return lines.join(" ");
 }
@@ -210,16 +209,11 @@ export class ExperimentService {
     );
     const datasetDirectory = await resolveDatasetDirectory(workspace, DATASET_DIRECTORY_NAME);
     const dataset = await loadDatasets(datasetDirectory);
-    const environmentState = await ensureEnvironmentFile(workspace);
-    const environmentValues =
-      environmentState.filePath === undefined
-        ? {}
-        : await readEnvironmentFile(environmentState.filePath);
-    const environments = buildProviderEnvironments(environmentValues);
-    const catalogPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
+    const configuration = await readConfiguration(workspace);
+    const environmentState = configuration.state.environment;
     const catalog = applyProviderEnvironments(
-      await loadProviderCatalog(catalogPath),
-      environments,
+      createProviderCatalog(),
+      configuration.environments,
     );
     const repetitionCount = clampInteger(
       request.repetitions,
@@ -272,6 +266,7 @@ export class ExperimentService {
       elapsedSeconds: 0,
       environmentFile: environmentState.filePath,
       environmentFileCreated: environmentState.created,
+      modelsFile: configuration.state.modelsFilePath,
     };
     const manifest: SessionManifest = {
       xid,
@@ -300,7 +295,7 @@ export class ExperimentService {
     try {
       const clients = [];
       for (const definition of definitions) {
-        const apiKey = resolveProviderApiKey(definition, environments);
+        const apiKey = resolveProviderApiKey(definition, configuration.environments);
         if (
           apiKey === undefined &&
           definition.key !== MOCK_PROVIDER_KEY &&
@@ -316,6 +311,14 @@ export class ExperimentService {
       const active = [];
       for (const client of clients) {
         if (client.definition.key === MOCK_PROVIDER_KEY) {
+          active.push(client);
+          continue;
+        }
+        if (client.definition.distribution === "chosen-only") {
+          warnings.push(
+            `The provider ${client.providerKey} serves the chosen token only, so each ` +
+              "distribution holds one token and every divergence is near zero.",
+          );
           active.push(client);
           continue;
         }
