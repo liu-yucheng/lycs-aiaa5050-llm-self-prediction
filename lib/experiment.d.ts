@@ -103,6 +103,25 @@ export declare class ExperimentService {
         report: string;
     }>;
     /**
+     * Write the demonstration website of one run again.
+     *
+     * The method reads the recorded metrics, records, and environment of the run. It writes the
+     * seven pages and the assets from the current templates, so a template change reaches a run
+     * that is already complete.
+     *
+     * @param agent - the agent that asks.
+     * @param signal - the cancellation signal.
+     * @param xid - the run identifier, or an empty string for the newest run.
+     * @returns the run identifier and the path of the entry page.
+     */
+    rewriteDemos(agent: {
+        readonly id?: string;
+    } | undefined, signal?: AbortSignal, xid?: string): Promise<{
+        xid: string;
+        directory: string;
+        entryPath: string;
+    }>;
+    /**
      * Describe the dataset of one workspace.
      *
      * @param agent - the agent that asks.

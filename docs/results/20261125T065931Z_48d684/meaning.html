@@ -10,16 +10,18 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <span class="brand-mark">NTP</span>
-      <span class="brand-text"><span data-lang="en">Can LLMs predict their own next token predictions?</span><span data-lang="zh" hidden>大模型能预测自己的下一个词块吗？</span></span>
+      <span class="brand-mark">AIAA5050</span>
+      <span class="brand-text"><span data-lang="en">Next-token self-prediction</span><span data-lang="zh" hidden>下一个词块自我预测</span></span>
     </div>
-    <nav class="nav"><a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
-<a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
-<a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
-<a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
-<a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
-<a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
-<a href="meaning.html" class="active"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a></nav>
+    <nav class="nav" aria-label="Chapters">
+      <a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+      <a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+      <a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+      <a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+      <a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+      <a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+      <a href="meaning.html" aria-current="page"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a>
+    </nav>
     <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
       <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
     </button>
@@ -28,36 +30,44 @@
 <main class="page">
   <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261125T065931Z_48d684</code></p>
   <h1><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></h1>
-  <p class="lede"><span data-lang="en">What these numbers show, what they do not show, and what to measure next.</span><span data-lang="zh" hidden>这些数字说明什么，不说明什么，下一步测什么。</span></p>
+  <p class="lede"><span data-lang="en">What these numbers support, what they do not support, and what to measure next.</span><span data-lang="zh" hidden>这些数字支持什么、不支持什么，以及下一步测量什么。</span></p>
   
-<h2><span data-lang="en">What a small divergence means</span><span data-lang="zh" hidden>小散度说明什么</span></h2>
-<p><span data-lang="en">A small divergence in the plain condition means that the text table of the model matches the served table at the resolution of the measurement. That is a statement about a capability: the model can report its own distribution. It is not a statement about experience, and it is not a statement about access to the computation that produced the distribution.</span><span data-lang="zh" hidden>普通条件下的小散度表示：在本次测量的分辨率下，模型写出的文字表格与接口表格一致。这是关于能力的一句话：模型能报告自己的分布。它不是关于体验的论断，也不是关于能访问产生该分布的计算过程的论断。</span></p>
-<h2><span data-lang="en">What a large divergence means</span><span data-lang="zh" hidden>大散度说明什么</span></h2>
-<p><span data-lang="en">A large divergence in the plain condition means that the model cannot state its own distribution. The model can still produce the distribution, because the interface reads it at each step. The gap between producing and reporting is the measured quantity.</span><span data-lang="zh" hidden>普通条件下的大散度表示：模型无法说出自己的分布。模型仍然能产生该分布，因为接口在每一步读取它。产生与报告之间的差距就是被测量的量。</span></p>
-<h2><span data-lang="en">The injection comparisons</span><span data-lang="zh" hidden>注入比较</span></h2>
-<p><span data-lang="en">The injected self condition controls for the mechanics of the task. If the model copies the served table with little error, then a large divergence in the plain condition comes from the model and not from the difficulty of writing a table.</span><span data-lang="zh" hidden>注入自我条件控制了任务的机械难度。如果模型几乎无误差地复制接口表格，那么普通条件下的大散度来自模型本身，而不是来自写表格的难度。</span></p>
-<p><span data-lang="en">The injected actual condition tests influence in the other direction. A small divergence means that the model ignores the self-predicted table when it predicts. A large divergence means that the table moves the prediction.</span><span data-lang="zh" hidden>注入实际条件检验相反方向的影响。小散度表示模型在预测时忽略了自我预测表格。大散度表示该表格改变了预测。</span></p>
+<h2><span data-lang="en">What the numbers mean</span><span data-lang="zh" hidden>数字说明什么</span></h2>
+<div class="cards">
+<div class="card"><span class="card-icon">✅</span><strong><span data-lang="en">A capability</span><span data-lang="zh" hidden>一项能力</span></strong><span><span data-lang="en">The model can write a table. The run measures how close that table stays.</span><span data-lang="zh" hidden>模型能写出表格。运行测量该表格有多接近。</span></span></div>
+<div class="card"><span class="card-icon">📉</span><strong><span data-lang="en">A gap</span><span data-lang="zh" hidden>一道差距</span></strong><span><span data-lang="en">Injection reduces the gap. It does not close the gap.</span><span data-lang="zh" hidden>注入会缩小差距。它不会消除差距。</span></span></div>
+<div class="card"><span class="card-icon">📐</span><strong><span data-lang="en">A measurement</span><span data-lang="zh" hidden>一次测量</span></strong><span><span data-lang="en">Every number has an interval, a tolerance, and a rule.</span><span data-lang="zh" hidden>每个数字都有区间、容差与规则。</span></span></div>
+</div>
+<aside class="callout"><span data-lang="en">⚖️ 27 of 27 comparisons stay above the tolerance. A separated verdict states a difference. It does not state a cause.</span><span data-lang="zh" hidden>⚖️ 27 个比较中有 27 个高于容差。判为有差异只说明存在差异，不说明原因。</span></aside>
+<h2><span data-lang="en">What the numbers do not mean</span><span data-lang="zh" hidden>数字不说明什么</span></h2>
+<ul>
+<li><span data-lang="en">🚫 Not a claim about experience, feeling, or consciousness.</span><span data-lang="zh" hidden>🚫 不主张体验、感受或意识。</span></li>
+<li><span data-lang="en">🚫 Not a claim about the internal state of the model.</span><span data-lang="zh" hidden>🚫 不主张模型的内部状态。</span></li>
+<li><span data-lang="en">🚫 Not a claim that one model family is better than another.</span><span data-lang="zh" hidden>🚫 不主张某个模型家族更好。</span></li>
+<li><span data-lang="en">🚫 Not a test of a hidden goal, a plan, or a motive.</span><span data-lang="zh" hidden>🚫 不检验隐藏目标、计划或动机。</span></li>
+</ul>
 <h2><span data-lang="en">Limits</span><span data-lang="zh" hidden>局限</span></h2>
 <ul>
-<li><span data-lang="en">The measurement covers one token at one position. It says nothing about a long reply.</span><span data-lang="zh" hidden>测量只覆盖一个位置的一个词块。它不涉及长回复。</span></li>
-<li><span data-lang="en">The table holds the top entries only. A model that reports the top entries well can still hold a different tail.</span><span data-lang="zh" hidden>表格只保存前若干条目。报告好前若干条目的模型，尾部仍然可能不同。</span></li>
-<li><span data-lang="en">The tokenizer is invisible to the model. A word that the tokenizer cuts into pieces limits the exact match of the top token.</span><span data-lang="zh" hidden>分词器对模型不可见。被切成片段的词会限制首位词块的精确一致。</span></li>
-<li><span data-lang="en">The floor of 1e-12 exaggerates one missing token. The report shows the coverage so that a reader can see this effect.</span><span data-lang="zh" hidden>1e-12 的概率下限会放大单个缺失词块的影响。报告给出覆盖率，读者可以看出这一影响。</span></li>
-<li><span data-lang="en">A provider can serve a quantized or a routed variant of a model. The recorded model name is the name that the provider reports.</span><span data-lang="zh" hidden>提供方可能提供量化版本或路由版本。记录的模型名是提供方报告的模型名。</span></li>
-<li><span data-lang="en">The repetition count is small. The interval covers the sampling of tasks and repetitions in this run, and no other source of variation.</span><span data-lang="zh" hidden>重复次数较少。区间只覆盖本次运行的任务抽样与重复抽样，不覆盖其他变异来源。</span></li>
+<li><span data-lang="en">🔢 The tables hold 20 entries. A tail stays unmeasured.</span><span data-lang="zh" hidden>🔢 表格只有 20 个条目。长尾未被测量。</span></li>
+<li><span data-lang="en">✂️ A token can be a piece, not a word. The parser accepts a hedge, and the hedge adds noise.</span><span data-lang="zh" hidden>✂️ 词块可能是片段而非整词。解析器接受这种折中，折中带来噪声。</span></li>
+<li><span data-lang="en">❌ A reply without a table removes one pair.</span><span data-lang="zh" hidden>❌ 没有表格的回复会少一对数据。</span></li>
+<li><span data-lang="en">🎛️ A run holds one temperature, one prompt, and one tolerance.</span><span data-lang="zh" hidden>🎛️ 一次运行只有一个温度、一套提示词和一个容差。</span></li>
+<li><span data-lang="en">🔁 Three repetitions limit the estimate of provider noise.</span><span data-lang="zh" hidden>🔁 三次重复限制了提供方噪声的估计。</span></li>
 </ul>
-<h2><span data-lang="en">Future work</span><span data-lang="zh" hidden>未来工作</span></h2>
+<h2><span data-lang="en">Future work</span><span data-lang="zh" hidden>后续工作</span></h2>
 <ul>
-<li><span data-lang="en">Measure a whole reply, one position at a time, and compare the error along it.</span><span data-lang="zh" hidden>逐个位置测量一整段回复，并比较误差沿回复的变化。</span></li>
-<li><span data-lang="en">Ask for the tail as well as the head, with a second prompt for rare tokens.</span><span data-lang="zh" hidden>除头部外也询问尾部，用第二个提示词覆盖稀有词块。</span></li>
-<li><span data-lang="en">Vary the temperature and the reasoning setting, and report each cell.</span><span data-lang="zh" hidden>改变温度与推理开关，逐格报告结果。</span></li>
-<li><span data-lang="en">Give the model its own served table and ask it to explain the difference from its self-report.</span><span data-lang="zh" hidden>把接口表格给模型，让它解释与自我报告的差异。</span></li>
+<li><span data-lang="en">📈 Raise the entry count and compare the tails.</span><span data-lang="zh" hidden>📈 提高条目数，比较长尾。</span></li>
+<li><span data-lang="en">🗣️ Ask for a table in a second turn and compare the two reports.</span><span data-lang="zh" hidden>🗣️ 在第二轮再索取表格，比较两次报告。</span></li>
+<li><span data-lang="en">🧪 Add a condition that shows a wrong table and measures the correction.</span><span data-lang="zh" hidden>🧪 增加一个条件：给出错误表格，测量修正。</span></li>
+<li><span data-lang="en">🌍 Add tasks from more domains and more languages.</span><span data-lang="zh" hidden>🌍 增加更多领域与语言的任务。</span></li>
 </ul>
 
 </main>
 <footer class="page-footer">
-  <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.7.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.7.0 生成。随机种子 20260815。</span></p>
-  <p><span data-lang="en">This page is a record of one run. The files below the run directory hold every number.</span><span data-lang="zh" hidden>本页记录一次运行。运行目录下的文件保存每一个数字。</span></p>
+  <div class="footer-inner">
+    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.8.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.8.0 生成。随机种子 20260815。</span></p>
+    <p><span data-lang="en">Tolerance 0.050 nats. Every number comes from the run directory.</span><span data-lang="zh" hidden>容差 0.050 nat。每个数字都来自运行目录。</span></p>
+  </div>
 </footer>
 <script src="assets/app.js"></script>
 </body>

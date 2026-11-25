@@ -144,6 +144,7 @@ function buildCommandLineHelp(): string {
     "  run       Run the four conditions and write one run directory.",
     "  status    List the recent runs of the output root.",
     "  report    Print the Markdown report of one run.",
+    "  demos     Write the demonstration website of one run again.",
     "  dataset   Describe the datasets of the workspace.",
     "  env       Show the environment file and the provider keys.",
     "  help      Print the protocol of the plugin.",
@@ -163,6 +164,9 @@ function buildCommandLineHelp(): string {
     "  --limit 5              Number of runs to list.",
     "",
     "Options of report:",
+    "  --session <xid>        Run identifier. An empty value selects the newest run.",
+    "",
+    "Options of demos:",
     "  --session <xid>        Run identifier. An empty value selects the newest run.",
     "",
     "Options of dataset:",
@@ -231,6 +235,13 @@ export async function runCommandLine(argv: readonly string[]): Promise<number> {
         typeof options.session === "string" ? options.session : (positionals[0] ?? "");
       const result = await service.report(undefined, undefined, session);
       writeLine(result.report);
+      return EXIT_SUCCESS;
+    }
+    if (command === "demos") {
+      const session = typeof options.session === "string" ? options.session : (positionals[0] ?? "");
+      const result = await service.rewriteDemos(undefined, undefined, session);
+      writeLine(`Wrote the demonstration website of ${result.xid}.`);
+      writeLine(`Entry page: ${result.entryPath}`);
       return EXIT_SUCCESS;
     }
     if (command === "dataset") {

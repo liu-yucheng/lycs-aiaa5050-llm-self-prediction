@@ -10,35 +10,65 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <span class="brand-mark">NTP</span>
-      <span class="brand-text"><span data-lang="en">Can LLMs predict their own next token predictions?</span><span data-lang="zh" hidden>大模型能预测自己的下一个词块吗？</span></span>
+      <span class="brand-mark">AIAA5050</span>
+      <span class="brand-text"><span data-lang="en">Next-token self-prediction</span><span data-lang="zh" hidden>下一个词块自我预测</span></span>
     </div>
-    <nav class="nav"><a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
-<a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
-<a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
-<a href="explorer.html" class="active"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
-<a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
-<a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
-<a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a></nav>
+    <nav class="nav" aria-label="Chapters">
+      <a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+      <a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+      <a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+      <a href="explorer.html" aria-current="page"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+      <a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+      <a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+      <a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a>
+    </nav>
     <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
       <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
     </button>
   </div>
 </header>
-<main class="page">
+<main class="page explorer">
   <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261125T065931Z_48d684</code></p>
   <h1><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></h1>
-  <p class="lede"><span data-lang="en">Two panes, one task, and every token contribution.</span><span data-lang="zh" hidden>双栏、单任务、每个词块的贡献。</span></p>
+  <p class="lede"><span data-lang="en">Two panes, one task, and the share of every token.</span><span data-lang="zh" hidden>两栏、一个任务，以及每个词块的份额。</span></p>
   
-<p><span data-lang="en">Pick a model, a task, and a comparison, then press Apply. The left pane shows the served distribution. The right pane shows the predicted distribution. Each row gives the probability and its share of the divergence. The page also updates when a control changes.</span><span data-lang="zh" hidden>选择模型、任务和比较，然后按“应用”。左栏显示接口分布。右栏显示预测分布。每行给出概率及其对散度的贡献。控件变化时，页面也会自动更新。</span></p>
+<ul>
+<li><span data-lang="en">1️⃣ Pick a model, a comparison, a task, and two repetitions.</span><span data-lang="zh" hidden>1️⃣ 选择模型、比较、任务与两次重复。</span></li>
+<li><span data-lang="en">2️⃣ Press Apply. A change also applies at once.</span><span data-lang="zh" hidden>2️⃣ 按“应用”。更改也会立即生效。</span></li>
+<li><span data-lang="en">3️⃣ Read the two panes. A row gives one token and its share of the divergence.</span><span data-lang="zh" hidden>3️⃣ 阅读左右两栏。每行给出一个词块及其在散度中的份额。</span></li>
+</ul>
 <div class="explorer-bar">
-  <form class="explorer-controls" id="explorer-controls" onsubmit="return false">
-    <label><span data-lang="en">Model</span><span data-lang="zh" hidden>模型</span><select id="select-model"><option value="huggingface-deepseek-ai-DeepSeek-V4.1-Flash-1017">deepseek-ai/DeepSeek-V4.1-Flash-1017 · huggingface-deepseek-ai-DeepSeek-V4.1-Flash-1017</option><option value="huggingface-Qwen-Qwen3-Coder-Next">Qwen/Qwen3-Coder-Next · huggingface-Qwen-Qwen3-Coder-Next</option><option value="huggingface-zai-org-GLM-5.2">zai-org/GLM-5.2 · huggingface-zai-org-GLM-5.2</option><option value="huggingface-XiaomiMiMo-MiMo-V2.6-Pro-RL">XiaomiMiMo/MiMo-V2.6-Pro-RL · huggingface-XiaomiMiMo-MiMo-V2.6-Pro-RL</option><option value="huggingface-tencent-Hy4">tencent/Hy4 · huggingface-tencent-Hy4</option><option value="huggingface-ByteDance-Seed-UI-TARS-1.5-7B">ByteDance-Seed/UI-TARS-1.5-7B · huggingface-ByteDance-Seed-UI-TARS-1.5-7B</option><option value="huggingface-MiniMaxAI-MiniMax-M3">MiniMaxAI/MiniMax-M3 · huggingface-MiniMaxAI-MiniMax-M3</option><option value="huggingface-meta-llama-Llama-4-Maverick-17B-128E-Instruct">meta-llama/Llama-4-Maverick-17B-128E-Instruct · huggingface-meta-llama-Llama-4-Maverick-17B-128E-Instruct</option><option value="huggingface-google-gemma-4-31B-it">google/gemma-4-31B-it · huggingface-google-gemma-4-31B-it</option></select></label>
-    <label><span data-lang="en">Comparison</span><span data-lang="zh" hidden>比较</span><select id="select-comparison"><option value="plain_self">plain_self</option><option value="injected_self">injected_self</option><option value="injected_actual">injected_actual</option></select></label>
-    <label><span data-lang="en">Task</span><span data-lang="zh" hidden>任务</span><select id="select-task"></select></label>
-    <label><span data-lang="en">Actual repetition</span><span data-lang="zh" hidden>实际重复</span><select id="select-actual"></select></label>
-    <label><span data-lang="en">Predicted repetition</span><span data-lang="zh" hidden>预测重复</span><select id="select-predicted"></select></label>
-    <label class="checkbox"><span data-lang="en">Compare two tasks</span><span data-lang="zh" hidden>对比两个任务</span>
+  <form id="explorer-controls" class="explorer-controls" onsubmit="return false">
+    <label><span data-lang="en">Model</span><span data-lang="zh" hidden>模型</span>
+      <select id="select-model">
+            <option value="0">deepseek-ai/DeepSeek-V4.1-Flash-1017 · huggingface-deepseek-ai-DeepSeek-V4.1-Flash-1017</option>
+            <option value="1">Qwen/Qwen3-Coder-Next · huggingface-Qwen-Qwen3-Coder-Next</option>
+            <option value="2">zai-org/GLM-5.2 · huggingface-zai-org-GLM-5.2</option>
+            <option value="3">XiaomiMiMo/MiMo-V2.6-Pro-RL · huggingface-XiaomiMiMo-MiMo-V2.6-Pro-RL</option>
+            <option value="4">tencent/Hy4 · huggingface-tencent-Hy4</option>
+            <option value="5">ByteDance-Seed/UI-TARS-1.5-7B · huggingface-ByteDance-Seed-UI-TARS-1.5-7B</option>
+            <option value="6">MiniMaxAI/MiniMax-M3 · huggingface-MiniMaxAI-MiniMax-M3</option>
+            <option value="7">meta-llama/Llama-4-Maverick-17B-128E-Instruct · huggingface-meta-llama-Llama-4-Maverick-17B-128E-Instruct</option>
+            <option value="8">google/gemma-4-31B-it · huggingface-google-gemma-4-31B-it</option>
+      </select>
+    </label>
+    <label><span data-lang="en">Comparison</span><span data-lang="zh" hidden>比较</span>
+      <select id="select-comparison">
+            <option value="plain_self">plain_self</option>
+            <option value="injected_self">injected_self</option>
+            <option value="injected_actual">injected_actual</option>
+      </select>
+    </label>
+    <label><span data-lang="en">Task</span><span data-lang="zh" hidden>任务</span>
+      <select id="select-task"></select>
+    </label>
+    <label><span data-lang="en">Actual repetition</span><span data-lang="zh" hidden>实际重复</span>
+      <select id="select-actual"></select>
+    </label>
+    <label><span data-lang="en">Predicted repetition</span><span data-lang="zh" hidden>预测重复</span>
+      <select id="select-predicted"></select>
+    </label>
+    <label class="check"><span data-lang="en">Compare two tasks</span><span data-lang="zh" hidden>比较两个任务</span>
       <input type="checkbox" id="toggle-compare">
     </label>
     <label id="label-task-b" hidden><span data-lang="en">Second task</span><span data-lang="zh" hidden>第二个任务</span>
@@ -46,35 +76,46 @@
     </label>
   </form>
   <div class="button-row">
-    <button class="primary" type="button" id="apply-selection"><span data-lang="en">Apply</span><span data-lang="zh" hidden>应用</span></button>
-    <button class="ghost" type="button" id="reset-selection"><span data-lang="en">Reset</span><span data-lang="zh" hidden>重置</span></button>
+    <button type="button" class="primary" id="apply-selection"><span data-lang="en">Apply</span><span data-lang="zh" hidden>应用</span></button>
+    <button type="button" class="ghost" id="reset-selection"><span data-lang="en">Reset</span><span data-lang="zh" hidden>重置</span></button>
   </div>
 </div>
-<p class="status-line" id="explorer-status"></p>
+<p class="status-line" id="explorer-status"><span data-lang="en">Loading…</span><span data-lang="zh" hidden>加载中…</span></p>
 <div class="stat-strip" id="explorer-stats"></div>
 <div class="legend">
-  <span class="key"><span class="dot actual"></span><span data-lang="en">Served</span><span data-lang="zh" hidden>接口</span></span>
-  <span class="key"><span class="dot predicted"></span><span data-lang="en">Predicted</span><span data-lang="zh" hidden>预测</span></span>
-  <span class="key"><span class="dot symmetric"></span><span data-lang="en">Divergence share</span><span data-lang="zh" hidden>散度贡献</span></span>
+  <span><span class="dot actual"></span><span data-lang="en">Served</span><span data-lang="zh" hidden>接口</span></span>
+  <span><span class="dot predicted"></span><span data-lang="en">Predicted</span><span data-lang="zh" hidden>预测</span></span>
+  <span><span class="dot symmetric"></span><span data-lang="en">Divergence share</span><span data-lang="zh" hidden>散度份额</span></span>
 </div>
-<div class="detail-grid" id="detail-grid">
-  <section class="detail-pane" id="pane-a"></section>
-  <section class="detail-pane" id="pane-b"></section>
-  <section class="detail-pane" id="pane-c" hidden></section>
-  <section class="detail-pane" id="pane-d" hidden></section>
+<div class="panes">
+  <section class="pane" id="pane-a"><h3><span data-lang="en">Served table</span><span data-lang="zh" hidden>接口表格</span></h3>
+    <div class="pane-body"><span data-lang="en">Pick a task to load a table.</span><span data-lang="zh" hidden>请选择任务以载入表格。</span></div>
+  </section>
+  <section class="pane" id="pane-b"><h3><span data-lang="en">Predicted table</span><span data-lang="zh" hidden>预测表格</span></h3>
+    <div class="pane-body"><span data-lang="en">Pick a task to load a table.</span><span data-lang="zh" hidden>请选择任务以载入表格。</span></div>
+  </section>
+  <section class="pane" id="pane-c"><h3><span data-lang="en">Second task, served</span><span data-lang="zh" hidden>第二任务，接口</span></h3>
+    <div class="pane-body"><span data-lang="en">Enable the second task to load a table.</span><span data-lang="zh" hidden>启用第二任务以载入表格。</span></div>
+  </section>
+  <section class="pane" id="pane-d"><h3><span data-lang="en">Second task, predicted</span><span data-lang="zh" hidden>第二任务，预测</span></h3>
+    <div class="pane-body"><span data-lang="en">Enable the second task to load a table.</span><span data-lang="zh" hidden>启用第二任务以载入表格。</span></div>
+  </section>
 </div>
-<h2><span data-lang="en">How to read a pane</span><span data-lang="zh" hidden>如何读一栏</span></h2>
+<h2><span data-lang="en">How to read a pane</span><span data-lang="zh" hidden>如何阅读栏目</span></h2>
 <ul>
-<li><span data-lang="en">Probability: the normalized probability of the token in that distribution.</span><span data-lang="zh" hidden>概率：该词块在该分布中归一化后的概率。</span></li>
-<li><span data-lang="en">Share: the part of the symmetric divergence that this token contributes.</span><span data-lang="zh" hidden>贡献：该词块对对称散度的贡献份额。</span></li>
-<li><span data-lang="en">Missing: the token does not appear in that distribution, so it takes the floor.</span><span data-lang="zh" hidden>缺失：该词块不在该分布中，因此取概率下限。</span></li>
-<li><span data-lang="en">Badge: green is below 0.05 nats, amber is below 0.5 nats, red is at or above 0.5.</span><span data-lang="zh" hidden>徽标：绿色低于 0.05 奈特，琥珀色低于 0.5 奈特，红色为 0.5 奈特或更高。</span></li>
+<li><span data-lang="en">Σ Token: the word piece that both sides score.</span><span data-lang="zh" hidden>Σ 词块：双方都给出概率的片段。</span></li>
+<li><span data-lang="en">🎯 Probability: the normalized value of that side.</span><span data-lang="zh" hidden>🎯 概率：该侧归一化后的值。</span></li>
+<li><span data-lang="en">📊 Share: the part of the divergence that this token adds.</span><span data-lang="zh" hidden>📊 份额：该词块贡献的散度部分。</span></li>
+<li><span data-lang="en">📉 Missing: the token is absent on one side and takes the floor.</span><span data-lang="zh" hidden>📉 缺失：该词块在一侧缺失，取地板值。</span></li>
+<li><span data-lang="en">✅ A green badge stays below 0.050 nats.</span><span data-lang="zh" hidden>✅ 绿色徽章低于 0.050 nat。</span></li>
 </ul>
 
 </main>
 <footer class="page-footer">
-  <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.7.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.7.0 生成。随机种子 20260815。</span></p>
-  <p><span data-lang="en">This page is a record of one run. The files below the run directory hold every number.</span><span data-lang="zh" hidden>本页记录一次运行。运行目录下的文件保存每一个数字。</span></p>
+  <div class="footer-inner">
+    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.8.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.8.0 生成。随机种子 20260815。</span></p>
+    <p><span data-lang="en">Tolerance 0.050 nats. Every number comes from the run directory.</span><span data-lang="zh" hidden>容差 0.050 nat。每个数字都来自运行目录。</span></p>
+  </div>
 </footer>
 <script src="assets/app.js"></script>
 </body>

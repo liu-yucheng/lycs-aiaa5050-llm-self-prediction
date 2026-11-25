@@ -130,7 +130,7 @@
   }
 
   function bar(value, maximum, kind) {
-    var width = maximum > 0 ? Math.max(1, Math.round((value / maximum) * 90)) : 1;
+    var width = maximum > 0 ? Math.max(1, Math.round((value / maximum) * 44)) : 1;
     return '<span class="bar ' + kind + '" style="width:' + width + 'px"></span>';
   }
 
@@ -177,8 +177,8 @@
       '<span>KL(P‖A) <b>' + formatNumber(summary.klPredictedActual, 3) + '</b></span>' +
       '<span>JS <b>' + formatNumber(summary.jensenShannon, 3) + '</b></span>' +
       '<span>TV <b>' + formatNumber(summary.totalVariation, 3) + '</b></span>' +
-      '<span>🕳️ <b>' + formatNumber(summary.coveragePredictedByActual, 3) + '</b></span>' +
-      '<span>🧮 <b>' + formatNumber(computed.total, 3) + '</b></span>' +
+      '<span>📉 <b>' + formatNumber(summary.coveragePredictedByActual, 3) + '</b></span>' +
+      '<span>Σ <b>' + formatNumber(computed.total, 3) + '</b></span>' +
       '</div>' +
       '<p class="url-hint">' +
       (emphasis === "predicted"
@@ -325,9 +325,9 @@
         statCard("🧭", formatNumber(value.symmetricKl, 3), text("symmetric KL", "对称散度"), "symmetric") +
         statCard("🎯", formatNumber(value.topTokenAgreement === true ? 1 : 0, 0),
           text("top-1 match", "首选一致"), "predicted") +
-        statCard("🧮", formatNumber(value.jensenShannon, 3), text("Jensen-Shannon", "JS 散度"), "actual") +
+        statCard("Σ", formatNumber(value.jensenShannon, 3), text("Jensen-Shannon", "JS 散度"), "actual") +
         statCard("📏", formatNumber(value.totalVariation, 3), text("total variation", "全变差")) +
-        statCard("🕳️", formatNumber(value.coveragePredictedByActual, 3),
+        statCard("📉", formatNumber(value.coveragePredictedByActual, 3),
           text("coverage of served mass", "接口质量覆盖率"));
     }
 
@@ -439,39 +439,5 @@
     });
   }
 
-  function setupChart() {
-    var chart = document.getElementById("verdict-chart");
-    if (!chart) { return; }
-    loadModelIndex().then(function (index) {
-      var metrics = index.metrics;
-      var tolerance = Number(chart.getAttribute("data-tolerance")) || 0.05;
-      var rows = [];
-      var maximum = tolerance * 2;
-      for (var index2 = 0; index2 < metrics.providers.length; index2 += 1) {
-        var provider = metrics.providers[index2];
-        for (var index3 = 0; index3 < provider.comparisons.length; index3 += 1) {
-          var entry = provider.comparisons[index3];
-          maximum = Math.max(maximum, entry.meanSymmetricKl);
-          rows.push({ key: provider.providerKey, comparison: entry.comparison, value: entry.meanSymmetricKl });
-        }
-      }
-      var html = rows.map(function (row) {
-        var width = maximum > 0 ? Math.max(1, Math.round((row.value / maximum) * 320)) : 1;
-        var toleranceX = maximum > 0 ? Math.round((tolerance / maximum) * 320) : 0;
-        return '<div class="chart-row" style="display:flex;gap:10px;align-items:center;margin:3px 0;' +
-          'font-family:var(--mono);font-size:12px">' +
-          '<span style="width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-          escapeHtml(row.key) + " · " + escapeHtml(row.comparison) + '</span>' +
-          '<span style="position:relative;flex:0 0 330px">' +
-          '<span class="bar" style="width:' + width + 'px"></span>' +
-          '<span style="position:absolute;left:' + toleranceX + 'px;top:-3px;height:14px;' +
-          'border-left:1px dashed var(--accent)"></span></span>' +
-          '<span>' + formatNumber(row.value, 3) + '</span></div>';
-      }).join("");
-      chart.innerHTML = html;
-    });
-  }
-
   setupExplorer();
-  setupChart();
 })();

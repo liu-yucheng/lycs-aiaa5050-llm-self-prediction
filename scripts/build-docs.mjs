@@ -232,6 +232,7 @@ const overviewBody = [
       "<code>outputs/&lt;xid&gt;/intermediate/</code> holds every raw exchange, one file for each call.",
       "<code>outputs/&lt;xid&gt;/results/</code> holds the metrics, the records, the report, and the tables.",
       "<code>outputs/&lt;xid&gt;/demos/</code> holds the static bilingual demonstration website.",
+      "<code>node lib/cli.js demos [&lt;xid&gt;]</code> writes that website again from the current templates.",
     ]),
   ),
   section(

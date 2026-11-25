@@ -176,6 +176,10 @@ node lib/cli.js status
 node lib/cli.js report
 node lib/cli.js dataset
 node lib/cli.js env
+
+# write the demonstration website of a complete run again
+node lib/cli.js demos
+node lib/cli.js demos 20261125T065931Z_48d684
 ```
 
 The plugin probes each model with one served table before the run. A model that reports no table
@@ -219,6 +223,19 @@ outputs/<xid>/
 Each page is bilingual. One button switches between English and Simplified Chinese. Each page
 leads with a strip of statistic cards, colored verdict badges, and horizontal bars that mark the
 tolerance, so the numbers read before the prose.
+
+The pages copy the tokens and the layout of `docs/` and keep three font roles. The sans font
+(Arial, SimHei) sets the top bar, the footer, and every chapter and section title. The serif font
+(Cambria, NSimSun) sets the body text. The monospace font (Cascadia Mono) sets a code block, a
+table number, and the whole Result Explorer. The top-bar mark names the course, `AIAA5050`.
+
+The prose follows ASD-STE100 non-strict mode with an academic US English fallback, and
+Simplified Technical Chinese non-strict mode with a 白话文 fallback. Each page states one point in
+one short sentence, and a list replaces a paragraph where a list reads faster.
+
+A page change reaches a completed run. The command `node lib/cli.js demos <xid>` reads the
+recorded metrics, records, and environment of the run, and it writes the seven pages again from
+the current templates.
 
 The Result Explorer shows one task pair in two panes and recomputes the divergence in the
 browser from the recorded tables. Pick a model, a comparison, a task, and one repetition for each

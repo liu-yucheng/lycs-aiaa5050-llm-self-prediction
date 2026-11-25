@@ -32,7 +32,7 @@ import {
   TOP_LOGPROBS_COUNT,
 } from "./constants.js";
 import { countByCategory, loadDatasets, resolveDatasetDirectory, selectTasks } from "./dataset.js";
-import { renderDemos } from "./demos.js";
+import { readDemoOptions, renderDemos } from "./demos.js";
 import { readConfiguration } from "./env.js";
 import { ExperimentError } from "./errors.js";
 import {
@@ -501,6 +501,38 @@ export class ExperimentService {
     } catch {
       throw new ExperimentError("MISSING_SESSION", `The run ${path.basename(target)} has no report.`);
     }
+  }
+
+  /**
+   * Write the demonstration website of one run again.
+   *
+   * The method reads the recorded metrics, records, and environment of the run. It writes the
+   * seven pages and the assets from the current templates, so a template change reaches a run
+   * that is already complete.
+   *
+   * @param agent - the agent that asks.
+   * @param signal - the cancellation signal.
+   * @param xid - the run identifier, or an empty string for the newest run.
+   * @returns the run identifier and the path of the entry page.
+   */
+  public async rewriteDemos(
+    agent: { readonly id?: string } | undefined,
+    signal?: AbortSignal,
+    xid?: string,
+  ): Promise<{ xid: string; directory: string; entryPath: string }> {
+    const workspace = await this.options.resolveWorkspace(agent, signal);
+    const outputRoot = resolveOutputRoot(workspace, this.options.outputRoot() ?? "");
+    const directories = await listChildDirectories(outputRoot);
+    const target =
+      xid === undefined || xid.trim() === ""
+        ? directories[directories.length - 1]
+        : path.join(outputRoot, safeFileSegment(xid.trim()));
+    if (target === undefined) {
+      throw new ExperimentError("MISSING_SESSION", "The output root holds no run.");
+    }
+    const options = await readDemoOptions(target);
+    const entryPath = await renderDemos(options);
+    return { xid: path.basename(target), directory: target, entryPath };
   }
 
   /**
