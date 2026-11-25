@@ -1,170 +1,373 @@
-import { type ProviderEnvironment } from "./env.js";
-import type { PredictionAnswer, ProbabilityEntry, ProviderCatalog, ProviderDefinition, Task } from "./types.js";
-/** The mock provider key. */
-export declare const MOCK_PROVIDER_KEY = "mock";
 /**
- * The sampling temperature of every request.
+ * Provider clients and the four request kinds of the protocol.
  *
- * A value of zero asks every provider for its most likely token. It applies to every provider and
- * every model, so a repeated run of one task stays comparable across models.
+ * One client talks to one OpenAI-compatible endpoint with one model. The client returns the table
+ * of one condition. The caller writes the raw exchanges and builds the record, so the client never
+ * writes a file. The mock client gives a deterministic table and needs no network.
  */
-export declare const REQUEST_TEMPERATURE = 0;
-/** One prediction request. */
-export interface PredictionRequest {
-    readonly mode: "actual" | "self";
-    readonly task: Task;
+import https from "node:https";
+import type { ConditionName, PredictionRecord, ProviderCatalog, ProviderDefinition, Task, TokenDistribution } from "./types.js";
+/** The provider key of the mock client. */
+export declare const MOCK_PROVIDER_KEY = "mock";
+/** One recorded HTTP exchange. */
+export interface RecordedExchange {
+    /** The ISO timestamp of the request. */
+    readonly requestedAt: string;
+    /** The elapsed time of the request in milliseconds. */
+    readonly elapsedMilliseconds: number;
+    /** The endpoint of the request. */
+    readonly endpoint: string;
+    /** The request body, without the API key. */
+    readonly requestBody: unknown;
+    /** The response body. */
+    readonly responseBody: unknown;
+}
+/** One prediction before the caller writes the raw files. */
+export interface PredictionDraft {
+    /** The condition that produced the draft. */
+    readonly condition: ConditionName;
+    /** The repetition number. */
     readonly repetition: number;
-    readonly topLogprobsCount: number;
+    /** The ISO timestamp of the request. */
+    readonly requestedAt: string;
+    /** The elapsed time of the request in milliseconds. */
+    readonly elapsedMilliseconds: number;
+    /** The chosen token of a served table. */
+    readonly token?: string;
+    /** The normalized table. */
+    readonly distribution: TokenDistribution;
+    /** The origin of the table. */
+    readonly source: "provider_logprobs" | "self_report";
+    /** The endpoint of the request. */
+    readonly endpoint: string;
+    /** The request body, without the API key. */
+    readonly requestBody: unknown;
+    /** A warning about the draft. */
+    readonly warning?: string;
 }
-/** One client that answers one prediction request. */
+/** One prediction with the exchanges that produced it. */
+export interface PredictionOutcome {
+    /** The draft of the prediction. */
+    readonly draft: PredictionDraft;
+    /** The exchanges in request order. */
+    readonly exchanges: readonly RecordedExchange[];
+}
+/** The outcome of the injected actual-prediction condition. */
+export interface InjectedActualOutcome {
+    /** The self report that the plugin keeps in context. */
+    readonly self: PredictionOutcome;
+    /** The served actual table that follows the self report. */
+    readonly actual: PredictionOutcome;
+}
+/** One client of one OpenAI-compatible endpoint. */
 export interface ProviderClient {
+    /** The provider definition of the client. */
     readonly definition: ProviderDefinition;
-    predict(request: PredictionRequest, signal: AbortSignal): Promise<PredictionAnswer>;
+    /** The model name of the client. */
+    readonly model: string;
+    /** The provider key of the client, expanded with the model name. */
+    readonly providerKey: string;
+    /** Read the served table of one task. */
+    requestPlainActual(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /** Read the self report of one task. */
+    requestPlainSelf(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /** Inject one served table and read the self report that follows. */
+    requestInjectedSelf(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /** Read one self report, keep it in context, and read the served table that follows. */
+    requestInjectedActual(task: Task, repetition: number, signal?: AbortSignal): Promise<InjectedActualOutcome>;
 }
-/** The validated provider catalog. */
+/**
+ * Validate one provider catalog.
+ *
+ * @param value - the parsed file value.
+ * @returns the validated catalog.
+ * @throws ExperimentError when the value is not a valid catalog.
+ */
 export declare function validateProviderCatalog(value: unknown): ProviderCatalog;
 /**
- * Load the provider catalog.
+ * Load one provider catalog file.
  *
- * @param filePath - the path of the catalog file. The default is the packaged file.
- * @returns the validated catalog.
+ * @param filePath - the path of the file, or undefined for the packaged catalog.
+ * @returns the catalog.
  */
 export declare function loadProviderCatalog(filePath?: string): Promise<ProviderCatalog>;
 /**
- * Select the providers of one run.
+ * Select the providers to run.
  *
- * @param catalog - the validated catalog.
+ * @param catalog - the catalog.
  * @param keys - the requested keys; an empty list selects every enabled provider.
- * @param includeDisabled - true to accept a requested provider that the catalog disables.
- * @returns the selected definitions in catalog order.
+ * @param includeDisabled - true to keep a disabled provider that the caller names.
+ * @returns the selected definitions.
  * @throws ExperimentError when a requested key is absent.
  */
-export declare function selectProviders(catalog: ProviderCatalog, keys: readonly string[], includeDisabled: boolean): ProviderDefinition[];
+export declare function selectProviders(catalog: ProviderCatalog, keys: readonly string[], includeDisabled?: boolean): ProviderDefinition[];
 /**
- * Read the credential of one provider from its environment variable.
+ * Read the API key of one provider.
+ *
+ * The environment file section wins over the process environment.
  *
  * @param definition - the provider definition.
- * @returns the credential, or undefined when the variable is absent or empty.
+ * @param environments - the sections of the environment file.
+ * @returns the API key, or undefined when the key is absent.
  */
-export declare function readProviderCredential(definition: ProviderDefinition): string | undefined;
+export declare function resolveProviderApiKey(definition: ProviderDefinition, environments: ReadonlyMap<string, {
+    readonly apiKey?: string;
+}>): string | undefined;
 /**
- * Read the section name of one provider in the environment file.
+ * Resolve the environment section name of one provider.
  *
  * @param definition - the provider definition.
- * @returns the section name, which defaults to the provider key.
+ * @returns the section name.
  */
 export declare function resolveEnvironmentPrefix(definition: ProviderDefinition): string;
 /**
- * Resolve the API key of one provider.
+ * Apply the environment sections to one catalog.
  *
- * The environment file wins. The process environment is the fallback, so a shell session that
- * already holds the variable needs no file.
- *
- * @param definition - the provider definition.
- * @param environments - the section values of the environment file.
- * @returns the key, or undefined when no usable key exists.
+ * @param catalog - the catalog to update.
+ * @param environments - the sections of the environment file.
+ * @returns a new catalog with the overrides applied.
  */
-export declare function resolveProviderApiKey(definition: ProviderDefinition, environments: ReadonlyMap<string, ProviderEnvironment>): string | undefined;
+export declare function applyProviderEnvironments(catalog: ProviderCatalog, environments: ReadonlyMap<string, {
+    readonly baseUrl?: string;
+    readonly model?: string;
+    readonly models?: readonly string[];
+    readonly topLogprobsCount?: number;
+    readonly edgeHost?: string;
+    readonly thinking?: string;
+    readonly reasoning?: string;
+}>): ProviderCatalog;
 /**
- * Apply the environment file to a provider catalog.
+ * Build the provider key of one model.
  *
- * A section overrides the base URL and the model of the matching provider. An empty value keeps
- * the catalog value. The function does not read or copy an API key.
- *
- * @param catalog - the validated catalog.
- * @param environments - the section values of the environment file.
- * @returns the catalog with the overrides applied.
- */
-export declare function applyProviderEnvironments(catalog: ProviderCatalog, environments: ReadonlyMap<string, ProviderEnvironment>): ProviderCatalog;
-/**
- * Resolve the requested keys to the keys of the expanded catalog.
- *
- * A request that names a provider with a model list selects every model of that list.
- *
- * @param catalog - the catalog before the model expansion.
- * @param keys - the requested provider keys or model identifiers.
- * @returns the keys of the expanded catalog.
- */
-export declare function resolveRequestedKeys(catalog: ProviderCatalog, keys: readonly string[]): string[];
-/**
- * Build the model identifier of one chat request.
- *
- * OpenRouter lists a `:batch` variant that answers no chat completion request. The plugin drops
- * that suffix for the request and keeps the variant name in the catalog, the report, and the file
- * names.
- *
- * @param model - the model identifier of the catalog.
- * @returns the identifier to send to the endpoint.
- */
-export declare function resolveRequestModel(model: string): string;
-/**
- * Build a file-name-safe provider key from one model identifier.
- *
- * @param providerKey - the key of the provider that lists the model.
- * @param model - the model identifier.
- * @returns the key, which holds only letters, digits, dots, underscores, and hyphens.
+ * @param providerKey - the provider key.
+ * @param model - the model name.
+ * @returns the expanded key, as in `huggingface-Qwen-Qwen3-Coder-Next`.
  */
 export declare function buildModelProviderKey(providerKey: string, model: string): string;
 /**
- * Expand each provider that lists model identifiers into one provider per model.
+ * Expand one catalog into one entry for each model.
  *
- * One environment section supplies the model list, so one OpenRouter section yields one provider
- * per model and every model keeps its own metrics and its own output files.
- *
- * @param catalog - the validated catalog.
- * @returns the catalog with one provider per model.
+ * @param catalog - the catalog.
+ * @returns the expanded definitions in model order.
  */
-export declare function expandProviderModels(catalog: ProviderCatalog): ProviderCatalog;
-/** The outcome of one capability probe. */
-export interface ProbeOutcome {
-    readonly supported: boolean;
-    readonly reason?: string;
+export declare function expandProviderModels(catalog: ProviderCatalog): ProviderDefinition[];
+/**
+ * Resolve the requested keys against one expanded catalog.
+ *
+ * @param catalog - the catalog.
+ * @param keys - the requested keys; an empty list selects every enabled model.
+ * @param includeDisabled - true to accept a disabled provider.
+ * @returns the selected definitions.
+ * @throws ExperimentError when a requested key matches no model.
+ */
+export declare function resolveRequestedKeys(catalog: ProviderCatalog, keys: readonly string[], includeDisabled?: boolean): ProviderDefinition[];
+/**
+ * Read the served table of one response body.
+ *
+ * @param body - the response body.
+ * @param topLogprobsCount - the expected entry count.
+ * @returns the chosen token and the normalized distribution.
+ * @throws ExperimentError when the body holds no served table.
+ */
+export declare function readServedTable(body: unknown, topLogprobsCount: number): {
+    token: string;
+    distribution: TokenDistribution;
+};
+/**
+ * Build the options of one request that travels through a permitted edge.
+ *
+ * The edge host can carry a port, as in `127.0.0.1:8443`. Without a port, the request uses the
+ * default HTTPS port. The `Host` header always names the host of the base URL, because the edge
+ * selects the distribution from that header.
+ *
+ * @param edgeHost - the host name of the edge, with an optional port.
+ * @param endpoint - the endpoint URL of the base URL host.
+ * @param headers - the request headers.
+ * @param bodyText - the encoded request body.
+ * @param timeoutMilliseconds - the time limit.
+ * @returns the request options.
+ */
+export declare function buildEdgeRequestOptions(edgeHost: string, endpoint: string, headers: Readonly<Record<string, string | number>>, bodyText: string, timeoutMilliseconds: number): https.RequestOptions;
+/** One client of one OpenAI-compatible chat endpoint. */
+export declare class OpenAiCompatibleClient implements ProviderClient {
+    /** The provider definition of the client. */
+    readonly definition: ProviderDefinition;
+    /** The model name of the client. */
+    readonly model: string;
+    /** The expanded provider key of the client. */
+    readonly providerKey: string;
+    /** The API key of the client. */
+    private readonly apiKey;
+    /** The time limit of one request. */
+    private readonly timeoutMilliseconds;
+    /** The number of requested table entries. */
+    private readonly topLogprobsCount;
+    /**
+     * Create one client.
+     *
+     * @param definition - the provider definition.
+     * @param apiKey - the API key.
+     * @param timeoutMilliseconds - the time limit of one request.
+     */
+    constructor(definition: ProviderDefinition, apiKey: string | undefined, timeoutMilliseconds?: number);
+    /**
+     * Read the served table of one task.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestPlainActual(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Read the self report of one task.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestPlainSelf(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Inject one served table and read the self report that follows.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param injected - the served table.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestInjectedSelf(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Read one self report, keep it in context, and read the served table that follows.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param signal - the cancellation signal.
+     * @returns both outcomes.
+     */
+    requestInjectedActual(task: Task, repetition: number, signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    /**
+     * Request one served table.
+     *
+     * @param condition - the condition name.
+     * @param repetition - the repetition number.
+     * @param messages - the messages of the request.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    private requestServedTable;
+    /**
+     * Request one self report.
+     *
+     * @param condition - the condition name.
+     * @param repetition - the repetition number.
+     * @param messages - the messages of the request.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    private requestSelfReport;
+    /**
+     * Send one request and record the exchange.
+     *
+     * @param endpoint - the endpoint URL.
+     * @param body - the request body.
+     * @param signal - the cancellation signal.
+     * @returns the recorded exchange.
+     */
+    private send;
+}
+/** One deterministic client that needs no network. */
+export declare class MockProviderClient implements ProviderClient {
+    /** The provider definition of the client. */
+    readonly definition: ProviderDefinition;
+    /** The model name of the client. */
+    readonly model: string;
+    /** The expanded provider key of the client. */
+    readonly providerKey: string;
+    /** The number of requested table entries. */
+    private readonly topLogprobsCount;
+    /**
+     * Create one mock client.
+     *
+     * @param definition - the provider definition.
+     */
+    constructor(definition: ProviderDefinition);
+    /**
+     * Read one mock served table.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestPlainActual(task: Task, repetition: number, _signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Read one mock self report.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestPlainSelf(task: Task, repetition: number, _signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Read one mock injected self report.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param injected - the injected table.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestInjectedSelf(task: Task, repetition: number, _injected: TokenDistribution, _signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Read one mock injected actual table.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param signal - the cancellation signal.
+     * @returns both outcomes.
+     */
+    requestInjectedActual(task: Task, repetition: number, _signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    /**
+     * Build one mock outcome.
+     *
+     * @param condition - the condition name.
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param source - the origin of the table.
+     * @returns the prediction outcome.
+     */
+    private buildOutcome;
 }
 /**
- * Probe whether one model returns a logprobs table at the requested support size.
- *
- * The experiment uses only the models that answer this probe, as the design requires.
- *
- * @param client - the client of the model.
- * @param topLogprobsCount - the requested support size.
- * @param signal - the cancellation signal of the run.
- * @returns the outcome, with a reason when the model does not support the request.
- */
-export declare function probeLogprobsSupport(client: ProviderClient, topLogprobsCount: number, signal: AbortSignal): Promise<ProbeOutcome>;
-/**
- * Create the client of one provider.
+ * Build one provider client.
  *
  * @param definition - the provider definition.
- * @param timeoutMilliseconds - the ceiling of one request.
+ * @param apiKey - the API key.
+ * @param timeoutMilliseconds - the time limit of one request.
  * @returns the client.
- * @throws ExperimentError when a real provider has no credential.
  */
-export declare function createProviderClient(definition: ProviderDefinition, timeoutMilliseconds?: number, apiKeyOverride?: string): ProviderClient;
+export declare function createProviderClient(definition: ProviderDefinition, apiKey: string | undefined, timeoutMilliseconds?: number): ProviderClient;
 /**
- * Parse one provider reply into an answer.
+ * Probe whether one client reports a full top-N table.
  *
- * An actual prediction reads `choices[0].logprobs.content[0]`. A self prediction reads the first
- * tool call, and falls back to a JSON body when the provider answers in text.
- *
- * @param request - the prediction request.
- * @param raw - the raw provider reply.
- * @param startedAt - the time before the request in milliseconds.
- * @param endpoint - the request endpoint.
- * @param requestBody - the request body.
- * @returns the parsed answer.
+ * @param client - the client to probe.
+ * @param task - the probe task.
+ * @param signal - the cancellation signal.
+ * @returns the support report.
  */
-export declare function parseProviderReply(request: PredictionRequest, raw: unknown, startedAt: number, endpoint: string, requestBody: unknown, providerKey?: string): PredictionAnswer;
+export declare function probeLogprobsSupport(client: ProviderClient, task: Task, signal?: AbortSignal): Promise<{
+    supported: boolean;
+    reason?: string;
+    entryCount: number;
+}>;
 /**
- * Build one deterministic probability table for the mock provider.
+ * Build one prediction record from one draft and its raw file names.
  *
- * The table uses a hash of the prefix and the token, so the actual table does not depend on the
- * repetition. The self-prediction mode adds a small perturbation that does depend on the
- * repetition, so its table mirrors the actual table with a reproducible amount of variation.
- *
- * @param task - the task.
- * @param mode - the prediction mode.
- * @param repetition - the repetition number.
- * @param entryCount - the requested table size.
- * @returns the probability entries in descending order.
+ * @param draft - the draft.
+ * @param rawFileNames - the raw file names relative to the run directory.
+ * @returns the prediction record.
  */
-export declare function buildMockDistribution(task: Task, mode: "actual" | "self", repetition: number, entryCount: number): ProbabilityEntry[];
+export declare function buildPredictionRecord(draft: PredictionDraft, rawFileNames: readonly string[]): PredictionRecord;

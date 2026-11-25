@@ -1,0 +1,232 @@
+{
+  "datasetId": "llm-self-prediction-en32",
+  "language": "en-US",
+  "description": "Thirty-two US English next-token tasks, four per category. Each task gives the text before the target position and a human reference token. The reference token is a sanity label. It does not enter a metric.",
+  "taskCount": 32,
+  "tasks": [
+    {
+      "id": "E001",
+      "category": "poetry",
+      "language": "en-US",
+      "prefix": "Roses are red, violets are",
+      "referenceToken": "blue"
+    },
+    {
+      "id": "E002",
+      "category": "poetry",
+      "language": "en-US",
+      "prefix": "To be or not to",
+      "referenceToken": "be"
+    },
+    {
+      "id": "E003",
+      "category": "poetry",
+      "language": "en-US",
+      "prefix": "Twinkle, twinkle, little",
+      "referenceToken": "star"
+    },
+    {
+      "id": "E004",
+      "category": "poetry",
+      "language": "en-US",
+      "prefix": "Mary had a little",
+      "referenceToken": "lamb"
+    },
+    {
+      "id": "E009",
+      "category": "idiom",
+      "language": "en-US",
+      "prefix": "Let us break the",
+      "referenceToken": "ice"
+    },
+    {
+      "id": "E010",
+      "category": "idiom",
+      "language": "en-US",
+      "prefix": "Do not spill the",
+      "referenceToken": "beans"
+    },
+    {
+      "id": "E011",
+      "category": "idiom",
+      "language": "en-US",
+      "prefix": "She is under the",
+      "referenceToken": "weather"
+    },
+    {
+      "id": "E012",
+      "category": "idiom",
+      "language": "en-US",
+      "prefix": "That test was a piece of",
+      "referenceToken": "cake"
+    },
+    {
+      "id": "E017",
+      "category": "daily",
+      "language": "en-US",
+      "prefix": "I brush my teeth with a",
+      "referenceToken": "toothbrush"
+    },
+    {
+      "id": "E018",
+      "category": "daily",
+      "language": "en-US",
+      "prefix": "She opened the door and walked",
+      "referenceToken": "in"
+    },
+    {
+      "id": "E019",
+      "category": "daily",
+      "language": "en-US",
+      "prefix": "He poured a cup of",
+      "referenceToken": "coffee"
+    },
+    {
+      "id": "E020",
+      "category": "daily",
+      "language": "en-US",
+      "prefix": "The alarm clock rang at seven in the",
+      "referenceToken": "morning"
+    },
+    {
+      "id": "E025",
+      "category": "food",
+      "language": "en-US",
+      "prefix": "I would like a slice of",
+      "referenceToken": "pizza"
+    },
+    {
+      "id": "E026",
+      "category": "food",
+      "language": "en-US",
+      "prefix": "She added salt and",
+      "referenceToken": "pepper"
+    },
+    {
+      "id": "E027",
+      "category": "food",
+      "language": "en-US",
+      "prefix": "The bread is in the",
+      "referenceToken": "oven"
+    },
+    {
+      "id": "E028",
+      "category": "food",
+      "language": "en-US",
+      "prefix": "He drank a glass of",
+      "referenceToken": "water"
+    },
+    {
+      "id": "E033",
+      "category": "weather",
+      "language": "en-US",
+      "prefix": "The sky is dark and it will",
+      "referenceToken": "rain"
+    },
+    {
+      "id": "E034",
+      "category": "weather",
+      "language": "en-US",
+      "prefix": "It is cold, so wear a",
+      "referenceToken": "coat"
+    },
+    {
+      "id": "E035",
+      "category": "weather",
+      "language": "en-US",
+      "prefix": "The sun rises in the",
+      "referenceToken": "east"
+    },
+    {
+      "id": "E036",
+      "category": "weather",
+      "language": "en-US",
+      "prefix": "A strong wind blew the",
+      "referenceToken": "leaves"
+    },
+    {
+      "id": "E041",
+      "category": "technology",
+      "language": "en-US",
+      "prefix": "I saved the file to the",
+      "referenceToken": "disk"
+    },
+    {
+      "id": "E042",
+      "category": "technology",
+      "language": "en-US",
+      "prefix": "The battery is almost",
+      "referenceToken": "dead"
+    },
+    {
+      "id": "E043",
+      "category": "technology",
+      "language": "en-US",
+      "prefix": "Press any key to",
+      "referenceToken": "continue"
+    },
+    {
+      "id": "E044",
+      "category": "technology",
+      "language": "en-US",
+      "prefix": "The server returned a 404",
+      "referenceToken": "error"
+    },
+    {
+      "id": "E049",
+      "category": "news",
+      "language": "en-US",
+      "prefix": "The president signed the",
+      "referenceToken": "bill"
+    },
+    {
+      "id": "E050",
+      "category": "news",
+      "language": "en-US",
+      "prefix": "The team won the",
+      "referenceToken": "game"
+    },
+    {
+      "id": "E051",
+      "category": "news",
+      "language": "en-US",
+      "prefix": "Heavy rain caused",
+      "referenceToken": "flooding"
+    },
+    {
+      "id": "E052",
+      "category": "news",
+      "language": "en-US",
+      "prefix": "The company reported higher",
+      "referenceToken": "profits"
+    },
+    {
+      "id": "E057",
+      "category": "story",
+      "language": "en-US",
+      "prefix": "Once upon a",
+      "referenceToken": "time"
+    },
+    {
+      "id": "E058",
+      "category": "story",
+      "language": "en-US",
+      "prefix": "The dragon guarded the",
+      "referenceToken": "cave"
+    },
+    {
+      "id": "E059",
+      "category": "story",
+      "language": "en-US",
+      "prefix": "She found a key under the",
+      "referenceToken": "mat"
+    },
+    {
+      "id": "E060",
+      "category": "story",
+      "language": "en-US",
+      "prefix": "The knight drew his",
+      "referenceToken": "sword"
+    }
+  ]
+}

@@ -2,187 +2,248 @@
 // GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
 
 /**
- * Loading and validation of the bundled dataset.
+ * Dataset loading and validation.
  *
- * The dataset is read-only input. The loader checks every field before a run uses the tasks, so a
- * damaged file fails at the start of a run and not in the middle of one.
+ * The protocol stores one dataset file for each language below the testing dataset directory. The
+ * loader reads the present files in the canonical order, merges their tasks, and reports a digest
+ * of the merged task list.
  */
 
-import { DATASET_FILE_NAME } from "./constants.js";
+import path from "node:path";
+
+import { DATASET_FILE_NAMES } from "./constants.js";
 import { ExperimentError, isRecord } from "./errors.js";
-import { packagedPath, readJsonFile, sha256Text } from "./files.js";
+import { packagedPath, pathExists, readJsonFile, sha256Text } from "./files.js";
 import type { Dataset, Task } from "./types.js";
 
+/** The merged dataset of one run. */
+export interface LoadedDataset {
+  /** The dataset files in canonical order. */
+  readonly datasets: readonly Dataset[];
+  /** The merged tasks in file order. */
+  readonly tasks: readonly Task[];
+  /** The comma-separated dataset identifiers. */
+  readonly datasetIds: readonly string[];
+  /** The language tags in file order. */
+  readonly languages: readonly string[];
+  /** The digest of the merged task list. */
+  readonly hash: string;
+}
+
 /**
- * Validate one dataset value.
+ * Read one string field of one record.
  *
- * @param value - the parsed JSON value.
+ * @param record - the record to read.
+ * @param field - the field name.
+ * @param context - the description of the record for one error message.
+ * @returns the trimmed value.
+ * @throws ExperimentError when the field is absent or not a string.
+ */
+function readString(
+  record: Readonly<Record<string, unknown>>,
+  field: string,
+  context: string,
+): string {
+  const value = record[field];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new ExperimentError(
+      "INVALID_DATASET",
+      `The ${context} field ${JSON.stringify(field)} must be a non-empty string.`,
+    );
+  }
+  return value.trim();
+}
+
+/**
+ * Validate one task.
+ *
+ * @param value - the value to check.
+ * @param index - the position of the task in the file.
+ * @returns the validated task.
+ * @throws ExperimentError when the value is not a valid task.
+ */
+export function validateTask(value: unknown, index: number): Task {
+  if (!isRecord(value)) {
+    throw new ExperimentError("INVALID_DATASET", `The task at index ${index} is not an object.`);
+  }
+  const context = `task at index ${index}`;
+  const id = readString(value, "id", context);
+  const category = readString(value, "category", context);
+  const prefix = readString(value, "prefix", context);
+  const referenceToken = readString(value, "referenceToken", context);
+  if (prefix.endsWith(referenceToken)) {
+    throw new ExperimentError(
+      "INVALID_DATASET",
+      `The task ${id} already ends with its reference token. The reference token must lie ahead.`,
+    );
+  }
+  const rawLanguage = value["language"];
+  const language =
+    typeof rawLanguage === "string" && rawLanguage.trim() !== ""
+      ? rawLanguage.trim()
+      : undefined;
+  return { id, category, language, prefix, referenceToken };
+}
+
+/**
+ * Validate one dataset file.
+ *
+ * @param value - the parsed file value.
  * @returns the validated dataset.
- * @throws ExperimentError when a field is absent or inconsistent.
+ * @throws ExperimentError when the value is not a valid dataset.
  */
 export function validateDataset(value: unknown): Dataset {
   if (!isRecord(value)) {
-    throw new ExperimentError("INVALID_DATASET", "The dataset is not a JSON object.");
+    throw new ExperimentError("INVALID_DATASET", "The dataset file must hold one JSON object.");
   }
-  const datasetId = readString(value, "datasetId");
-  const language = readString(value, "language");
-  const description = readString(value, "description");
+  const datasetId = readString(value, "datasetId", "dataset");
+  const language = readString(value, "language", "dataset");
+  const description = readString(value, "description", "dataset");
   const rawTasks = value["tasks"];
   if (!Array.isArray(rawTasks) || rawTasks.length === 0) {
-    throw new ExperimentError("INVALID_DATASET", "The dataset holds no task.");
+    throw new ExperimentError("INVALID_DATASET", "The dataset must hold at least one task.");
   }
   const tasks: Task[] = [];
   const identifiers = new Set<string>();
-  for (const rawTask of rawTasks) {
-    const task = validateTask(rawTask);
+  for (let index = 0; index < rawTasks.length; index += 1) {
+    const task = validateTask(rawTasks[index], index);
     if (identifiers.has(task.id)) {
-      throw new ExperimentError("INVALID_DATASET", `The task identifier ${task.id} repeats.`);
+      throw new ExperimentError("INVALID_DATASET", `The dataset repeats the task ${task.id}.`);
     }
     identifiers.add(task.id);
     tasks.push(task);
   }
-  const rawLanguages = value["languages"];
-  const languages =
-    Array.isArray(rawLanguages) && rawLanguages.every((entry) => typeof entry === "string")
-      ? (rawLanguages as string[])
-      : undefined;
-  const taskCount = value["taskCount"];
-  if (typeof taskCount === "number" && taskCount !== tasks.length) {
+  const rawTaskCount = value["taskCount"];
+  if (typeof rawTaskCount === "number" && rawTaskCount !== tasks.length) {
     throw new ExperimentError(
       "INVALID_DATASET",
-      `The task count ${taskCount} does not match the ${tasks.length} tasks.`,
+      `The dataset ${datasetId} reports ${rawTaskCount} tasks and holds ${tasks.length}.`,
     );
   }
-  return {
-    datasetId,
-    language,
-    ...(languages === undefined ? {} : { languages }),
-    description,
-    taskCount: tasks.length,
-    tasks,
-  };
+  return { datasetId, language, description, taskCount: tasks.length, tasks };
 }
 
 /**
- * Validate one task value.
+ * Compute the digest of one task list.
  *
- * @param value - the parsed JSON value of one task.
- * @returns the validated task.
+ * @param tasks - the tasks to hash.
+ * @returns the SHA-256 digest as lowercase hexadecimal.
  */
-function validateTask(value: unknown): Task {
-  if (!isRecord(value)) {
-    throw new ExperimentError("INVALID_DATASET", "One task is not a JSON object.");
+export function computeDatasetHash(tasks: readonly Task[]): string {
+  const body = tasks.map((task) => ({
+    id: task.id,
+    category: task.category,
+    language: task.language ?? "",
+    prefix: task.prefix,
+    referenceToken: task.referenceToken,
+  }));
+  return sha256Text(JSON.stringify(body));
+}
+
+/**
+ * Resolve the testing dataset directory of one workspace.
+ *
+ * A workspace copy wins over the packaged copy.
+ *
+ * @param workspace - the absolute workspace directory.
+ * @param directoryName - the directory name below the inputs directory.
+ * @returns the absolute directory path of the copy to read.
+ */
+export async function resolveDatasetDirectory(
+  workspace: string,
+  directoryName: string,
+): Promise<string> {
+  const workspaceDirectory = path.join(workspace, "inputs", directoryName);
+  if (await pathExists(workspaceDirectory)) {
+    return workspaceDirectory;
   }
-  const id = readString(value, "id");
-  const category = readString(value, "category");
-  const rawLanguage = value["language"];
-  const language = typeof rawLanguage === "string" ? rawLanguage.trim() : "";
-  const prefix = readString(value, "prefix");
-  const referenceToken = readString(value, "referenceToken");
-  if (prefix.trim() === "") {
-    throw new ExperimentError("INVALID_DATASET", `The task ${id} has an empty prefix.`);
+  return packagedPath(path.join("inputs", directoryName));
+}
+
+/**
+ * Load and merge the dataset files of one directory.
+ *
+ * @param directory - the directory that holds the dataset files.
+ * @returns the merged dataset.
+ * @throws ExperimentError when the directory holds no dataset file.
+ */
+export async function loadDatasets(directory: string): Promise<LoadedDataset> {
+  const datasets: Dataset[] = [];
+  for (const fileName of DATASET_FILE_NAMES) {
+    const filePath = path.join(directory, fileName);
+    if (!(await pathExists(filePath))) {
+      continue;
+    }
+    datasets.push(validateDataset(await readJsonFile(filePath)));
   }
-  if (referenceToken.trim() === "") {
-    throw new ExperimentError("INVALID_DATASET", `The task ${id} has an empty reference token.`);
-  }
-  if (prefix.endsWith(referenceToken)) {
+  if (datasets.length === 0) {
     throw new ExperimentError(
       "INVALID_DATASET",
-      `The task ${id} already ends with its reference token.`,
+      `The directory ${directory} holds no dataset file: ${DATASET_FILE_NAMES.join(", ")}.`,
     );
   }
-  return {
-    id,
-    category,
-    ...(language === "" ? {} : { language }),
-    prefix,
-    referenceToken,
-  };
-}
-
-/**
- * Read one required string field.
- *
- * @param value - the record that holds the field.
- * @param field - the field name.
- * @returns the field value.
- */
-function readString(value: Record<string, unknown>, field: string): string {
-  const raw = value[field];
-  if (typeof raw !== "string" || raw.trim() === "") {
-    throw new ExperimentError("INVALID_DATASET", `The dataset field ${field} is absent or empty.`);
-  }
-  return raw;
-}
-
-/**
- * Load the bundled dataset.
- *
- * @param filePath - the path of the dataset file. The default is the packaged file.
- * @returns the validated dataset.
- */
-export async function loadDataset(filePath?: string): Promise<Dataset> {
-  const target = filePath ?? packagedPath(`inputs/${DATASET_FILE_NAME}`);
-  return validateDataset(await readJsonFile(target));
-}
-
-/**
- * Compute the SHA-256 digest of the canonical dataset text.
- *
- * The digest identifies the exact tasks of one session.
- *
- * @param dataset - the validated dataset.
- * @returns the digest as lowercase hexadecimal.
- */
-export function computeDatasetHash(dataset: Dataset): string {
-  return sha256Text(JSON.stringify(dataset.tasks));
-}
-
-/**
- * Select the tasks of one run.
- *
- * @param dataset - the validated dataset.
- * @param taskIds - the requested identifiers; an empty list selects every task.
- * @param limit - the maximum number of tasks; a value of 0 keeps every selected task.
- * @returns the selected tasks in dataset order.
- * @throws ExperimentError when a requested identifier is absent.
- */
-export function selectTasks(
-  dataset: Dataset,
-  taskIds: readonly string[],
-  limit: number,
-): Task[] {
-  const requested = new Set(taskIds);
-  if (requested.size > 0) {
-    for (const identifier of requested) {
-      if (!dataset.tasks.some((task) => task.id === identifier)) {
-        throw new ExperimentError(
-          "INVALID_DATASET",
-          `The dataset has no task with the identifier ${identifier}.`,
-        );
+  const tasks: Task[] = [];
+  const identifiers = new Set<string>();
+  for (const dataset of datasets) {
+    for (const task of dataset.tasks) {
+      if (identifiers.has(task.id)) {
+        throw new ExperimentError("INVALID_DATASET", `The dataset repeats the task ${task.id}.`);
       }
+      identifiers.add(task.id);
+      tasks.push(task);
     }
   }
-  const selected =
-    requested.size === 0
-      ? [...dataset.tasks]
-      : dataset.tasks.filter((task) => requested.has(task.id));
-  if (limit > 0 && selected.length > limit) {
-    return selected.slice(0, limit);
+  return {
+    datasets,
+    tasks,
+    datasetIds: datasets.map((dataset) => dataset.datasetId),
+    languages: datasets.map((dataset) => dataset.language),
+    hash: computeDatasetHash(tasks),
+  };
+}
+
+/**
+ * Select the requested tasks.
+ *
+ * @param tasks - the tasks in file order.
+ * @param taskIds - the requested identifiers; an empty list selects every task.
+ * @returns the selected tasks in file order.
+ * @throws ExperimentError when a requested identifier is absent.
+ */
+export function selectTasks(tasks: readonly Task[], taskIds: readonly string[]): Task[] {
+  if (taskIds.length === 0) {
+    return [...tasks];
+  }
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const selected: Task[] = [];
+  const missing: string[] = [];
+  for (const taskId of taskIds) {
+    const task = byId.get(taskId);
+    if (task === undefined) {
+      missing.push(taskId);
+      continue;
+    }
+    selected.push(task);
+  }
+  if (missing.length > 0) {
+    throw new ExperimentError(
+      "INVALID_ARGUMENT",
+      `The dataset holds no task ${missing.join(", ")}.`,
+    );
   }
   return selected;
 }
 
 /**
- * Group the tasks by category and count each group.
+ * Count the tasks of each category.
  *
- * @param tasks - the tasks to group.
- * @returns the category names in sorted order with their counts.
+ * @param tasks - the tasks to count.
+ * @returns a map from the category name to the task count, in first-seen order.
  */
-export function countByCategory(tasks: readonly Task[]): Record<string, number> {
-  const counts: Record<string, number> = {};
+export function countByCategory(tasks: readonly Task[]): Map<string, number> {
+  const counts = new Map<string, number>();
   for (const task of tasks) {
-    counts[task.category] = (counts[task.category] ?? 0) + 1;
+    counts.set(task.category, (counts.get(task.category) ?? 0) + 1);
   }
   return counts;
 }

@@ -9,31 +9,36 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { cp, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
 import { apply, inject, name } from "../lib/index.js";
 
+const repository = path.resolve(import.meta.dirname, "..");
 const scratchDirectories = [];
-
-/**
- * Create one scratch directory.
- *
- * @returns the absolute path of the directory.
- */
-async function createScratchDirectory() {
-  const directory = await mkdtemp(path.join(tmpdir(), "llm-self-prediction-plugin-"));
-  scratchDirectories.push(directory);
-  return directory;
-}
 
 after(async () => {
   for (const directory of scratchDirectories) {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+/**
+ * Create one scratch workspace with the inputs of the repository.
+ *
+ * @returns the absolute path of the directory.
+ */
+async function createScratchDirectory() {
+  const directory = await mkdtemp(path.join(tmpdir(), "llm-self-prediction-plugin-"));
+  scratchDirectories.push(directory);
+  await cp(path.join(repository, "inputs"), path.join(directory, "inputs"), {
+    recursive: true,
+    filter: (source) => !source.endsWith(".env"),
+  });
+  return directory;
+}
 
 /**
  * Create one stub host context.
@@ -94,20 +99,20 @@ test("the entry point registers the five tools and reads the configuration", asy
   const controller = new AbortController();
   const runTool = registry.get("llm_self_prediction_run");
   const value = await runTool.execute(
-    { limit: 1, repetitions: 1, dryRun: true },
+    { tasks: ["Z001"], repetitions: 1, dryRun: true },
     { signal: controller.signal, agent: { id: "test-agent" } },
   );
 
-  assert.equal(value.taskCount, 1);
-  assert.equal(value.pairCount, 1);
-  assert.equal(value.verdicts.length, 1);
-  assert.equal(value.verdicts[0].provider, "mock");
-  assert.ok(value.outputDirectory.startsWith(outputRoot));
-  assert.deepEqual(await readdir(outputRoot), [value.sessionCode]);
+  assert.equal(value.metrics.taskCount, 1);
+  assert.equal(value.metrics.providers.length, 1);
+  assert.equal(value.metrics.verdicts.length, 1);
+  assert.equal(value.metrics.verdicts[0].verdicts.length, 3);
+  assert.ok(value.directory.startsWith(outputRoot));
+  assert.deepEqual(await readdir(outputRoot), [value.xid]);
 
   const rendered = runTool.output.render({}, value);
   assert.equal(rendered.length, 1);
-  assert.match(rendered[0].text, new RegExp(`^Session: ${value.sessionCode}`));
+  assert.match(rendered[0].text, new RegExp(`^Run ${value.xid}`, "u"));
 
   disposeAll();
   assert.equal(registry.size, 0);

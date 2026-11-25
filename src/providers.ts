@@ -2,811 +2,1284 @@
 // GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
 
 /**
- * Provider catalog and provider clients.
+ * Provider clients and the four request kinds of the protocol.
  *
- * A provider definition names one OpenAI-compatible chat completions endpoint. The real client
- * sends one request and reads the answer. The mock client builds a deterministic answer from the
- * task text, so a dry run and a test need no network access and no credential.
+ * One client talks to one OpenAI-compatible endpoint with one model. The client returns the table
+ * of one condition. The caller writes the raw exchanges and builds the record, so the client never
+ * writes a file. The mock client gives a deterministic table and needs no network.
  */
 
-import { createHash } from "node:crypto";
+import https from "node:https";
 
 import {
+  CONDITION_INJECTED_ACTUAL,
+  CONDITION_INJECTED_SELF,
+  CONDITION_PLAIN_ACTUAL,
+  CONDITION_PLAIN_SELF,
   DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
-  PROVIDER_FILE_NAME,
-  SLOW_GUESS_THRESHOLD_MILLISECONDS,
+  MAX_PROBABILITY_ENTRY_COUNT,
+  PROBABILITY_FLOOR,
+  REQUEST_ATTEMPT_COUNT,
+  REQUEST_RETRY_DELAY_MILLISECONDS,
+  SLOW_REQUEST_THRESHOLD_MILLISECONDS,
 } from "./constants.js";
-import { isPlaceholderValue, type ProviderEnvironment } from "./env.js";
 import { ExperimentError, errorMessage, isRecord } from "./errors.js";
-import { packagedPath, readJsonFile } from "./files.js";
+import { packagedPath, readJsonFile, sleep } from "./files.js";
 import { buildDistribution } from "./probability.js";
 import {
   buildActualPredictionPrompt,
+  buildInjectedActualPrompt,
+  buildInjectedSelfPredictionPrompt,
+  buildInjectedTableMessage,
   buildSelfPredictionPrompt,
-  buildSelfPredictionTool,
-  parseSelfPredictionArguments,
+  formatTableJson,
+  parseSelfReport,
 } from "./prompts.js";
-import type { PredictionAnswer, ProbabilityEntry, ProviderCatalog, ProviderDefinition, Task } from
-  "./types.js";
+import type {
+  ConditionName,
+  PredictionRecord,
+  ProbabilityEntry,
+  ProviderCatalog,
+  ProviderDefinition,
+  Task,
+  TokenDistribution,
+} from "./types.js";
 
-/** The mock provider key. */
+/** The provider key of the mock client. */
 export const MOCK_PROVIDER_KEY = "mock";
 
-/**
- * The sampling temperature of every request.
- *
- * A value of zero asks every provider for its most likely token. It applies to every provider and
- * every model, so a repeated run of one task stays comparable across models.
- */
-export const REQUEST_TEMPERATURE = 0;
+/** The temperature of every request. */
+const REQUEST_TEMPERATURE = 0;
 
-/** The candidate tokens of the mock provider. */
-const MOCK_TOKENS: readonly string[] = [
-  "的", "了", "是", "在", "和", "有", "人", "我", "他", "她", "们", "这", "那", "不", "也", "就",
-  "都", "说", "到", "去", "来", "上", "下", "大", "小", "多", "好", "天", "地", "水", "火", "风",
-  "雨", "雪", "山", "河", "树", "花", "草", "鸟", "鱼", "车", "路", "门", "窗", "灯", "书", "字",
-  "话", "心", "手", "头", "眼", "脸", "家", "城", "村", "店", "饭", "茶", "酒", "肉", "菜", "汤",
-  "面", "米", "油", "盐", "糖", "甜", "香", "热", "冷", "快", "慢", "高", "低", "长", "短", "新",
-  "旧", "真", "假", "对", "错", "开", "关", "进", "出", "回", "走", "跑", "看", "听", "想", "笑",
-];
+/** The number of tokens of one self report. */
+const SELF_REPORT_MAX_TOKENS = 2048;
 
-/** One prediction request. */
-export interface PredictionRequest {
-  readonly mode: "actual" | "self";
-  readonly task: Task;
+/** One recorded HTTP exchange. */
+export interface RecordedExchange {
+  /** The ISO timestamp of the request. */
+  readonly requestedAt: string;
+  /** The elapsed time of the request in milliseconds. */
+  readonly elapsedMilliseconds: number;
+  /** The endpoint of the request. */
+  readonly endpoint: string;
+  /** The request body, without the API key. */
+  readonly requestBody: unknown;
+  /** The response body. */
+  readonly responseBody: unknown;
+}
+
+/** One prediction before the caller writes the raw files. */
+export interface PredictionDraft {
+  /** The condition that produced the draft. */
+  readonly condition: ConditionName;
+  /** The repetition number. */
   readonly repetition: number;
-  readonly topLogprobsCount: number;
+  /** The ISO timestamp of the request. */
+  readonly requestedAt: string;
+  /** The elapsed time of the request in milliseconds. */
+  readonly elapsedMilliseconds: number;
+  /** The chosen token of a served table. */
+  readonly token?: string;
+  /** The normalized table. */
+  readonly distribution: TokenDistribution;
+  /** The origin of the table. */
+  readonly source: "provider_logprobs" | "self_report";
+  /** The endpoint of the request. */
+  readonly endpoint: string;
+  /** The request body, without the API key. */
+  readonly requestBody: unknown;
+  /** A warning about the draft. */
+  readonly warning?: string;
 }
 
-/** One client that answers one prediction request. */
+/** One prediction with the exchanges that produced it. */
+export interface PredictionOutcome {
+  /** The draft of the prediction. */
+  readonly draft: PredictionDraft;
+  /** The exchanges in request order. */
+  readonly exchanges: readonly RecordedExchange[];
+}
+
+/** The outcome of the injected actual-prediction condition. */
+export interface InjectedActualOutcome {
+  /** The self report that the plugin keeps in context. */
+  readonly self: PredictionOutcome;
+  /** The served actual table that follows the self report. */
+  readonly actual: PredictionOutcome;
+}
+
+/** One client of one OpenAI-compatible endpoint. */
 export interface ProviderClient {
+  /** The provider definition of the client. */
   readonly definition: ProviderDefinition;
-  predict(request: PredictionRequest, signal: AbortSignal): Promise<PredictionAnswer>;
-}
-
-/** The validated provider catalog. */
-export function validateProviderCatalog(value: unknown): ProviderCatalog {
-  if (!isRecord(value)) {
-    throw new ExperimentError("INVALID_PROVIDER", "The provider catalog is not a JSON object.");
-  }
-  const schemaVersion = value["schemaVersion"];
-  const description = value["description"];
-  const rawProviders = value["providers"];
-  if (!Array.isArray(rawProviders) || rawProviders.length === 0) {
-    throw new ExperimentError("INVALID_PROVIDER", "The provider catalog holds no provider.");
-  }
-  const providers: ProviderDefinition[] = [];
-  const keys = new Set<string>();
-  for (const rawProvider of rawProviders) {
-    const provider = validateProvider(rawProvider);
-    if (keys.has(provider.key)) {
-      throw new ExperimentError("INVALID_PROVIDER", `The provider key ${provider.key} repeats.`);
-    }
-    keys.add(provider.key);
-    providers.push(provider);
-  }
-  return {
-    schemaVersion: typeof schemaVersion === "number" ? schemaVersion : 1,
-    description: typeof description === "string" ? description : "",
-    providers,
-  };
+  /** The model name of the client. */
+  readonly model: string;
+  /** The provider key of the client, expanded with the model name. */
+  readonly providerKey: string;
+  /** Read the served table of one task. */
+  requestPlainActual(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+  /** Read the self report of one task. */
+  requestPlainSelf(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+  /** Inject one served table and read the self report that follows. */
+  requestInjectedSelf(
+    task: Task,
+    repetition: number,
+    injected: TokenDistribution,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome>;
+  /** Read one self report, keep it in context, and read the served table that follows. */
+  requestInjectedActual(
+    task: Task,
+    repetition: number,
+    signal?: AbortSignal,
+  ): Promise<InjectedActualOutcome>;
 }
 
 /**
  * Validate one provider definition.
  *
- * @param value - the parsed JSON value of one provider.
+ * @param value - the value to check.
+ * @param index - the position of the definition in the file.
  * @returns the validated definition.
+ * @throws ExperimentError when the value is not a valid definition.
  */
-function validateProvider(value: unknown): ProviderDefinition {
+function validateProviderDefinition(value: unknown, index: number): ProviderDefinition {
   if (!isRecord(value)) {
-    throw new ExperimentError("INVALID_PROVIDER", "One provider is not a JSON object.");
+    throw new ExperimentError(
+      "INVALID_PROVIDER",
+      `The provider at index ${index} is not an object.`,
+    );
   }
-  const fields = ["key", "label", "baseUrl", "model", "apiKeyEnvironmentVariable"] as const;
-  const parts: Record<string, string> = {};
-  for (const field of fields) {
-    const raw = value[field];
-    if (typeof raw !== "string") {
-      throw new ExperimentError("INVALID_PROVIDER", `The provider field ${field} is absent.`);
-    }
-    parts[field] = raw;
+  const key = value["key"];
+  const label = value["label"];
+  const baseUrl = value["baseUrl"];
+  const model = value["model"];
+  if (typeof key !== "string" || key.trim() === "") {
+    throw new ExperimentError("INVALID_PROVIDER", `The provider at index ${index} has no key.`);
   }
-  if (parts["key"] === "" || parts["model"] === "") {
-    throw new ExperimentError("INVALID_PROVIDER", "A provider key and model must not be empty.");
+  if (typeof baseUrl !== "string" || baseUrl.trim() === "") {
+    throw new ExperimentError("INVALID_PROVIDER", `The provider ${key} has no base URL.`);
   }
-  const enabled = value["enabled"];
-  const environmentPrefix = value["environmentPrefix"];
-  const prefix = typeof environmentPrefix === "string" ? environmentPrefix.trim() : "";
-  const topLogprobsCount = value["topLogprobsCount"];
-  const thinking = value["thinking"];
-  const thinkingValue = typeof thinking === "string" ? thinking.trim() : "";
-  const reasoning = value["reasoning"];
-  const reasoningValue = typeof reasoning === "string" ? reasoning.trim().toLowerCase() : "";
+  if (typeof model !== "string" || model.trim() === "") {
+    throw new ExperimentError("INVALID_PROVIDER", `The provider ${key} has no model.`);
+  }
   const rawModels = value["models"];
-  const models =
-    Array.isArray(rawModels) && rawModels.every((entry) => typeof entry === "string")
-      ? rawModels.map((entry) => entry.trim()).filter((entry) => entry !== "")
-      : undefined;
+  const models = Array.isArray(rawModels)
+    ? rawModels.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "")
+    : undefined;
+  const rawApiKeyVariable = value["apiKeyEnvironmentVariable"];
+  const rawTopLogprobs = value["topLogprobsCount"];
   return {
-    key: parts["key"] as string,
-    label: parts["label"] as string,
-    baseUrl: parts["baseUrl"] as string,
-    model: parts["model"] as string,
-    apiKeyEnvironmentVariable: parts["apiKeyEnvironmentVariable"] as string,
-    environmentPrefix: prefix === "" ? undefined : prefix,
-    topLogprobsCount:
-      typeof topLogprobsCount === "number" && Number.isInteger(topLogprobsCount) &&
-      topLogprobsCount >= 1 && topLogprobsCount <= 64
-        ? topLogprobsCount
+    key: key.trim(),
+    label: typeof label === "string" && label.trim() !== "" ? label.trim() : key.trim(),
+    baseUrl: baseUrl.trim(),
+    model: model.trim(),
+    models: models === undefined ? undefined : models.map((entry) => entry.trim()),
+    apiKeyEnvironmentVariable:
+      typeof rawApiKeyVariable === "string" ? rawApiKeyVariable.trim() : "",
+    environmentPrefix:
+      typeof value["environmentPrefix"] === "string"
+        ? (value["environmentPrefix"] as string).trim()
         : undefined,
-    thinking: thinkingValue === "" ? undefined : thinkingValue,
-    reasoning: reasoningValue === "" ? undefined : reasoningValue,
-    ...(models === undefined || models.length === 0 ? {} : { models }),
-    enabled: enabled !== false,
+    topLogprobsCount:
+      typeof rawTopLogprobs === "number" && Number.isInteger(rawTopLogprobs)
+        ? rawTopLogprobs
+        : undefined,
+    thinking: typeof value["thinking"] === "string" ? (value["thinking"] as string) : undefined,
+    reasoning: typeof value["reasoning"] === "string" ? (value["reasoning"] as string) : undefined,
+    enabled: value["enabled"] !== false,
   };
 }
 
 /**
- * Load the provider catalog.
+ * Validate one provider catalog.
  *
- * @param filePath - the path of the catalog file. The default is the packaged file.
+ * @param value - the parsed file value.
  * @returns the validated catalog.
+ * @throws ExperimentError when the value is not a valid catalog.
+ */
+export function validateProviderCatalog(value: unknown): ProviderCatalog {
+  if (!isRecord(value)) {
+    throw new ExperimentError("INVALID_PROVIDER", "The provider catalog must be one JSON object.");
+  }
+  const rawProviders = value["providers"];
+  if (!Array.isArray(rawProviders) || rawProviders.length === 0) {
+    throw new ExperimentError("INVALID_PROVIDER", "The provider catalog holds no provider.");
+  }
+  const providers = rawProviders.map((entry, index) => validateProviderDefinition(entry, index));
+  const rawSchemaVersion = value["schemaVersion"];
+  return {
+    schemaVersion: typeof rawSchemaVersion === "number" ? rawSchemaVersion : 1,
+    description: typeof value["description"] === "string" ? (value["description"] as string) : "",
+    providers,
+  };
+}
+
+/**
+ * Load one provider catalog file.
+ *
+ * @param filePath - the path of the file, or undefined for the packaged catalog.
+ * @returns the catalog.
  */
 export async function loadProviderCatalog(filePath?: string): Promise<ProviderCatalog> {
-  const target = filePath ?? packagedPath(`inputs/${PROVIDER_FILE_NAME}`);
+  const target = filePath ?? packagedPath("inputs/providers.json");
   return validateProviderCatalog(await readJsonFile(target));
 }
 
 /**
- * Select the providers of one run.
+ * Select the providers to run.
  *
- * @param catalog - the validated catalog.
+ * @param catalog - the catalog.
  * @param keys - the requested keys; an empty list selects every enabled provider.
- * @param includeDisabled - true to accept a requested provider that the catalog disables.
- * @returns the selected definitions in catalog order.
+ * @param includeDisabled - true to keep a disabled provider that the caller names.
+ * @returns the selected definitions.
  * @throws ExperimentError when a requested key is absent.
  */
 export function selectProviders(
   catalog: ProviderCatalog,
   keys: readonly string[],
-  includeDisabled: boolean,
+  includeDisabled = false,
 ): ProviderDefinition[] {
-  if (keys.length > 0) {
-    const requested = new Set(keys);
-    for (const key of requested) {
-      const known = catalog.providers.some(
-        (provider) => provider.key === key || provider.model === key,
+  if (keys.length === 0) {
+    return catalog.providers.filter((provider) => provider.enabled);
+  }
+  const selected: ProviderDefinition[] = [];
+  for (const key of keys) {
+    const match = catalog.providers.find((provider) => provider.key === key);
+    if (match === undefined) {
+      throw new ExperimentError(
+        "INVALID_PROVIDER",
+        `The catalog holds no provider ${key}. The keys are ${catalog.providers
+          .map((provider) => provider.key)
+          .join(", ")}.`,
       );
-      if (!known) {
-        throw new ExperimentError("INVALID_PROVIDER", `The provider catalog has no key ${key}.`);
-      }
     }
-    return catalog.providers.filter(
-      (provider) =>
-        (requested.has(provider.key) || requested.has(provider.model)) &&
-        (includeDisabled || provider.enabled || provider.key === MOCK_PROVIDER_KEY),
-    );
+    if (!match.enabled && !includeDisabled) {
+      throw new ExperimentError("INVALID_PROVIDER", `The provider ${key} is disabled.`);
+    }
+    selected.push(match);
   }
-  return catalog.providers.filter((provider) => provider.enabled);
+  return selected;
 }
 
 /**
- * Read the credential of one provider from its environment variable.
+ * Read the API key of one provider.
+ *
+ * The environment file section wins over the process environment.
  *
  * @param definition - the provider definition.
- * @returns the credential, or undefined when the variable is absent or empty.
- */
-export function readProviderCredential(definition: ProviderDefinition): string | undefined {
-  const variable = definition.apiKeyEnvironmentVariable.trim();
-  if (variable === "") {
-    return undefined;
-  }
-  const value = process.env[variable];
-  if (value === undefined || isPlaceholderValue(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-/**
- * Read the section name of one provider in the environment file.
- *
- * @param definition - the provider definition.
- * @returns the section name, which defaults to the provider key.
- */
-export function resolveEnvironmentPrefix(definition: ProviderDefinition): string {
-  const prefix = definition.environmentPrefix?.trim() ?? "";
-  return prefix === "" ? definition.key : prefix;
-}
-
-/**
- * Resolve the API key of one provider.
- *
- * The environment file wins. The process environment is the fallback, so a shell session that
- * already holds the variable needs no file.
- *
- * @param definition - the provider definition.
- * @param environments - the section values of the environment file.
- * @returns the key, or undefined when no usable key exists.
+ * @param environments - the sections of the environment file.
+ * @returns the API key, or undefined when the key is absent.
  */
 export function resolveProviderApiKey(
   definition: ProviderDefinition,
-  environments: ReadonlyMap<string, ProviderEnvironment>,
+  environments: ReadonlyMap<string, { readonly apiKey?: string }>,
 ): string | undefined {
-  const section = environments.get(resolveEnvironmentPrefix(definition));
-  const override = section?.apiKey;
-  if (override !== undefined && !isPlaceholderValue(override)) {
-    return override;
+  const prefix = resolveEnvironmentPrefix(definition);
+  const fromFile = environments.get(prefix)?.apiKey;
+  if (fromFile !== undefined && !isPlaceholderValue(fromFile)) {
+    return fromFile.trim();
   }
-  return readProviderCredential(definition);
+  const variableName = definition.apiKeyEnvironmentVariable;
+  if (variableName === "") {
+    return undefined;
+  }
+  const fromProcess = process.env[variableName];
+  if (fromProcess !== undefined && !isPlaceholderValue(fromProcess)) {
+    return fromProcess.trim();
+  }
+  return undefined;
 }
 
 /**
- * Apply the environment file to a provider catalog.
+ * Report whether one value is absent or an unfilled placeholder.
  *
- * A section overrides the base URL and the model of the matching provider. An empty value keeps
- * the catalog value. The function does not read or copy an API key.
+ * @param value - the value to test.
+ * @returns true when the value is empty or a placeholder.
+ */
+function isPlaceholderValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return true;
+  }
+  return trimmed.startsWith("<") && trimmed.endsWith(">");
+}
+
+/**
+ * Resolve the environment section name of one provider.
  *
- * @param catalog - the validated catalog.
- * @param environments - the section values of the environment file.
- * @returns the catalog with the overrides applied.
+ * @param definition - the provider definition.
+ * @returns the section name.
+ */
+export function resolveEnvironmentPrefix(definition: ProviderDefinition): string {
+  const prefix = definition.environmentPrefix?.trim();
+  return prefix === undefined || prefix === "" ? definition.key : prefix;
+}
+
+/**
+ * Apply the environment sections to one catalog.
+ *
+ * @param catalog - the catalog to update.
+ * @param environments - the sections of the environment file.
+ * @returns a new catalog with the overrides applied.
  */
 export function applyProviderEnvironments(
   catalog: ProviderCatalog,
-  environments: ReadonlyMap<string, ProviderEnvironment>,
-): ProviderCatalog {
-  const providers = catalog.providers.map((definition) => {
-    const section = environments.get(resolveEnvironmentPrefix(definition));
-    if (section === undefined) {
-      return definition;
+  environments: ReadonlyMap<
+    string,
+    {
+      readonly baseUrl?: string;
+      readonly model?: string;
+      readonly models?: readonly string[];
+      readonly topLogprobsCount?: number;
+      readonly edgeHost?: string;
+      readonly thinking?: string;
+      readonly reasoning?: string;
     }
-    const baseUrl = section.baseUrl?.trim() ?? "";
-    const model = section.model?.trim() ?? "";
+  >,
+): ProviderCatalog {
+  const providers = catalog.providers.map((provider) => {
+    const section = environments.get(resolveEnvironmentPrefix(provider));
+    if (section === undefined) {
+      return provider;
+    }
     return {
-      ...definition,
-      baseUrl: baseUrl === "" ? definition.baseUrl : baseUrl,
-      model: model === "" ? definition.model : model,
-      models:
-        section.models === undefined || section.models.length === 0
-          ? definition.models
-          : section.models,
-      topLogprobsCount: section.topLogprobsCount ?? definition.topLogprobsCount,
-      thinking:
-        section.thinking === undefined || section.thinking.trim() === ""
-          ? definition.thinking
-          : section.thinking,
-      reasoning:
-        section.reasoning === undefined || section.reasoning.trim() === ""
-          ? definition.reasoning
-          : section.reasoning,
+      ...provider,
+      baseUrl: section.baseUrl ?? provider.baseUrl,
+      model: section.model ?? provider.model,
+      models: section.models ?? provider.models,
+      topLogprobsCount: section.topLogprobsCount ?? provider.topLogprobsCount,
+      edgeHost: section.edgeHost ?? provider.edgeHost,
+      thinking: section.thinking ?? provider.thinking,
+      reasoning: section.reasoning ?? provider.reasoning,
     };
   });
   return { ...catalog, providers };
 }
 
 /**
- * Resolve the requested keys to the keys of the expanded catalog.
+ * Build the provider key of one model.
  *
- * A request that names a provider with a model list selects every model of that list.
+ * @param providerKey - the provider key.
+ * @param model - the model name.
+ * @returns the expanded key, as in `huggingface-Qwen-Qwen3-Coder-Next`.
+ */
+export function buildModelProviderKey(providerKey: string, model: string): string {
+  const cleaned = model.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+  return `${providerKey}-${cleaned === "" ? "model" : cleaned}`;
+}
+
+/**
+ * Expand one catalog into one entry for each model.
  *
- * @param catalog - the catalog before the model expansion.
- * @param keys - the requested provider keys or model identifiers.
- * @returns the keys of the expanded catalog.
+ * @param catalog - the catalog.
+ * @returns the expanded definitions in model order.
+ */
+export function expandProviderModels(catalog: ProviderCatalog): ProviderDefinition[] {
+  const expanded: ProviderDefinition[] = [];
+  for (const provider of catalog.providers) {
+    const models = provider.models ?? [provider.model];
+    for (const model of models) {
+      expanded.push({ ...provider, model });
+    }
+  }
+  return expanded;
+}
+
+/**
+ * Resolve the requested keys against one expanded catalog.
+ *
+ * @param catalog - the catalog.
+ * @param keys - the requested keys; an empty list selects every enabled model.
+ * @param includeDisabled - true to accept a disabled provider.
+ * @returns the selected definitions.
+ * @throws ExperimentError when a requested key matches no model.
  */
 export function resolveRequestedKeys(
   catalog: ProviderCatalog,
   keys: readonly string[],
-): string[] {
-  const resolved: string[] = [];
+  includeDisabled = false,
+): ProviderDefinition[] {
+  const expanded = expandProviderModels(catalog);
+  if (keys.length === 0) {
+    return expanded.filter((provider) => provider.enabled);
+  }
+  const selected: ProviderDefinition[] = [];
   for (const key of keys) {
-    const parent = catalog.providers.find((provider) => provider.key === key);
-    const models = parent?.models ?? [];
-    if (parent === undefined || models.length === 0) {
-      resolved.push(key);
+    const byModel = expanded.find(
+      (provider) => buildModelProviderKey(provider.key, provider.model) === key,
+    );
+    if (byModel !== undefined) {
+      selected.push(byModel);
       continue;
     }
-    for (const model of models) {
-      resolved.push(buildModelProviderKey(parent.key, model));
-    }
-  }
-  return resolved;
-}
-
-/**
- * Build the model identifier of one chat request.
- *
- * OpenRouter lists a `:batch` variant that answers no chat completion request. The plugin drops
- * that suffix for the request and keeps the variant name in the catalog, the report, and the file
- * names.
- *
- * @param model - the model identifier of the catalog.
- * @returns the identifier to send to the endpoint.
- */
-export function resolveRequestModel(model: string): string {
-  const suffix = ":batch";
-  const trimmed = model.trim();
-  return trimmed.endsWith(suffix) ? trimmed.slice(0, -suffix.length) : trimmed;
-}
-
-/**
- * Build a file-name-safe provider key from one model identifier.
- *
- * @param providerKey - the key of the provider that lists the model.
- * @param model - the model identifier.
- * @returns the key, which holds only letters, digits, dots, underscores, and hyphens.
- */
-export function buildModelProviderKey(providerKey: string, model: string): string {
-  const modelKey = model.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
-  return modelKey === "" ? providerKey : `${providerKey}-${modelKey}`;
-}
-
-/**
- * Expand each provider that lists model identifiers into one provider per model.
- *
- * One environment section supplies the model list, so one OpenRouter section yields one provider
- * per model and every model keeps its own metrics and its own output files.
- *
- * @param catalog - the validated catalog.
- * @returns the catalog with one provider per model.
- */
-export function expandProviderModels(catalog: ProviderCatalog): ProviderCatalog {
-  const providers: ProviderDefinition[] = [];
-  for (const definition of catalog.providers) {
-    const models = definition.models ?? [];
-    if (models.length === 0) {
-      providers.push(definition);
-      continue;
-    }
-    for (const rawModel of models) {
-      const model = rawModel.trim();
-      if (model === "") {
-        continue;
-      }
-      providers.push({
-        key: buildModelProviderKey(definition.key, model),
-        label: model,
-        baseUrl: definition.baseUrl,
-        model,
-        apiKeyEnvironmentVariable: definition.apiKeyEnvironmentVariable,
-        environmentPrefix: definition.environmentPrefix,
-        topLogprobsCount: definition.topLogprobsCount,
-        thinking: definition.thinking,
-        reasoning: definition.reasoning,
-        enabled: definition.enabled,
-      });
-    }
-  }
-  return { ...catalog, providers };
-}
-
-/** The task that the capability probe sends to one model. */
-const PROBE_TASK: Task = {
-  id: "PROBE",
-  category: "probe",
-  language: "zh-Hans",
-  prefix: "床前明月光，疑是地上",
-  referenceToken: "霜",
-};
-
-/** The outcome of one capability probe. */
-export interface ProbeOutcome {
-  readonly supported: boolean;
-  readonly reason?: string;
-}
-
-/**
- * Probe whether one model returns a logprobs table at the requested support size.
- *
- * The experiment uses only the models that answer this probe, as the design requires.
- *
- * @param client - the client of the model.
- * @param topLogprobsCount - the requested support size.
- * @param signal - the cancellation signal of the run.
- * @returns the outcome, with a reason when the model does not support the request.
- */
-export async function probeLogprobsSupport(
-  client: ProviderClient,
-  topLogprobsCount: number,
-  signal: AbortSignal,
-): Promise<ProbeOutcome> {
-  try {
-    await client.predict(
-      { mode: "actual", task: PROBE_TASK, repetition: 1, topLogprobsCount },
-      signal,
+    const byProvider = expanded.filter(
+      (provider) => provider.key === key && (includeDisabled || provider.enabled),
     );
-    return { supported: true };
-  } catch (error) {
-    return { supported: false, reason: errorMessage(error) };
-  }
-}
-
-/**
- * Create the client of one provider.
- *
- * @param definition - the provider definition.
- * @param timeoutMilliseconds - the ceiling of one request.
- * @returns the client.
- * @throws ExperimentError when a real provider has no credential.
- */
-export function createProviderClient(
-  definition: ProviderDefinition,
-  timeoutMilliseconds: number = DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
-  apiKeyOverride?: string,
-): ProviderClient {
-  if (definition.key === MOCK_PROVIDER_KEY) {
-    return new MockProviderClient(definition);
-  }
-  const credential = apiKeyOverride ?? readProviderCredential(definition);
-  if (credential === undefined) {
-    throw new ExperimentError(
-      "MISSING_CREDENTIAL",
-      `The provider ${definition.key} needs an API key in the environment file ` +
-        `or in the environment variable ${definition.apiKeyEnvironmentVariable}.`,
-    );
-  }
-  return new OpenAiCompatibleClient(definition, credential, timeoutMilliseconds);
-}
-
-/**
- * Build one answer object from the raw numbers of one provider reply.
- *
- * @param request - the prediction request.
- * @param entries - the reported probability entries.
- * @param token - the reported chosen token.
- * @param raw - the raw provider reply.
- * @param startedAt - the time before the request in milliseconds.
- * @param endpoint - the request endpoint.
- * @param requestBody - the request body.
- * @returns the answer with the normalized distribution.
- */
-function buildAnswer(
-  request: PredictionRequest,
-  entries: readonly ProbabilityEntry[],
-  token: string,
-  raw: unknown,
-  startedAt: number,
-  endpoint: string,
-  requestBody: unknown,
-  providerKey?: string,
-): PredictionAnswer {
-  const elapsedMilliseconds = Date.now() - startedAt;
-  const distribution = buildDistribution(entries);
-  const answer: PredictionAnswer = {
-    mode: request.mode,
-    repetition: request.repetition,
-    requestedAt: new Date(startedAt).toISOString(),
-    elapsedMilliseconds,
-    token,
-    distribution,
-    raw,
-    rawFileName: `${providerKey === undefined ? "" : `${providerKey}-`}${request.task.id}-${
-      request.mode
-    }-r${request.repetition}.json`,
-    endpoint,
-    requestBody,
-  };
-  if (elapsedMilliseconds > SLOW_GUESS_THRESHOLD_MILLISECONDS) {
-    return { ...answer, warning: `The guess took ${(elapsedMilliseconds / 1000).toFixed(1)}s.` };
-  }
-  return answer;
-}
-
-/** One client of an OpenAI-compatible chat completions endpoint. */
-class OpenAiCompatibleClient implements ProviderClient {
-  /** The provider definition. */
-  public readonly definition: ProviderDefinition;
-  private readonly credential: string;
-  private readonly timeoutMilliseconds: number;
-
-  /**
-   * Create one client.
-   *
-   * @param definition - the provider definition.
-   * @param credential - the API key.
-   * @param timeoutMilliseconds - the ceiling of one request.
-   */
-  public constructor(
-    definition: ProviderDefinition,
-    credential: string,
-    timeoutMilliseconds: number,
-  ) {
-    this.definition = definition;
-    this.credential = credential;
-    this.timeoutMilliseconds = timeoutMilliseconds;
-  }
-
-  /**
-   * Send one prediction request and parse the answer.
-   *
-   * @param request - the prediction request.
-   * @param signal - the cancellation signal of the run.
-   * @returns the parsed answer.
-   */
-  public async predict(
-    request: PredictionRequest,
-    signal: AbortSignal,
-  ): Promise<PredictionAnswer> {
-    const endpoint = `${this.definition.baseUrl.replace(/\/+$/u, "")}/chat/completions`;
-    const body =
-      request.mode === "actual"
-        ? this.buildActualBody(request)
-        : this.buildSelfBody(request);
-    const startedAt = Date.now();
-    const raw = await this.post(endpoint, body, signal);
-    return parseProviderReply(request, raw, startedAt, endpoint, body, this.definition.key);
-  }
-
-  /** Build the body of one actual-prediction request. */
-  private buildActualBody(request: PredictionRequest): Record<string, unknown> {
-    const prompt = buildActualPredictionPrompt(request.task);
-    const body: Record<string, unknown> = {
-      model: resolveRequestModel(this.definition.model),
-      messages: [
-        { role: "system", content: prompt.system },
-        { role: "user", content: prompt.user },
-      ],
-      max_tokens: 1,
-      logprobs: true,
-      top_logprobs: request.topLogprobsCount,
-      temperature: REQUEST_TEMPERATURE,
-      stream: false,
-    };
-    this.applyThinking(body);
-    this.applyReasoning(body);
-    this.applyOpenRouterHints(body);
-    return body;
-  }
-
-  /**
-   * Merge the thinking parameter of the provider into a request body.
-   *
-   * A provider that thinks by default rejects a forced tool choice. A section value of `disabled`
-   * turns thinking off, and a value of `low`, `high`, or `max` sets the effort level.
-   *
-   * @param body - the request body to extend in place.
-   */
-  private applyThinking(body: Record<string, unknown>): void {
-    const thinking = this.definition.thinking?.trim() ?? "";
-    if (thinking !== "") {
-      body["thinking"] = { type: thinking };
-    }
-  }
-
-  /**
-   * Merge the reasoning switch of the provider into a request body.
-   *
-   * A reasoning model spends its first tokens on thinking, so the first content token does not
-   * follow the prefix. The switch turns reasoning off for a clean next-token prediction.
-   *
-   * @param body - the request body to extend in place.
-   */
-  private applyReasoning(body: Record<string, unknown>): void {
-    const reasoning = this.definition.reasoning?.trim().toLowerCase() ?? "";
-    if (reasoning === "disabled") {
-      body["reasoning"] = { enabled: false };
-    }
-  }
-
-  /**
-   * Merge the routing hint of OpenRouter into a request body.
-   *
-   * OpenRouter can skip a model whose route does not carry the requested parameters. Other
-   * providers reject the unknown field, so the hint stays with OpenRouter.
-   *
-   * @param body - the request body to extend in place.
-   */
-  private applyOpenRouterHints(body: Record<string, unknown>): void {
-    if (this.definition.baseUrl.includes("openrouter.ai")) {
-      body["provider"] = { require_parameters: true };
-    }
-  }
-
-  /** Build the body of one self-prediction request with the forced tool. */
-  private buildSelfBody(request: PredictionRequest): Record<string, unknown> {
-    const prompt = buildSelfPredictionPrompt(request.task, request.topLogprobsCount);
-    const tool = buildSelfPredictionTool(request.topLogprobsCount);
-    const body: Record<string, unknown> = {
-      model: resolveRequestModel(this.definition.model),
-      messages: [
-        { role: "system", content: prompt.system },
-        { role: "user", content: prompt.user },
-      ],
-      tools: [{ type: "function", function: tool }],
-      tool_choice: { type: "function", function: { name: tool.name } },
-      max_tokens: 2048,
-      temperature: REQUEST_TEMPERATURE,
-      stream: false,
-    };
-    this.applyThinking(body);
-    this.applyReasoning(body);
-    this.applyOpenRouterHints(body);
-    return body;
-  }
-
-  /** Send one HTTP request and read the JSON reply. */
-  private async post(endpoint: string, body: unknown, signal: AbortSignal): Promise<unknown> {
-    const timeout = AbortSignal.timeout(this.timeoutMilliseconds);
-    const combined = AbortSignal.any([signal, timeout]);
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.credential}`,
-        },
-        body: JSON.stringify(body),
-        signal: combined,
-      });
-    } catch (error) {
+    if (byProvider.length === 0) {
       throw new ExperimentError(
-        "PROVIDER_FAILURE",
-        `The provider ${this.definition.key} did not answer: ${errorMessage(error)}`,
+        "INVALID_PROVIDER",
+        `The catalog holds no enabled provider or model ${key}.`,
       );
     }
-    const text = await response.text();
-    if (!response.ok) {
-      const head = text.length > 500 ? `${text.slice(0, 500)}...` : text;
-      throw new ExperimentError(
-        "PROVIDER_FAILURE",
-        `The provider ${this.definition.key} returned HTTP ${response.status}: ${head}`,
-      );
-    }
+    selected.push(...byProvider);
+  }
+  return selected;
+}
+
+/**
+ * Build the self report table of one model reply.
+ *
+ * @param content - the message content.
+ * @param toolArguments - the arguments of the first tool call, when present.
+ * @returns the normalized distribution.
+ */
+function buildSelfDistribution(content: string, toolArguments?: unknown): TokenDistribution {
+  if (typeof toolArguments === "string" && toolArguments.trim() !== "") {
     try {
-      return JSON.parse(text) as unknown;
+      return buildDistribution(parseSelfReport(toolArguments));
     } catch {
-      throw new ExperimentError(
-        "INVALID_RESPONSE",
-        `The provider ${this.definition.key} returned invalid JSON.`,
-      );
+      // The message body is the second chance.
     }
   }
+  return buildDistribution(parseSelfReport(content));
 }
 
 /**
- * Parse one provider reply into an answer.
+ * Read the served table of one response body.
  *
- * An actual prediction reads `choices[0].logprobs.content[0]`. A self prediction reads the first
- * tool call, and falls back to a JSON body when the provider answers in text.
- *
- * @param request - the prediction request.
- * @param raw - the raw provider reply.
- * @param startedAt - the time before the request in milliseconds.
- * @param endpoint - the request endpoint.
- * @param requestBody - the request body.
- * @returns the parsed answer.
+ * @param body - the response body.
+ * @param topLogprobsCount - the expected entry count.
+ * @returns the chosen token and the normalized distribution.
+ * @throws ExperimentError when the body holds no served table.
  */
-export function parseProviderReply(
-  request: PredictionRequest,
-  raw: unknown,
-  startedAt: number,
-  endpoint: string,
-  requestBody: unknown,
-  providerKey?: string,
-): PredictionAnswer {
-  if (!isRecord(raw)) {
-    throw new ExperimentError("INVALID_RESPONSE", "The provider reply is not a JSON object.");
-  }
-  const choices = raw["choices"];
-  if (!Array.isArray(choices) || choices.length === 0 || !isRecord(choices[0])) {
-    throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds no choice.");
-  }
-  const choice = choices[0];
-  if (request.mode === "actual") {
-    const entries = readLogprobEntries(choice);
-    const token = readLogprobToken(choice);
-    return buildAnswer(request, entries, token, raw, startedAt, endpoint, requestBody, providerKey);
-  }
-  const entries = readSelfPredictionEntries(choice);
-  const distribution = buildDistribution(entries);
-  return buildAnswer(
-    request,
-    entries,
-    distribution.topToken,
-    raw,
-    startedAt,
-    endpoint,
-    requestBody,
-    providerKey,
-  );
-}
-
-/**
- * Read the chosen token of one actual-prediction choice.
- *
- * @param choice - one reply choice.
- * @returns the token text.
- */
-function readLogprobToken(choice: Record<string, unknown>): string {
-  const logprobs = choice["logprobs"];
-  if (isRecord(logprobs)) {
-    const content = logprobs["content"];
-    if (Array.isArray(content) && content.length > 0 && isRecord(content[0])) {
-      const token = content[0]["token"];
-      if (typeof token === "string") {
-        return token;
-      }
-    }
-  }
-  throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds no logprob token.");
-}
-
-/**
- * Read the top log-probability entries of one actual-prediction choice.
- *
- * @param choice - one reply choice.
- * @returns the probability entries, or a single entry of the chosen token when the provider
- *   reports no top table.
- */
-function readLogprobEntries(choice: Record<string, unknown>): ProbabilityEntry[] {
+export function readServedTable(
+  body: unknown,
+  topLogprobsCount: number,
+): { token: string; distribution: TokenDistribution } {
+  const choice = readFirstChoice(body);
   const logprobs = choice["logprobs"];
   if (!isRecord(logprobs)) {
-    throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds no logprobs table.");
+    throw new ExperimentError("INVALID_RESPONSE", "The reply holds no logprobs table.");
   }
   const content = logprobs["content"];
-  if (!Array.isArray(content) || content.length === 0 || !isRecord(content[0])) {
-    throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds an empty logprobs table.");
-  }
-  const first = content[0];
-  const token = first["token"];
-  const logprob = first["logprob"];
-  const entries: ProbabilityEntry[] = [];
-  const top = first["top_logprobs"];
-  if (Array.isArray(top)) {
-    for (const item of top) {
-      if (!isRecord(item)) {
-        continue;
-      }
-      const itemToken = item["token"];
-      const itemLogprob = item["logprob"];
-      if (typeof itemToken === "string" && typeof itemLogprob === "number") {
-        entries.push({ token: itemToken, logProbability: itemLogprob });
-      }
+  if (Array.isArray(content) && content.length > 0) {
+    const first = content[0];
+    if (!isRecord(first)) {
+      throw new ExperimentError("INVALID_RESPONSE", "The logprobs entry is not an object.");
     }
+    const entries = readTopLogprobs(first["top_logprobs"]);
+    if (entries.length === 0) {
+      throw new ExperimentError("INVALID_RESPONSE", "The logprobs table holds no token.");
+    }
+    const chosen = first["token"];
+    const token = typeof chosen === "string" && chosen.trim() !== "" ? chosen : entries[0]!.token;
+    return { token, distribution: buildDistribution(entries) };
   }
-  if (entries.length === 0 && typeof token === "string" && typeof logprob === "number") {
-    entries.push({ token, logProbability: logprob });
+  const token = readMessageContent(choice);
+  if (token.trim() === "") {
+    throw new ExperimentError("INVALID_RESPONSE", "The reply holds an empty logprobs table.");
   }
-  if (entries.length === 0) {
-    throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds no usable logprob.");
+  return {
+    token,
+    distribution: buildDistribution([{ token, logProbability: 0 }]),
+  };
+}
+
+/**
+ * Read the top entry list of one logprobs entry.
+ *
+ * @param value - the raw value.
+ * @returns the entries with a finite log probability.
+ */
+function readTopLogprobs(value: unknown): ProbabilityEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const entries: ProbabilityEntry[] = [];
+  for (const rawEntry of value) {
+    if (!isRecord(rawEntry)) {
+      continue;
+    }
+    const token = rawEntry["token"];
+    const logProbability = rawEntry["logprob"];
+    if (typeof token !== "string" || token.trim() === "") {
+      continue;
+    }
+    if (typeof logProbability !== "number" || !Number.isFinite(logProbability)) {
+      continue;
+    }
+    entries.push({ token, logProbability });
   }
   return entries;
 }
 
 /**
- * Read one self-prediction answer from one reply choice.
+ * Read the first choice of one response body.
  *
- * @param choice - one reply choice.
- * @returns the probability entries.
+ * @param body - the response body.
+ * @returns the choice record.
+ * @throws ExperimentError when the body holds no choice.
  */
-function readSelfPredictionEntries(choice: Record<string, unknown>): ProbabilityEntry[] {
-  const message = choice["message"];
-  if (!isRecord(message)) {
-    throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds no message.");
+function readFirstChoice(body: unknown): Readonly<Record<string, unknown>> {
+  if (!isRecord(body)) {
+    throw new ExperimentError("INVALID_RESPONSE", "The response body is not an object.");
   }
-  const toolCalls = message["tool_calls"];
-  if (Array.isArray(toolCalls)) {
-    for (const call of toolCalls) {
-      if (!isRecord(call)) {
-        continue;
-      }
-      const functionValue = call["function"];
-      if (isRecord(functionValue) && functionValue["arguments"] !== undefined) {
-        return parseSelfPredictionArguments(functionValue["arguments"]);
-      }
-    }
+  const choices = body["choices"];
+  if (!Array.isArray(choices) || choices.length === 0 || !isRecord(choices[0])) {
+    throw new ExperimentError("INVALID_RESPONSE", "The response body holds no choice.");
   }
-  const content = message["content"];
-  if (typeof content === "string" && content.trim() !== "") {
-    return parseSelfPredictionArguments(content.trim());
-  }
-  throw new ExperimentError("INVALID_RESPONSE", "The provider reply holds no tool call.");
+  return choices[0];
 }
 
-/** A deterministic client that needs no network access and no credential. */
-class MockProviderClient implements ProviderClient {
-  /** The provider definition. */
+/**
+ * Read the message content of one choice.
+ *
+ * @param choice - the choice record.
+ * @returns the content text.
+ */
+function readMessageContent(choice: Readonly<Record<string, unknown>>): string {
+  const message = choice["message"];
+  if (!isRecord(message)) {
+    return "";
+  }
+  const content = message["content"];
+  return typeof content === "string" ? content : "";
+}
+
+/**
+ * Read the tool argument value of the first tool call.
+ *
+ * @param choice - the choice record.
+ * @returns the argument value, or undefined when the reply holds no tool call.
+ */
+function readToolArguments(choice: Readonly<Record<string, unknown>>): unknown {
+  const message = choice["message"];
+  if (!isRecord(message)) {
+    return undefined;
+  }
+  const toolCalls = message["tool_calls"];
+  if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+    return undefined;
+  }
+  const first = toolCalls[0];
+  if (!isRecord(first)) {
+    return undefined;
+  }
+  const callFunction = first["function"];
+  if (!isRecord(callFunction)) {
+    return undefined;
+  }
+  return callFunction["arguments"];
+}
+
+/**
+ * Apply one switch to a request body.
+ *
+ * @param body - the body to update.
+ * @param definition - the provider definition.
+ * @returns the updated body.
+ */
+function applySwitches(
+  body: Record<string, unknown>,
+  definition: ProviderDefinition,
+): Record<string, unknown> {
+  if (definition.thinking !== undefined && definition.thinking.trim() !== "") {
+    body["thinking"] = { type: definition.thinking.trim() };
+  }
+  if (definition.reasoning !== undefined && definition.reasoning.trim() !== "") {
+    body["reasoning"] = { enabled: definition.reasoning.trim().toLowerCase() === "enabled" };
+  }
+  if (definition.baseUrl.includes("openrouter.ai")) {
+    body["provider"] = { require_parameters: true };
+  }
+  return body;
+}
+
+/** One chat message. */
+interface ChatMessage {
+  /** The role of the message. */
+  readonly role: "system" | "user" | "assistant";
+  /** The text of the message. */
+  readonly content: string;
+}
+
+/**
+ * Build the options of one request that travels through a permitted edge.
+ *
+ * The edge host can carry a port, as in `127.0.0.1:8443`. Without a port, the request uses the
+ * default HTTPS port. The `Host` header always names the host of the base URL, because the edge
+ * selects the distribution from that header.
+ *
+ * @param edgeHost - the host name of the edge, with an optional port.
+ * @param endpoint - the endpoint URL of the base URL host.
+ * @param headers - the request headers.
+ * @param bodyText - the encoded request body.
+ * @param timeoutMilliseconds - the time limit.
+ * @returns the request options.
+ */
+export function buildEdgeRequestOptions(
+  edgeHost: string,
+  endpoint: string,
+  headers: Readonly<Record<string, string | number>>,
+  bodyText: string,
+  timeoutMilliseconds: number,
+): https.RequestOptions {
+  const target = new URL(endpoint);
+  const separator = edgeHost.lastIndexOf(":");
+  const hasPort = separator > 0 && /^\d+$/u.test(edgeHost.slice(separator + 1));
+  const hostname = hasPort ? edgeHost.slice(0, separator) : edgeHost;
+  const port = hasPort ? Number.parseInt(edgeHost.slice(separator + 1), 10) : 443;
+  const requestHeaders: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    requestHeaders[name] = value;
+  }
+  requestHeaders["host"] = target.host;
+  requestHeaders["content-length"] = Buffer.byteLength(bodyText);
+  return {
+    hostname,
+    port,
+    path: `${target.pathname}${target.search}`,
+    method: "POST",
+    headers: requestHeaders,
+    servername: hostname,
+    rejectUnauthorized: false,
+    timeout: timeoutMilliseconds,
+  };
+}
+
+/**
+ * Post one request and read the JSON body, with a bounded retry.
+ *
+ * A shared pool of an upstream provider can answer HTTP 429 at any moment. A server fault can
+ * answer HTTP 5xx. Both answers can succeed after a short wait, so the request repeats with a
+ * growing delay. Any other failure ends the attempt at once.
+ *
+ * @param endpoint - the endpoint URL.
+ * @param body - the request body.
+ * @param apiKey - the API key.
+ * @param timeoutMilliseconds - the time limit.
+ * @param providerKey - the provider key for one error message.
+ * @param signal - the cancellation signal.
+ * @param edgeHost - the permitted network edge, when the base URL host is blocked.
+ * @returns the response body.
+ */
+async function postJson(
+  endpoint: string,
+  body: unknown,
+  apiKey: string | undefined,
+  timeoutMilliseconds: number,
+  providerKey: string,
+  signal?: AbortSignal,
+  edgeHost?: string,
+): Promise<unknown> {
+  let lastError: ExperimentError | undefined;
+  for (let attempt = 1; attempt <= REQUEST_ATTEMPT_COUNT; attempt += 1) {
+    try {
+      return await postJsonOnce(
+        endpoint,
+        body,
+        apiKey,
+        timeoutMilliseconds,
+        providerKey,
+        signal,
+        edgeHost,
+      );
+    } catch (error) {
+      if (!(error instanceof ExperimentError) || !isRetryable(error.message)) {
+        throw error;
+      }
+      lastError = error;
+      if (attempt === REQUEST_ATTEMPT_COUNT) {
+        break;
+      }
+      await waitBeforeRetry(REQUEST_RETRY_DELAY_MILLISECONDS * attempt, signal);
+    }
+  }
+  throw lastError ?? new ExperimentError("PROVIDER_FAILURE", `The provider ${providerKey} failed.`);
+}
+
+/**
+ * Test one error message for a failure that a retry can clear.
+ *
+ * @param message - the error message.
+ * @returns true when the message names HTTP 429 or HTTP 5xx.
+ */
+function isRetryable(message: string): boolean {
+  return /HTTP (?:429|5\d\d)/u.test(message);
+}
+
+/**
+ * Wait before one retry.
+ *
+ * @param delayMilliseconds - the delay.
+ * @param signal - the cancellation signal.
+ * @returns a promise that settles after the delay.
+ */
+async function waitBeforeRetry(
+  delayMilliseconds: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  await sleep(delayMilliseconds, signal);
+}
+
+/**
+ * Post one request and read the JSON body.
+ *
+ * @param endpoint - the endpoint URL.
+ * @param body - the request body.
+ * @param apiKey - the API key.
+ * @param timeoutMilliseconds - the time limit.
+ * @param providerKey - the provider key for one error message.
+ * @param signal - the cancellation signal.
+ * @returns the response body.
+ */
+async function postJsonOnce(
+  endpoint: string,
+  body: unknown,
+  apiKey: string | undefined,
+  timeoutMilliseconds: number,
+  providerKey: string,
+  signal?: AbortSignal,
+  edgeHost?: string,
+): Promise<unknown> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    accept: "application/json",
+  };
+  if (apiKey !== undefined) {
+    headers["authorization"] = `Bearer ${apiKey}`;
+  }
+  if (edgeHost !== undefined && edgeHost.trim() !== "") {
+    return await postJsonThroughEdge(
+      edgeHost.trim(),
+      endpoint,
+      headers,
+      JSON.stringify(body),
+      timeoutMilliseconds,
+      providerKey,
+      signal,
+    );
+  }
+  const timeoutSignal = AbortSignal.timeout(timeoutMilliseconds);
+  const combinedSignal = signal === undefined ? timeoutSignal : AbortSignal.any([signal, timeoutSignal]);
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: combinedSignal,
+    });
+  } catch (error) {
+    throw new ExperimentError(
+      "PROVIDER_FAILURE",
+      `The provider ${providerKey} did not answer: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const text = await response.text();
+  if (!response.ok) {
+    throw new ExperimentError(
+      "PROVIDER_FAILURE",
+      `The provider ${providerKey} returned HTTP ${response.status}: ${text.slice(0, 500)}`,
+    );
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new ExperimentError(
+      "INVALID_RESPONSE",
+      `The provider ${providerKey} returned invalid JSON: ${text.slice(0, 200)}`,
+    );
+  }
+}
+
+/**
+ * Post one request through a permitted network edge.
+ *
+ * The local network can block the host of the base URL. The edge carries the TLS handshake, and
+ * the `Host` header names the host of the base URL. The edge then selects the distribution from
+ * the header. The certificate belongs to the edge, so the check of the certificate is off.
+ *
+ * @param edgeHost - the host name of the edge.
+ * @param endpoint - the endpoint URL of the base URL host.
+ * @param headers - the request headers.
+ * @param bodyText - the encoded request body.
+ * @param timeoutMilliseconds - the time limit.
+ * @param providerKey - the provider key for one error message.
+ * @param signal - the cancellation signal.
+ * @returns the response body.
+ */
+async function postJsonThroughEdge(
+  edgeHost: string,
+  endpoint: string,
+  headers: Readonly<Record<string, string>>,
+  bodyText: string,
+  timeoutMilliseconds: number,
+  providerKey: string,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const requestHeaders: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    requestHeaders[name] = value;
+  }
+  const options = buildEdgeRequestOptions(edgeHost, endpoint, requestHeaders, bodyText, timeoutMilliseconds);
+  const text = await new Promise<string>((resolve, reject) => {
+    const request = https.request(
+      options,
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          const status = response.statusCode ?? 0;
+          const body = Buffer.concat(chunks).toString("utf8");
+          if (status < 200 || status >= 300) {
+            reject(
+              new ExperimentError(
+                "PROVIDER_FAILURE",
+                `The provider ${providerKey} returned HTTP ${status}: ${body.slice(0, 500)}`,
+              ),
+            );
+            return;
+          }
+          resolve(body);
+        });
+        response.on("error", (error) => {
+          reject(
+            new ExperimentError(
+              "PROVIDER_FAILURE",
+              `The provider ${providerKey} did not answer: ${errorMessage(error)}`,
+            ),
+          );
+        });
+      },
+    );
+    request.on("timeout", () => {
+      request.destroy(new Error("The request reached its time limit."));
+    });
+    request.on("error", (error) => {
+      reject(
+        new ExperimentError(
+          "PROVIDER_FAILURE",
+          `The provider ${providerKey} did not answer: ${errorMessage(error)}`,
+        ),
+      );
+    });
+    if (signal !== undefined) {
+      signal.addEventListener("abort", () => {
+        request.destroy(new Error("The request was cancelled."));
+      });
+    }
+    request.end(bodyText);
+  });
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new ExperimentError(
+      "INVALID_RESPONSE",
+      `The provider ${providerKey} returned invalid JSON: ${text.slice(0, 200)}`,
+    );
+  }
+}
+
+/**
+ * Build one warning for a slow exchange.
+ *
+ * @param elapsedMilliseconds - the elapsed time.
+ * @returns the warning, or undefined when the request is fast.
+ */
+function buildSlowWarning(elapsedMilliseconds: number): string | undefined {
+  if (elapsedMilliseconds <= SLOW_REQUEST_THRESHOLD_MILLISECONDS) {
+    return undefined;
+  }
+  return `The request took ${Math.round(elapsedMilliseconds / 1000)} s.`;
+}
+
+/** One client of one OpenAI-compatible chat endpoint. */
+export class OpenAiCompatibleClient implements ProviderClient {
+  /** The provider definition of the client. */
   public readonly definition: ProviderDefinition;
+  /** The model name of the client. */
+  public readonly model: string;
+  /** The expanded provider key of the client. */
+  public readonly providerKey: string;
+  /** The API key of the client. */
+  private readonly apiKey: string | undefined;
+  /** The time limit of one request. */
+  private readonly timeoutMilliseconds: number;
+  /** The number of requested table entries. */
+  private readonly topLogprobsCount: number;
+
+  /**
+   * Create one client.
+   *
+   * @param definition - the provider definition.
+   * @param apiKey - the API key.
+   * @param timeoutMilliseconds - the time limit of one request.
+   */
+  public constructor(
+    definition: ProviderDefinition,
+    apiKey: string | undefined,
+    timeoutMilliseconds = DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
+  ) {
+    this.definition = definition;
+    this.model = definition.model;
+    this.providerKey = buildModelProviderKey(definition.key, definition.model);
+    this.apiKey = apiKey;
+    this.timeoutMilliseconds = timeoutMilliseconds;
+    this.topLogprobsCount = Math.min(
+      definition.topLogprobsCount ?? MAX_PROBABILITY_ENTRY_COUNT,
+      MAX_PROBABILITY_ENTRY_COUNT,
+    );
+  }
+
+  /**
+   * Read the served table of one task.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  public async requestPlainActual(
+    task: Task,
+    repetition: number,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    const prompt = buildActualPredictionPrompt(task);
+    const messages: ChatMessage[] = [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ];
+    return this.requestServedTable(CONDITION_PLAIN_ACTUAL, repetition, messages, signal);
+  }
+
+  /**
+   * Read the self report of one task.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  public async requestPlainSelf(
+    task: Task,
+    repetition: number,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    const prompt = buildSelfPredictionPrompt(task, this.topLogprobsCount);
+    const messages: ChatMessage[] = [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ];
+    return this.requestSelfReport(CONDITION_PLAIN_SELF, repetition, messages, signal);
+  }
+
+  /**
+   * Inject one served table and read the self report that follows.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param injected - the served table.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  public async requestInjectedSelf(
+    task: Task,
+    repetition: number,
+    injected: TokenDistribution,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    const prompt = buildSelfPredictionPrompt(task, this.topLogprobsCount);
+    const messages: ChatMessage[] = [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+      { role: "assistant", content: buildInjectedTableMessage(injected) },
+      {
+        role: "user",
+        content: buildInjectedSelfPredictionPrompt(task, this.topLogprobsCount),
+      },
+    ];
+    return this.requestSelfReport(CONDITION_INJECTED_SELF, repetition, messages, signal);
+  }
+
+  /**
+   * Read one self report, keep it in context, and read the served table that follows.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param signal - the cancellation signal.
+   * @returns both outcomes.
+   */
+  public async requestInjectedActual(
+    task: Task,
+    repetition: number,
+    signal?: AbortSignal,
+  ): Promise<InjectedActualOutcome> {
+    const prompt = buildSelfPredictionPrompt(task, this.topLogprobsCount);
+    const selfMessages: ChatMessage[] = [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ];
+    const self = await this.requestSelfReport(CONDITION_INJECTED_ACTUAL, repetition, selfMessages, signal);
+    const tableText = formatTableJson({ entries: self.draft.distribution.entries });
+    const messages: ChatMessage[] = [
+      ...selfMessages,
+      { role: "assistant", content: tableText },
+      { role: "user", content: buildInjectedActualPrompt(task) },
+    ];
+    const actual = await this.requestServedTable(
+      CONDITION_INJECTED_ACTUAL,
+      repetition,
+      messages,
+      signal,
+    );
+    return { self, actual };
+  }
+
+  /**
+   * Request one served table.
+   *
+   * @param condition - the condition name.
+   * @param repetition - the repetition number.
+   * @param messages - the messages of the request.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  private async requestServedTable(
+    condition: ConditionName,
+    repetition: number,
+    messages: readonly ChatMessage[],
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    const endpoint = `${this.definition.baseUrl.replace(/\/+$/u, "")}/chat/completions`;
+    const body = applySwitches(
+      {
+        model: this.model,
+        messages: messages.map((message) => ({ role: message.role, content: message.content })),
+        temperature: REQUEST_TEMPERATURE,
+        max_tokens: 1,
+        logprobs: true,
+        top_logprobs: this.topLogprobsCount,
+        stream: false,
+      },
+      this.definition,
+    );
+    const exchange = await this.send(endpoint, body, signal);
+    const choice = readFirstChoice(exchange.responseBody);
+    const served = readServedTable(exchange.responseBody, this.topLogprobsCount);
+    const content = readMessageContent(choice);
+    return {
+      draft: {
+        condition,
+        repetition,
+        requestedAt: exchange.requestedAt,
+        elapsedMilliseconds: exchange.elapsedMilliseconds,
+        token: served.token,
+        distribution: served.distribution,
+        source: "provider_logprobs",
+        endpoint,
+        requestBody: body,
+        warning: buildSlowWarning(exchange.elapsedMilliseconds),
+      },
+      exchanges: [exchange],
+    };
+  }
+
+  /**
+   * Request one self report.
+   *
+   * @param condition - the condition name.
+   * @param repetition - the repetition number.
+   * @param messages - the messages of the request.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  private async requestSelfReport(
+    condition: ConditionName,
+    repetition: number,
+    messages: readonly ChatMessage[],
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    const endpoint = `${this.definition.baseUrl.replace(/\/+$/u, "")}/chat/completions`;
+    const body = applySwitches(
+      {
+        model: this.model,
+        messages: messages.map((message) => ({ role: message.role, content: message.content })),
+        temperature: REQUEST_TEMPERATURE,
+        max_tokens: SELF_REPORT_MAX_TOKENS,
+        stream: false,
+      },
+      this.definition,
+    );
+    const exchange = await this.send(endpoint, body, signal);
+    const choice = readFirstChoice(exchange.responseBody);
+    const distribution = buildSelfDistribution(
+      readMessageContent(choice),
+      readToolArguments(choice),
+    );
+    return {
+      draft: {
+        condition,
+        repetition,
+        requestedAt: exchange.requestedAt,
+        elapsedMilliseconds: exchange.elapsedMilliseconds,
+        distribution,
+        source: "self_report",
+        endpoint,
+        requestBody: body,
+        warning: buildSlowWarning(exchange.elapsedMilliseconds),
+      },
+      exchanges: [exchange],
+    };
+  }
+
+  /**
+   * Send one request and record the exchange.
+   *
+   * @param endpoint - the endpoint URL.
+   * @param body - the request body.
+   * @param signal - the cancellation signal.
+   * @returns the recorded exchange.
+   */
+  private async send(
+    endpoint: string,
+    body: unknown,
+    signal?: AbortSignal,
+  ): Promise<RecordedExchange> {
+    const requestedAt = new Date().toISOString();
+    const started = performance.now();
+    const responseBody = await postJson(
+      endpoint,
+      body,
+      this.apiKey,
+      this.timeoutMilliseconds,
+      this.providerKey,
+      signal,
+      this.definition.edgeHost,
+    );
+    return {
+      requestedAt,
+      elapsedMilliseconds: Math.round(performance.now() - started),
+      endpoint,
+      requestBody: body,
+      responseBody,
+    };
+  }
+}
+
+/** The token alphabet of the mock client. */
+/** The weight of the served table in each mock condition. */
+const MOCK_CONDITION_WEIGHTS: Readonly<Record<ConditionName, number>> = {
+  plain_actual: 1,
+  plain_self: 0,
+  injected_self: 0.55,
+  injected_actual: 0.85,
+};
+
+const MOCK_TOKENS = [
+  "霜",
+  "流",
+  "鸟",
+  "花",
+  "月",
+  "风",
+  "雨",
+  "云",
+  "山",
+  "水",
+  "晚",
+  "早",
+  "光",
+  "声",
+  "blue",
+  "star",
+  "day",
+  "night",
+  "rain",
+  "wind",
+  "moon",
+  "light",
+  "water",
+  "song",
+];
+
+/**
+ * Compute one stable hash of a text.
+ *
+ * @param text - the text to hash.
+ * @returns a non-negative integer.
+ */
+function stableHash(text: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Build one deterministic distribution of the mock client.
+ *
+ * @param task - the task.
+ * @param condition - the condition name.
+ * @param repetition - the repetition number.
+ * @param entryCount - the requested entry count.
+ * @returns the normalized distribution.
+ */
+function buildMockDistribution(
+  task: Task,
+  condition: ConditionName,
+  repetition: number,
+  entryCount: number,
+): TokenDistribution {
+  const count = Math.max(2, Math.min(entryCount, MOCK_TOKENS.length));
+  const seed = stableHash(`${task.id}|${repetition}`);
+  const tokenSeed = stableHash(task.id);
+  const tokens = Array.from({ length: count }, (_value, index) => {
+    const position = (tokenSeed + index * 7) % MOCK_TOKENS.length;
+    return MOCK_TOKENS[position] ?? MOCK_TOKENS[0]!;
+  });
+  const served = mockWeights(count, seed % count);
+  const reported = mockWeights(count, (seed + 11) % count);
+  const weight = MOCK_CONDITION_WEIGHTS[condition];
+  const entries: ProbabilityEntry[] = tokens.map((token, index) => {
+    const left = served[index] ?? 0;
+    const right = reported[index] ?? 0;
+    const probability = weight * left + (1 - weight) * right;
+    return { token, logProbability: Math.log(Math.max(probability, PROBABILITY_FLOOR)) };
+  });
+  return buildDistribution(entries);
+}
+
+/**
+ * Build one normalized Zipf weight vector with a rotation.
+ *
+ * @param count - the entry count.
+ * @param rotation - the rotation of the ranking.
+ * @returns the normalized weights.
+ */
+function mockWeights(count: number, rotation: number): number[] {
+  const weights: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const rank = ((index - rotation + count) % count) + 1;
+    weights.push(1 / Math.pow(rank, 1.35));
+  }
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  return weights.map((value) => value / total);
+}
+
+/** One deterministic client that needs no network. */
+export class MockProviderClient implements ProviderClient {
+  /** The provider definition of the client. */
+  public readonly definition: ProviderDefinition;
+  /** The model name of the client. */
+  public readonly model: string;
+  /** The expanded provider key of the client. */
+  public readonly providerKey: string;
+  /** The number of requested table entries. */
+  private readonly topLogprobsCount: number;
 
   /**
    * Create one mock client.
@@ -815,112 +1288,205 @@ class MockProviderClient implements ProviderClient {
    */
   public constructor(definition: ProviderDefinition) {
     this.definition = definition;
+    this.model = definition.model;
+    this.providerKey = buildModelProviderKey(definition.key, definition.model);
+    this.topLogprobsCount = definition.topLogprobsCount ?? MAX_PROBABILITY_ENTRY_COUNT;
   }
 
   /**
-   * Build one deterministic answer from the task text.
+   * Read one mock served table.
    *
-   * @param request - the prediction request.
-   * @param signal - the cancellation signal of the run.
-   * @returns the answer.
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
    */
-  public async predict(
-    request: PredictionRequest,
-    signal: AbortSignal,
-  ): Promise<PredictionAnswer> {
-    if (signal.aborted) {
-      throw new ExperimentError("PROVIDER_FAILURE", "The mock request was aborted.");
-    }
-    const startedAt = Date.now();
-    const entries = buildMockDistribution(
-      request.task,
-      request.mode,
-      request.repetition,
-      request.topLogprobsCount,
+  public async requestPlainActual(
+    task: Task,
+    repetition: number,
+    _signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    return this.buildOutcome(CONDITION_PLAIN_ACTUAL, task, repetition, "provider_logprobs");
+  }
+
+  /**
+   * Read one mock self report.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  public async requestPlainSelf(
+    task: Task,
+    repetition: number,
+    _signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    return this.buildOutcome(CONDITION_PLAIN_SELF, task, repetition, "self_report");
+  }
+
+  /**
+   * Read one mock injected self report.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param injected - the injected table.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  public async requestInjectedSelf(
+    task: Task,
+    repetition: number,
+    _injected: TokenDistribution,
+    _signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    return this.buildOutcome(CONDITION_INJECTED_SELF, task, repetition, "self_report");
+  }
+
+  /**
+   * Read one mock injected actual table.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param signal - the cancellation signal.
+   * @returns both outcomes.
+   */
+  public async requestInjectedActual(
+    task: Task,
+    repetition: number,
+    _signal?: AbortSignal,
+  ): Promise<InjectedActualOutcome> {
+    return {
+      self: this.buildOutcome(CONDITION_INJECTED_ACTUAL, task, repetition, "self_report"),
+      actual: this.buildOutcome(CONDITION_INJECTED_ACTUAL, task, repetition, "provider_logprobs"),
+    };
+  }
+
+  /**
+   * Build one mock outcome.
+   *
+   * @param condition - the condition name.
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param source - the origin of the table.
+   * @returns the prediction outcome.
+   */
+  private buildOutcome(
+    condition: ConditionName,
+    task: Task,
+    repetition: number,
+    source: "provider_logprobs" | "self_report",
+  ): PredictionOutcome {
+    const distribution = buildMockDistribution(
+      task,
+      condition,
+      repetition,
+      this.topLogprobsCount,
     );
-    const distribution = buildDistribution(entries);
-    const raw = {
-      id: `mock-${createHash("sha256").update(JSON.stringify(request)).digest("hex").slice(0, 16)}`,
-      object: "chat.completion",
-      model: this.definition.model,
-      choices: [
+    const endpoint = "mock://local/chat/completions";
+    return {
+      draft: {
+        condition,
+        repetition,
+        requestedAt: new Date().toISOString(),
+        elapsedMilliseconds: 0,
+        token: source === "provider_logprobs" ? distribution.topToken : undefined,
+        distribution,
+        source,
+        endpoint,
+        requestBody: { model: this.model, mock: true, condition },
+      },
+      exchanges: [
         {
-          index: 0,
-          message: {
-            role: "assistant",
-            content: request.mode === "actual" ? distribution.topToken : "",
+          requestedAt: new Date().toISOString(),
+          elapsedMilliseconds: 0,
+          endpoint,
+          requestBody: {
+            model: this.model,
+            messages: [{ role: "user", content: task.prefix }],
+            temperature: REQUEST_TEMPERATURE,
+            mock: true,
+            condition,
           },
-          finish_reason: "stop",
+          responseBody: {
+            mock: true,
+            model: this.model,
+            condition,
+            entries: distribution.entries,
+          },
         },
       ],
-      mock: true,
     };
-    const held = Math.max(1, entries.length);
-    const answer = buildAnswer(
-      request,
-      entries,
-      distribution.topToken,
-      raw,
-      startedAt,
-      "mock://local/chat/completions",
-      { mode: request.mode, taskId: request.task.id, repetition: request.repetition },
-      this.definition.key,
-    );
-    if (held !== request.topLogprobsCount) {
-      return { ...answer, warning: `The mock table holds ${held} entries.` };
-    }
-    return answer;
   }
 }
 
 /**
- * Build one deterministic probability table for the mock provider.
+ * Build one provider client.
  *
- * The table uses a hash of the prefix and the token, so the actual table does not depend on the
- * repetition. The self-prediction mode adds a small perturbation that does depend on the
- * repetition, so its table mirrors the actual table with a reproducible amount of variation.
- *
- * @param task - the task.
- * @param mode - the prediction mode.
- * @param repetition - the repetition number.
- * @param entryCount - the requested table size.
- * @returns the probability entries in descending order.
+ * @param definition - the provider definition.
+ * @param apiKey - the API key.
+ * @param timeoutMilliseconds - the time limit of one request.
+ * @returns the client.
  */
-export function buildMockDistribution(
+export function createProviderClient(
+  definition: ProviderDefinition,
+  apiKey: string | undefined,
+  timeoutMilliseconds = DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
+): ProviderClient {
+  if (definition.key === MOCK_PROVIDER_KEY || definition.baseUrl.startsWith("mock://")) {
+    return new MockProviderClient(definition);
+  }
+  return new OpenAiCompatibleClient(definition, apiKey, timeoutMilliseconds);
+}
+
+/**
+ * Probe whether one client reports a full top-N table.
+ *
+ * @param client - the client to probe.
+ * @param task - the probe task.
+ * @param signal - the cancellation signal.
+ * @returns the support report.
+ */
+export async function probeLogprobsSupport(
+  client: ProviderClient,
   task: Task,
-  mode: "actual" | "self",
-  repetition: number,
-  entryCount: number,
-): ProbabilityEntry[] {
-  const size = Math.min(entryCount, MOCK_TOKENS.length);
-  const scored: { token: string; score: number }[] = [];
-  for (const token of MOCK_TOKENS) {
-    const digest = createHash("sha256")
-      .update(`${task.prefix}|${token}`)
-      .digest();
-    const raw = digest.readUInt32BE(0) / 0xffffffff;
-    let score = raw * 2 - 1;
-    if (mode === "self") {
-      const jitter = createHash("sha256")
-        .update(`self|${task.prefix}|${token}|${repetition}`)
-        .digest()
-        .readUInt32BE(0) / 0xffffffff;
-      score += (jitter - 0.5) * 0.02;
-    }
-    scored.push({ token, score });
+  signal?: AbortSignal,
+): Promise<{ supported: boolean; reason?: string; entryCount: number }> {
+  try {
+    const outcome = await client.requestPlainActual(task, 1, signal);
+    const entryCount = outcome.draft.distribution.supportSize;
+    return { supported: entryCount > 1, entryCount };
+  } catch (error) {
+    return {
+      supported: false,
+      reason: error instanceof Error ? error.message : String(error),
+      entryCount: 0,
+    };
   }
-  scored.sort((left, right) => right.score - left.score || left.token.localeCompare(right.token));
-  const top = scored.slice(0, size);
-  const maximum = top[0]?.score ?? 0;
-  let total = 0;
-  const probabilities: number[] = [];
-  for (const item of top) {
-    const probability = Math.exp((item.score - maximum) * 3);
-    probabilities.push(probability);
-    total += probability;
-  }
-  return top.map((item, index) => ({
-    token: item.token,
-    logProbability: Math.log((probabilities[index] ?? 0) / total),
-  }));
+}
+
+/**
+ * Build one prediction record from one draft and its raw file names.
+ *
+ * @param draft - the draft.
+ * @param rawFileNames - the raw file names relative to the run directory.
+ * @returns the prediction record.
+ */
+export function buildPredictionRecord(
+  draft: PredictionDraft,
+  rawFileNames: readonly string[],
+): PredictionRecord {
+  return {
+    condition: draft.condition,
+    repetition: draft.repetition,
+    requestedAt: draft.requestedAt,
+    elapsedMilliseconds: draft.elapsedMilliseconds,
+    token: draft.token,
+    distribution: draft.distribution,
+    source: draft.source,
+    rawFileNames,
+    endpoint: draft.endpoint,
+    requestBody: draft.requestBody,
+    warning: draft.warning,
+  };
 }

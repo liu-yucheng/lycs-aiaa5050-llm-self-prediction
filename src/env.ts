@@ -16,6 +16,7 @@ import { writeFile } from "node:fs/promises";
 import {
   ENV_API_KEY_PROPERTY,
   ENV_BASE_URL_PROPERTY,
+  ENV_EDGE_HOST_PROPERTY,
   ENV_EXAMPLE_FILE_NAME,
   ENV_FILE_NAME,
   ENV_MODEL_PROPERTY,
@@ -40,6 +41,7 @@ export interface ProviderEnvironment {
   readonly models?: readonly string[];
   readonly apiKey?: string;
   readonly topLogprobsCount?: number;
+  readonly edgeHost?: string;
   readonly thinking?: string;
   readonly reasoning?: string;
 }
@@ -175,6 +177,11 @@ export function buildProviderEnvironments(
       const count = Number.parseInt(value.trim(), 10);
       if (Number.isInteger(count) && count >= 1 && count <= 64) {
         environments.set(prefix, { ...current, topLogprobsCount: count });
+      }
+    } else if (property === ENV_EDGE_HOST_PROPERTY) {
+      const edgeHost = value.trim().toLowerCase();
+      if (edgeHost !== "") {
+        environments.set(prefix, { ...current, edgeHost });
       }
     } else if (property === ENV_THINKING_PROPERTY) {
       const thinking = value.trim().toLowerCase();

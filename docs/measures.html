@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Measures — Next-token self-prediction</title>
-<meta name="description" content="Alignment, divergence measures, the bootstrap interval, and the verdict rule.">
+<title>Measures — plugin documentation</title>
+<meta name="description" content="The comparison rule, the divergence measures, the bootstrap, and the verdict.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.5.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -23,169 +23,64 @@
 </header>
 
 <main>
-  <h1>Measures</h1>
-  <p class="lede">How two top-20 tables become one divergence, one interval, and one verdict.</p>
+  <h1>Measures and verdict</h1>
+  <p class="lede">The three comparisons, the alignment rule, the divergence measures, and the
 
-  <h2>1. Normalize one table</h2>
-  <ol>
-    <li>Normalize each token with NFKC and trim it.</li>
-    <li>Aggregate two entries with the same token by the sum of their probabilities.</li>
-    <li>Convert each natural-log probability with <code>p = exp(logProbability)</code>.</li>
-    <li>Sort the entries from the highest probability to the lowest.</li>
-  </ol>
-  <p>A table with a non-finite value, a negative probability, or a zero total is invalid, and the
-    answer is missing.</p>
+    verdict rule.</p>
 
-  <h2>2. Align two tables</h2>
-  <p>Two top-20 tables rarely share the same tokens, because the tail differs. The plugin builds the
-    union of both supports, gives the probability floor <code>1e-12</code> to each token that one
-    side does not report, and renormalizes each side over the union.</p>
-  <pre><code>tokens = union(actual.tokens, self.tokens)
-p_i = actual.probability(token_i) or 1e-12
-q_i = self.probability(token_i) or 1e-12
-p_i = p_i / sum(p),  q_i = q_i / sum(q)</code></pre>
-  <p>The floor keeps a divergence finite when one table gives zero probability to a token that the
-    other table reports. The floor is the reason a missing tail cannot become an infinite
-    divergence.</p>
-
-  <h2>3. Measures of one pair</h2>
+<h2>The three comparisons</h2>
   <table>
     <thead>
-      <tr><th>Measure</th><th>Definition</th><th>Range</th><th>Reading</th></tr>
+      <tr><th>Comparison</th><th>Actual side</th><th>Predicted side</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td><code>KL(P||Q)</code></td>
-        <td>Σ p<sub>i</sub> ln(p<sub>i</sub> / q<sub>i</sub>)</td>
-        <td>0 to ∞</td>
-        <td>The extra cost of coding an actual table with a self table.</td>
-      </tr>
-      <tr>
-        <td><code>KL(Q||P)</code></td>
-        <td>Σ q<sub>i</sub> ln(q<sub>i</sub> / p<sub>i</sub>)</td>
-        <td>0 to ∞</td>
-        <td>The extra cost in the other direction. It is not equal to the first value.</td>
-      </tr>
-      <tr>
-        <td>Symmetric KL</td>
-        <td>( KL(P||Q) + KL(Q||P) ) / 2</td>
-        <td>0 to ∞</td>
-        <td>The reported distance, in nats.</td>
-      </tr>
-      <tr>
-        <td>JS</td>
-        <td>½ KL(P||M) + ½ KL(Q||M), with M = (P + Q) / 2</td>
-        <td>0 to ln 2</td>
-        <td>A bounded distance that a reader can compare across tasks.</td>
-      </tr>
-      <tr>
-        <td>TV</td>
-        <td>½ Σ |p<sub>i</sub> − q<sub>i</sub>|</td>
-        <td>0 to 1</td>
-        <td>The largest probability difference that the two tables give one event set.</td>
-      </tr>
-      <tr>
-        <td>Top-1</td>
-        <td>The most likely token of each table</td>
-        <td>true or false</td>
-        <td>Whether the model at least names its own first choice.</td>
-      </tr>
-      <tr>
-        <td>Coverage</td>
-        <td>The probability that one table gives to the support of the other</td>
-        <td>0 to 1</td>
-        <td>Whether the model reports the tokens that the provider weighs.</td>
-      </tr>
-      <tr>
-        <td>Union support size</td>
-        <td>The count of aligned tokens</td>
-        <td>1 to 128</td>
-        <td>How much the two supports differ.</td>
-      </tr>
+      <tr><td><code>plain_self</code></td><td><code>plain_actual</code></td><td><code>plain_self</code></td></tr>
+      <tr><td><code>injected_self</code></td><td><code>plain_actual</code></td><td><code>injected_self</code></td></tr>
+      <tr><td><code>injected_actual</code></td><td><code>plain_actual</code></td><td><code>injected_actual</code></td></tr>
     </tbody>
   </table>
 
-  <h2>4. Aggregate one provider</h2>
-  <p>The plugin collects the pair values of every task and reports the mean, the median, and the
-    count. It also reports the two baselines: actual against actual, and self against self.</p>
-  <pre><code>mean symmetric KL = mean(pair.symmetricKl for each task and each pair)
-baseline         = mean(symmetric KL between two answers of the same mode)</code></pre>
+<h2>The alignment</h2>
+<p>Two tables rarely share one token set. The plugin builds the union of both token sets. A token that one table omits receives the probability floor of 1e-12, and each side is renormalized after the floor. The floor keeps the divergence finite and gives one missing token a large but bounded cost.</p>
+  <p>The alignment reports the union size and the coverage of each side, so a reader can tell a real disagreement from a narrow table.</p>
 
-  <h2>5. Confidence interval</h2>
-  <p>The interval comes from a percentile bootstrap of the mean symmetric divergence:</p>
-  <ol>
-    <li>Draw 2000 resamples of the pair values with replacement, using a fixed seed.</li>
-    <li>Compute the mean of each resample.</li>
-    <li>Take the 2.5 percent and 97.5 percent quantiles.</li>
-  </ol>
-  <p>The fixed seed makes the interval reproducible. The same pair values and the same seed give
-    the same interval on every platform.</p>
-
-  <h2>6. Verdict</h2>
+<h2>The measures</h2>
   <table>
     <thead>
-      <tr><th>Verdict</th><th>Condition</th><th>Reading</th></tr>
+      <tr><th>Measure</th><th>Definition</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td><code>separated</code></td>
-        <td>lower bound &gt; tolerance</td>
-        <td>The self table differs from the actual table by more than the tolerance. The null hypothesis holds for this
-          sample.</td>
-      </tr>
-      <tr>
-        <td><code>indistinguishable</code></td>
-        <td>upper bound &lt; tolerance</td>
-        <td>The two tables agree within the tolerance. The alternative hypothesis holds for this sample.</td>
-      </tr>
-      <tr>
-        <td><code>inconclusive</code></td>
-        <td>the interval crosses the tolerance</td>
-        <td>The sample cannot decide. The run needs more pairs, or a smaller tolerance.</td>
-      </tr>
+      <tr><td><code>klActualPredicted</code></td><td>The divergence from the actual table to the predicted table, in nats.</td></tr>
+      <tr><td><code>klPredictedActual</code></td><td>The divergence from the predicted table to the actual table, in nats.</td></tr>
+      <tr><td><code>symmetricKl</code></td><td>The mean of the two directed divergences. This measure carries the verdict.</td></tr>
+      <tr><td><code>jensenShannon</code></td><td>The bounded divergence against the mean table, in nats.</td></tr>
+      <tr><td><code>totalVariation</code></td><td>One half of the L1 distance between the two tables.</td></tr>
+      <tr><td><code>topTokenAgreement</code></td><td>True when both tables name the same most likely token.</td></tr>
     </tbody>
   </table>
-  <p>The default tolerance is 0.05 nats. A run can set another value, and the report records the
-    value that the run used.</p>
 
-  <h2>7. Reading the baseline</h2>
-  <ul>
-    <li>A mean divergence close to the same-mode baseline means the two modes differ no more than
-      two runs of one mode differ.</li>
-    <li>A mean divergence far above the baseline means the model reports a table that it does not
-      produce.</li>
-    <li>A baseline that is itself large means the provider samples widely, and the run needs more
-      repetitions before it can decide.</li>
-  </ul>
-
-  <h2>8. Illustration</h2>
-  <p>The numbers below come from the mock provider with three tasks and two repetitions. They show
-    the shape of a report and they are not a result about any model.</p>
-  <table>
+<h2>The verdict</h2>
+<p>The plugin computes the mean symmetric divergence of each task, then one bootstrap interval of that mean with 2000 resamples and a fixed seed. The interval states how much the task sample supports.</p>
+    <table>
     <thead>
-      <tr><th>Quantity</th><th class="numeric">Value</th></tr>
+      <tr><th>Interval against the tolerance</th><th>Verdict</th></tr>
     </thead>
     <tbody>
-      <tr><td>Pairs</td><td class="numeric">12</td></tr>
-      <tr><td>Mean symmetric KL</td><td class="numeric">0.004307 nats</td></tr>
-      <tr><td>95 percent interval</td><td class="numeric">0.0001 to 0.0106</td></tr>
-      <tr><td>Mean JS</td><td class="numeric">0.000173 nats</td></tr>
-      <tr><td>Top-1 agreement</td><td class="numeric">0.833</td></tr>
-      <tr><td>Same-mode baseline</td><td class="numeric">0.004249 nats</td></tr>
-      <tr><td>Verdict</td><td class="numeric">indistinguishable</td></tr>
+      <tr><td>The upper bound is below the tolerance.</td><td><code>indistinguishable</code></td></tr>
+      <tr><td>The lower bound is above the tolerance.</td><td><code>separated</code></td></tr>
+      <tr><td>The interval covers the tolerance.</td><td><code>inconclusive</code></td></tr>
+      <tr><td>The comparison holds no pair.</td><td><code>inconclusive</code></td></tr>
     </tbody>
   </table>
-  <p>The mean sits close to the baseline, which is the expected shape of a mock that shares one
-    score table between the two modes.</p>
+  <p>The default tolerance is 0.05 nats. One nat is a factor of e in probability, so the tolerance asks whether the two tables differ by more than about five percent in the exponential sense.</p>
 
-  <p><a href="reference.html">Next: the tools, the command line, and the output layout →</a></p>
+<h2>The warning about repetition noise</h2>
+<p>A self report varies across repetitions, and a served table can also vary at temperature zero. The interval covers the task sample, not the provider noise. A reader must compare the interval with the spread of the repetitions before the reader calls a small divergence a real one.</p>
 </main>
 
-<footer class="site-footer">
-  <div class="inner">
-    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
-      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
-  </div>
+<footer>
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+    The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
 </html>

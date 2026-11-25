@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Protocol — Next-token self-prediction</title>
-<meta name="description" content="Request bodies, the forced tool schema, and the reply rules of the experiment.">
+<title>Protocol — plugin documentation</title>
+<meta name="description" content="The request bodies, the prompts, the injections, and the reply rules.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.5.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -23,268 +23,62 @@
 </header>
 
 <main>
-  <h1>Protocol</h1>
-  <p class="lede">The exact bytes on the wire, so a run can be repeated with another client.</p>
+  <h1>Protocol of one run</h1>
+  <p class="lede">The exact request bodies, the prompt rules, the injections, and the reply
 
-  <h2>1. Endpoint and headers</h2>
-  <p>Each provider declares a base URL in <code>inputs/providers.json</code>. The client sends one
-    <code>POST</code> to <code>&lt;baseUrl&gt;/chat/completions</code>:</p>
-  <pre><code>POST /v1/chat/completions
-content-type: application/json
-authorization: Bearer $PROVIDER_API_KEY</code></pre>
-  <p>One request has a ceiling of 120 seconds, and the run signal cancels it earlier when the user
-    stops the session.</p>
+    parsing rules.</p>
 
-  <h2>2. Actual-prediction request</h2>
-  <pre><code>{
-  "model": "deepseek/deepseek-v4.1-flash-1017",
-  "messages": [
-    {
-      "role": "system",
-      "content": "你正在参加一项中文下一个词预测实验。你要阅读一段句子前缀，并给出紧接着出现的一个词。只输出这一个词，不要解释，不要加标点。"
-    },
-    {
-      "role": "user",
-      "content": "句子前缀：床前明月光，疑是地上\n\n请只输出紧接着的一个词。"
-    }
-  ],
-  "max_tokens": 1,
-  "logprobs": true,
-  "top_logprobs": 20,
-  "reasoning": { "enabled": false },
-  "provider": { "require_parameters": true },
-  "stream": false
+<h2>The actual request</h2>
+<p>The plugin sends one system message and one user message, with <code>temperature: 0</code>, <code>max_tokens: 1</code>, <code>logprobs: true</code>, and <code>top_logprobs: 20</code>. The provider returns the top 20 entries of the first generated token.</p>
+    <pre><code>POST &lt;base_url&gt;/chat/completions
+{
+  &quot;model&quot;: &quot;&lt;model&gt;&quot;,
+  &quot;messages&quot;: [{&quot;role&quot;: &quot;system&quot;, &quot;content&quot;: &quot;...&quot;}, {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;...&quot;}],
+  &quot;temperature&quot;: 0,
+  &quot;max_tokens&quot;: 1,
+  &quot;logprobs&quot;: true,
+  &quot;top_logprobs&quot;: 20,
+  &quot;stream&quot;: false
 }</code></pre>
-  <p>The reply table comes from <code>choices[0].logprobs.content[0].top_logprobs</code>. Each entry
-    holds a <code>token</code> and a <code>logprob</code> in nats. A provider that omits the table is
-    an invalid response.</p>
-  <p>The value of <code>top_logprobs</code> is the support size: 20 by default, a catalog value, a
-    <code>&lt;prefix&gt;.top_logprobs</code> value, or the run argument. An endpoint that caps the
-    value rejects a larger one with an HTTP 400 error, and the probe excludes that model.</p>
-  <p>The <code>reasoning</code> field turns reasoning off, because a reasoning model spends its first
-    tokens on thinking and then returns no table for the prefix. OpenRouter refuses the switch for a
-    model that requires reasoning, and the probe excludes that model too.</p>
-  <p>The <code>provider.require_parameters</code> field asks OpenRouter to route the call only to an
-    upstream endpoint that serves the requested parameters. A direct provider endpoint adds
-    <code>"thinking": {"type": "&lt;level&gt;"}</code> instead.</p>
 
-  <h2>3. Self-prediction request</h2>
-  <pre><code>{
-  "model": "deepseek/deepseek-v4.1-flash-1017",
-  "messages": [
-    {
-      "role": "system",
-      "content": "&lt;the system prompt of section 3.1&gt;"
-    },
-    {
-      "role": "user",
-      "content": "&lt;the user prompt of section 3.1&gt;"
-    }
-  ],
-  "tools": [
-    {
-      "type": "function",
-      "function": {
-        "name": "submit_next_token_log_probabilities",
-        "description": "提交下一个词的自然对数概率表。每个条目给出一个词和它的自然对数概率。按概率从高到低排列，概率之和必须约等于 1。",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "entries": {
-              "type": "array",
-              "description": "下一个词的概率表条目，按概率从高到低排列。",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "token": { "type": "string", "description": "一个词。" },
-                  "logProbability": { "type": "number", "description": "这个词的自然对数概率。" }
-                },
-                "required": ["token", "logProbability"],
-                "additionalProperties": false
-              },
-              "minItems": 1,
-              "maxItems": 64
-            }
-          },
-          "required": ["entries"],
-          "additionalProperties": false
-        }
-      }
-    }
-  ],
-  "tool_choice": {
-    "type": "function",
-    "function": { "name": "submit_next_token_log_probabilities" }
-  },
-  "max_tokens": 2048,
-  "stream": false
-}</code></pre>
-  <p>The ceiling of 2048 completion tokens leaves room for the entry list. The forced choice keeps the
-    model from answering in prose, and a text answer that holds one JSON object is also accepted.</p>
+<h2>The self request</h2>
+<p>The self request asks the model to write the table itself. The request sets <code>max_tokens: 2048</code> and no <code>logprobs</code> field. The reply must hold one JSON object with an entry list, where each entry gives a token and a log probability.</p>
+    <pre><code>{&quot;entries&quot;:[{&quot;token&quot;:&quot;霜&quot;,&quot;logProbability&quot;:-0.42},
+            {&quot;token&quot;:&quot;光&quot;,&quot;logProbability&quot;:-1.05}]}</code></pre>
+  <p>The prompt describes the tokenize cut. A tokenizer can split one word into several tokens. The prompt asks the model to list the leading pieces as separate entries and to give the rest of the mass to the whole word.</p>
 
-  <h3>3.1 Prompt text</h3>
-  <p>The system message joins these segments in this order, with no space between them:</p>
-  <ol>
-    <li>你正在参加一项中文下一个词自我预测实验。</li>
-    <li>你要报告自己作为语言模型在看到一段句子前缀时，对紧接着出现的那个词的概率分布。</li>
-    <li>优先调用工具提交结果。无法调用工具时，只在正文中写一个 JSON 对象。</li>
-  </ol>
-  <p>The user message joins these segments in this order:</p>
-  <ol>
-    <li><code>句子前缀：&lt;prefix&gt;</code>, then two newline characters.</li>
-    <li>请调用 submit_next_token_log_probabilities 工具，提交你认为最可能的
-      &lt;entry count&gt; 个词，每个词给出自然对数概率 logProbability。</li>
-    <li>概率之和必须约等于 1，数值必须小于或等于 0。</li>
-    <li>按概率从高到低排列。</li>
-  </ol>
-  <p>The prefix comes from the task, and the entry count comes from <code>top_logprobs</code>, which
-    is 20. An English task gets the English prompt pair instead: the system message names the
-    self-prediction experiment and the JSON fallback, and the user message names the prefix, the
-    tool, and the same entry count.</p>
+<h2>The two injections</h2>
+<p><strong>Injected self.</strong> The plugin sends the task prompt, then one assistant message that holds a served table, then one user message that asks for the self report again. The second report is the measurement.</p>
+  <p><strong>Injected actual.</strong> The plugin reads one self report, keeps that report as one assistant message, and then asks for the served table of the same prefix. The served table that follows is the measurement.</p>
+  <p>The plugin records both calls of the second injection, so a reader can see whether the model repeated its own table or changed it.</p>
 
-  <h2>4. Parsing the self-prediction reply</h2>
-  <ol>
-    <li>Read <code>choices[0].message.tool_calls[0].function.arguments</code>.</li>
-    <li>When the value is a string, parse it as JSON. When it is already an object, use it.</li>
-    <li>Require one <code>entries</code> array with at least one item and at most 64 items.</li>
-    <li>Require one <code>token</code> string and one finite <code>logProbability</code> number for
-      each item.</li>
-    <li>When the message carries no tool call, accept one text body that holds the same JSON object
-      and record the raw reply in both cases.</li>
-  </ol>
-  <p>A reply that breaks a rule becomes one error file and one warning. The run continues with the
-    remaining tasks.</p>
-
-  <h2>5. Dataset file</h2>
-  <pre><code>{
-  "datasetId": "llm-self-prediction-zh64-en64-v2",
-  "language": "zh-Hans, en-US",
-  "languages": ["zh-Hans", "en-US"],
-  "tasks": [
-    {
-      "id": "Z001",
-      "language": "zh-Hans",
-      "category": "poetry",
-      "prefix": "床前明月光，疑是地上",
-      "referenceToken": "霜"
-    }
-  ]
-}</code></pre>
-  <p>The shipped file holds 64 Simplified Chinese tasks and 64 US English tasks. The plugin reads the
-    packaged copy and never writes to it.</p>
-
-  <h2>6. Provider file</h2>
-  <pre><code>{
-  "schemaVersion": 1,
-  "providers": [
-    {
-      "key": "openrouter",
-      "label": "OpenRouter",
-      "baseUrl": "https://openrouter.ai/api/v1",
-      "model": "google/gemini-4-neon:batch",
-      "models": ["google/gemini-4-neon:batch", "qwen/qwen3.8-flash"],
-      "apiKeyEnvironmentVariable": "OPENROUTER_API_KEY",
-      "environmentPrefix": "openrouter",
-      "topLogprobsCount": 20,
-      "reasoning": "disabled",
-      "enabled": true
-    }
-  ]
-}</code></pre>
+<h2>The reply rules</h2>
   <table>
     <thead>
-      <tr><th>Field</th><th>Rule</th></tr>
+      <tr><th>Reply</th><th>Rule</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>key</code></td><td>A unique name in lower case. The mock provider uses <code>mock</code>.</td></tr>
-      <tr>
-        <td><code>baseUrl</code></td>
-        <td>An HTTP or HTTPS URL. The client adds <code>/chat/completions</code>.</td>
-      </tr>
-      <tr><td><code>model</code></td><td>The model name that the provider accepts.</td></tr>
-      <tr>
-        <td><code>models</code></td>
-        <td>An optional model list. The plugin expands the list into one provider per model, and one
-          model keeps one row in the report and one set of output files.</td>
-      </tr>
-      <tr>
-        <td><code>topLogprobsCount</code></td>
-        <td>The support size of the section. The default is 20.</td>
-      </tr>
-      <tr>
-        <td><code>reasoning</code></td>
-        <td><code>disabled</code> sends <code>{"enabled": false}</code> with each request.</td>
-      </tr>
-      <tr>
-        <td><code>apiKeyEnvironmentVariable</code></td>
-        <td>The name of the variable that holds the credential. An empty name means no credential.</td>
-      </tr>
-      <tr>
-        <td><code>enabled</code></td>
-        <td>A disabled entry needs the explicit key <code>mock</code> or the flag <code>includeDisabled</code>.</td>
-      </tr>
+      <tr><td>Served table</td><td>Read <code>choices[0].logprobs.content[0].top_logprobs</code>.</td></tr>
+      <tr><td>Self report</td><td>Read the first balanced JSON object or array in the message body.</td></tr>
+      <tr><td>Token names</td><td>Apply NFKC and trim the token. Drop an empty token.</td></tr>
+      <tr><td>Duplicates</td><td>Add the probabilities of two entries that name the same token.</td></tr>
+      <tr><td>Missing entry</td><td>Use the probability floor of 1e-12 and renormalize the table.</td></tr>
+      <tr><td>Slow reply</td><td>Add one warning when a call takes more than 10 seconds.</td></tr>
     </tbody>
   </table>
 
-  <h2>7. Environment file</h2>
-  <p>The private file <code>.env</code> sits in the <code>inputs/</code> directory of the workspace,
-    and the public file <code>.env.example</code> ships with the plugin. Both use one section for each
-    provider:</p>
-  <p>A run copies an old <code>.env</code> of the workspace root to <code>inputs/.env</code> and reports
-    that copy in the warnings. The old file stays in place.</p>
-  <pre><code>openrouter.base_url=https://openrouter.ai/api/v1
-openrouter.api_key=&lt;Your API key.&gt;
-openrouter.models_to_use=google/gemini-4-neon:batch, qwen/qwen3.8-flash</code></pre>
-  <table>
-    <thead>
-      <tr><th>Property</th><th>Rule</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>base_url</code></td>
-        <td>Overrides <code>baseUrl</code> of the provider catalog.</td>
-      </tr>
-      <tr>
-        <td><code>model_to_use</code></td>
-        <td>Overrides <code>model</code> of the provider catalog.</td>
-      </tr>
-      <tr>
-        <td><code>models_to_use</code></td>
-        <td>Overrides the model list of the provider catalog. The value is a comma-separated list.</td>
-      </tr>
-      <tr>
-        <td><code>top_logprobs</code></td>
-        <td>Overrides <code>topLogprobsCount</code> of the provider catalog.</td>
-      </tr>
-      <tr>
-        <td><code>reasoning</code></td>
-        <td>Overrides <code>reasoning</code> of the provider catalog.</td>
-      </tr>
-      <tr>
-        <td><code>api_key</code></td>
-        <td>The credential. A value between angle brackets is a placeholder, and the run treats it
-          as an absent key.</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>The section name comes from the <code>environmentPrefix</code> field of the catalog, so the
-    provider <code>openrouter</code> uses the section <code>openrouter</code>. The process environment
-    is the fallback, and <code>OPENROUTER_API_KEY</code> serves every model of the section. The plugin
-    writes no key to a session file.</p>
-
-  <h2>8. Session manifest</h2>
-  <p><code>session.json</code> records the session code, the dataset identifier, the dataset digest,
-    the resolved options, the provider definitions with their model names, the environment, the
-    status, and the failure message when a run stops.</p>
-
-  <p><a href="measures.html">Next: how the two tables become one number →</a></p>
+<h2>The provider switches</h2>
+<ul>
+    <li><code>thinking: disabled</code> sends <code>{"thinking": {"type": "disabled"}}</code>, which the DeepSeek endpoint reads.</li>
+    <li><code>reasoning: disabled</code> sends <code>{"reasoning": {"enabled": false}}</code>, which the Hugging Face router reads.</li>
+    <li>An OpenRouter base URL also sends <code>{"provider": {"require_parameters": true}}</code>.</li>
+    <li>A model that reports one entry only is left out, and the run records one warning.</li>
+  </ul>
 </main>
 
-<footer class="site-footer">
-  <div class="inner">
-    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
-      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
-  </div>
+<footer>
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+    The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
 </html>

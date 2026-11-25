@@ -1,7 +1,7 @@
 {
   "name": "lycs-aiaa5050-llm-self-prediction",
-  "version": "0.5.0",
-  "description": "DeepSeek Harness plugin for the LLM next-token self-prediction experiment across DeepSeek, Qwen, and GLM.",
+  "version": "0.6.0",
+  "description": "DeepSeek Harness plugin that measures how far a model's next-token table stands from the table the same model reports about itself.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -28,6 +28,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test test/*.test.mjs",
+    "docs": "npm run build && node scripts/build-docs.mjs",
     "experiment": "npm run build && node lib/cli.js",
     "dataset:check": "npm run build && node lib/cli.js dataset"
   },

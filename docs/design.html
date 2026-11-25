@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Design — Next-token self-prediction</title>
-<meta name="description" content="Hypotheses, run flow, dataset rules, prompts, and pairing of the experiment.">
+<title>Design — plugin documentation</title>
+<meta name="description" content="The hypotheses, the four conditions, the dataset, and the run flow.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.5.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html" aria-current="page">Design</a>
@@ -23,163 +23,62 @@
 </header>
 
 <main>
-  <h1>Design</h1>
-  <p class="lede">What the experiment assumes, how one session runs, and how the answers pair
-    before any number is computed.</p>
+  <h1>Design of the experiment</h1>
+  <p class="lede">The research question, the two hypotheses, the four conditions, and the rules
 
-  <h2>1. Hypotheses</h2>
-  <p>A language model produces a probability for each possible next token, and a provider can
-    return that table through the <code>logprobs</code> field. The experiment asks whether the same
-    model can report the table when a tool call asks for it.</p>
+    that keep the comparison honest.</p>
+
+<h2>The hypotheses</h2>
+<p><strong>The null hypothesis.</strong> The self report agrees with the served table. The divergence is near zero, and self-prediction is an emergent property of next-token training.</p>
+  <p><strong>The alternative hypothesis.</strong> The divergence is significantly larger than zero. The model predicts text well and its own table badly.</p>
+  <p>A verdict never proves either hypothesis. It states whether the observed sample supports a difference that is larger than the tolerance.</p>
+
+<h2>The four conditions</h2>
   <table>
     <thead>
-      <tr><th>Hypothesis</th><th>Statement</th><th>Expected measurement</th></tr>
+      <tr><th>Condition</th><th>Context</th><th>Table origin</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td>Null</td>
-        <td>The training did not teach the model to report its own table.</td>
-        <td>The mean symmetric divergence sits clearly above the tolerance.</td>
-      </tr>
-      <tr>
-        <td>Alternative</td>
-        <td>Self-prediction emerges from the training.</td>
-        <td>The mean symmetric divergence sits close to zero, near the same-mode baseline.</td>
-      </tr>
+      <tr><td><code>plain_actual</code></td><td>The task prompt.</td><td>The provider logprobs of one served token.</td></tr>
+      <tr><td><code>plain_self</code></td><td>The task prompt.</td><td>The JSON table in the reply body.</td></tr>
+      <tr><td><code>injected_self</code></td><td>The task prompt, then one assistant message with a served table.</td><td>The JSON table in the second reply body.</td></tr>
+      <tr><td><code>injected_actual</code></td><td>The task prompt, then one assistant message with a self report.</td><td>The provider logprobs of the following served token.</td></tr>
     </tbody>
   </table>
-  <p>Both hypotheses are statements about one dataset and one model version. Neither one is a
-    statement about every prompt or every language.</p>
 
-  <h2>2. Run flow</h2>
-  <ol>
-    <li>The user opens a workspace and a session in DeepSeek Harness and names the experiment.</li>
-    <li>The agent calls <code>llm_self_prediction_run</code> with the providers, the tasks, and the
-      repetition count.</li>
-    <li>The plugin loads the dataset and the provider catalog, creates one session directory, and
-      starts one job for each task and provider pair.</li>
-    <li>A job asks for one actual prediction, then one self prediction, for each repetition.</li>
-    <li>The job writes each raw reply, then one parsed record with the pair metrics.</li>
-    <li>The run writes the aggregate metrics, the report, and the CSV tables.</li>
-    <li>The agent calls <code>llm_self_prediction_report</code> and reports the verdict.</li>
-  </ol>
-  <p>One job at a time per task keeps the two modes of a repetition close in time. The worker pool
-    runs several jobs at once, with a default limit of three.</p>
+<h2>The repetitions</h2>
+<p>Each condition runs three times for each task. The temperature is zero, so the served table of one model changes little across repetitions, while a self report can change a lot. Both kinds of repetition appear in the comparison.</p>
+  <p>One comparison pairs each actual repetition with each predicted repetition. Three repetitions give nine pairs for each task and each comparison.</p>
 
-  <h2>3. Dataset</h2>
-  <p>The dataset holds 128 tasks in eight categories: 64 Simplified Chinese tasks and 64 US English
-    tasks. One category holds 16 tasks.</p>
-  <table>
-    <thead>
-      <tr><th>Category</th><th class="numeric">Tasks</th><th>Example prefix</th><th>Reference token</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>poetry</td>
-        <td>床前明月光，疑是地上 <span class="muted">(Z001)</span></td>
-        <td>霜</td>
-      </tr>
-      <tr><td>idiom</td><td class="numeric">16</td><td>画蛇添足，多此一 <span class="muted">(T017)</span></td><td>举</td></tr>
-      <tr>
-        <td>daily life</td>
-        <td>早上闹钟响了三遍，他才从床上坐 <span class="muted">(T033)</span></td>
-        <td>起来</td>
-      </tr>
-      <tr>
-        <td>food</td>
-        <td>锅里水开了，她把面条下进 <span class="muted">(T049)</span></td>
-        <td>去</td>
-      </tr>
-      <tr>
-        <td>weather</td>
-        <td>乌云压得很低，眼看就要下 <span class="muted">(T065)</span></td>
-        <td>雨</td>
-      </tr>
-      <tr>
-        <td>technology</td>
-        <td>手机系统提示更新，他点了稍后提 <span class="muted">(T081)</span></td>
-        <td>醒</td>
-      </tr>
-      <tr>
-        <td>news</td>
-        <td>早高峰的地铁站里，人流排到了楼梯 <span class="muted">(T097)</span></td>
-        <td>口</td>
-      </tr>
-      <tr><td>story</td><td class="numeric">16</td><td>他推开门，屋里一片漆 <span class="muted">(T113)</span></td><td>黑</td></tr>
-    </tbody>
-  </table>
-  <p>Each task has an identifier, a category, a prefix, and one reference token. The validator
-    enforces these rules:</p>
-  <ul>
-    <li>The identifier, the category, the prefix, and the reference token are non-empty strings.</li>
-    <li>The identifier is unique.</li>
-    <li>The prefix does not end with the reference token.</li>
-  </ul>
-  <p>The reference token is a reference only. No metric compares a table with the reference token,
-    so the experiment measures self-knowledge and not sentence completion.</p>
+<h2>The dataset</h2>
+<p>The dataset holds two files in <code>inputs/testing-dataset/</code>. One file holds 32 Simplified Chinese tasks. The other file holds 32 US English tasks. Each file spreads its tasks over eight categories: poetry, idiom, daily, food, weather, technology, news, and story.</p>
+  <p>A task holds an identifier, a category, a language, a sentence prefix, and a reference token. The reference token is the token that a human writer would choose next. The plugin validates the dataset and rejects a prefix that already ends with its reference token. No metric reads the reference token, so a wrong completion cannot flatter or spoil a divergence.</p>
 
-  <h2>4. The two requests</h2>
-  <h3>Actual prediction</h3>
-  <p>The request sets <code>max_tokens</code> to 1, <code>logprobs</code> to true, and
-    <code>top_logprobs</code> to 20. The system message asks for one next word, and the user message
-    gives the prefix. The plugin reads <code>choices[0].logprobs.content[0].top_logprobs</code>.</p>
-  <h3>Self prediction</h3>
-  <p>The request adds one tool, <code>submit_next_token_log_probabilities</code>, and it forces that
-    tool with <code>tool_choice</code>. The prompt names the prefix, the entry count, and the rule
-    that the probabilities sum to one. The plugin reads the arguments of the first tool call.</p>
-  <h3>Inference parameters</h3>
-  <p>The plugin sends no sampling parameter, so each provider uses its recommended default. A
-    provider entry in <code>inputs/providers.json</code> can add a fixed parameter when a run needs
-    one.</p>
-
-  <h2>5. Reading a reply</h2>
-  <ul>
-    <li>A token is normalized with NFKC and trimmed at both ends.</li>
-    <li>Two entries with the same normalized token are aggregated by the sum of their
-      probabilities.</li>
-    <li>A duplicate token, a negative probability, a non-finite value, or a zero sum is an invalid
-      response.</li>
-    <li>A missing <code>logprobs</code> table, an empty tool call, or an argument that breaks the
-      schema is an invalid response.</li>
-    <li>An invalid response becomes one error file, one warning, and one missing answer. The run
-      continues.</li>
+<h2>The run flow</h2>
+<ul>
+    <li>Read the workspace, the dataset, the environment file, and the provider catalog.</li>
+    <li>Expand each provider that lists several models into one client for each model.</li>
+    <li>Resolve the API key of each client and stop with a prompt when a key is absent.</li>
+    <li>Probe each client with one served table and leave out a model that reports no table.</li>
+    <li>Create the run directory and write <code>run.json</code> and <code>tasks.json</code>.</li>
+    <li>Run one job for each task and client pair, with a bounded worker pool.</li>
+    <li>Write the raw exchange of each call before the plugin parses the reply.</li>
+    <li>Compute the three comparisons, the summaries, and the bootstrap intervals.</li>
+    <li>Write the metrics, the records, the report, the tables, and the demonstration website.</li>
   </ul>
 
-  <h2>6. Pairing</h2>
-  <p>One task and one provider give <code>R</code> actual answers and <code>R</code> self answers,
-    with <code>R</code> equal to the repetition count, which defaults to 4. The plugin compares each
-    actual answer with each self answer, so one task gives <code>R × R</code> pairs, which is 16
-    pairs at the default.</p>
-  <p>The plugin also builds two baselines:</p>
-  <table>
-    <thead>
-      <tr><th>Baseline</th><th>Compared groups</th><th>What it shows</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Actual baseline</td>
-        <td>Each actual answer against each other actual answer</td>
-        <td>The divergence that sampling noise alone produces between two real outputs</td>
-      </tr>
-      <tr>
-        <td>Self baseline</td>
-        <td>Each self answer against each other self answer</td>
-        <td>The divergence that remains inside the model report</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>A mean symmetric divergence near the baseline means that the two modes differ no more than two
-    runs of one mode differ. A divergence far above the baseline means the model reports a table that
-    it does not produce.</p>
-
-  <p><a href="protocol.html">Next: the exact request and reply protocol →</a></p>
+<h2>The integrity rules</h2>
+<ul>
+    <li>The plugin never edits a raw reply. The parse result lives in a separate file.</li>
+    <li>The plugin never changes a prompt or a dataset task to make a metric pass.</li>
+    <li>The plugin records the plugin version, the Node.js version, the platform, and the seed.</li>
+    <li>A failed call becomes one failure line in the task record, and the run continues.</li>
+  </ul>
 </main>
 
-<footer class="site-footer">
-  <div class="inner">
-    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
-      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
-  </div>
+<footer>
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+    The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
 </html>

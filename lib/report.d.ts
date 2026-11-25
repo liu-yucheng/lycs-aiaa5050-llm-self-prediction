@@ -1,39 +1,32 @@
+import type { SessionEnvironment, SessionMetrics, TaskRecord } from "./types.js";
 /**
- * Report and table rendering.
+ * Format one number with a fixed digit count.
  *
- * The report states the method, the results, and the limits of the result. It repeats the exact
- * numbers that `metrics.json` holds, and it never states a conclusion that the numbers do not
- * support.
+ * @param value - the number.
+ * @param digits - the digit count after the decimal point.
+ * @returns the text of the number, or `n/a` for a missing value.
  */
-import type { SessionManifest, SessionMetrics, TaskRecord } from "./types.js";
+export declare function formatNumber(value: number | undefined, digits?: number): string;
 /**
- * Format one number for a human reader.
- *
- * @param value - the number to format.
- * @param digits - the number of decimal places.
- * @returns the fixed-point text.
- */
-export declare function formatNumber(value: number, digits?: number): string;
-/**
- * Render the Markdown report of one session.
+ * Render the report of one run.
  *
  * @param metrics - the session metrics.
- * @param session - the session manifest.
- * @param records - the task records of the session.
- * @returns the report text.
+ * @param environment - the run environment.
+ * @param records - the task records.
+ * @returns the Markdown report.
  */
-export declare function renderReport(metrics: SessionMetrics, session: SessionManifest, records: readonly TaskRecord[]): string;
+export declare function renderReport(metrics: SessionMetrics, environment: SessionEnvironment, records: readonly TaskRecord[]): string;
 /**
- * Render the provider summary as CSV.
+ * Render the summary table in comma-separated values.
  *
  * @param metrics - the session metrics.
- * @returns the CSV text with a header row.
+ * @returns the CSV text.
  */
 export declare function renderSummaryCsv(metrics: SessionMetrics): string;
 /**
- * Render the per-task metrics as CSV.
+ * Render the task table in comma-separated values.
  *
  * @param records - the task records.
- * @returns the CSV text with a header row.
+ * @returns the CSV text.
  */
 export declare function renderTasksCsv(records: readonly TaskRecord[]): string;

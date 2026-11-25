@@ -107,3 +107,11 @@ export declare function resolveInputPath(workspace: string, fileName: string): P
  * @returns the absolute inputs directory.
  */
 export declare function resolveInputsDirectory(workspace: string): string;
+/**
+ * Wait for one delay.
+ *
+ * @param delayMilliseconds - the delay in milliseconds.
+ * @param signal - the cancellation signal.
+ * @returns a promise that settles after the delay.
+ */
+export declare function sleep(delayMilliseconds: number, signal?: AbortSignal): Promise<void>;

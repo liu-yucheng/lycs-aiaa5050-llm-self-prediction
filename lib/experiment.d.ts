@@ -1,144 +1,159 @@
-import type { Agent, Logger } from "./dsh.js";
-import type { RunResult } from "./types.js";
-/** One run request from a tool or a command. */
+import type { DatasetSummary, RunResult, SessionStatus } from "./types.js";
+/** The request of one run. */
 export interface RunRequest {
+    /** The requested provider keys or model keys. */
     readonly providerKeys?: readonly string[];
+    /** The requested task identifiers. */
     readonly taskIds?: readonly string[];
-    readonly limit?: number;
+    /** The repetition count of one condition. */
     readonly repetitions?: number;
+    /** The divergence tolerance in nats. */
     readonly toleranceNats?: number;
+    /** The output root. */
     readonly outputDirectory?: string;
+    /** The random seed. */
     readonly randomSeed?: number;
+    /** The number of tasks that run at the same time. */
     readonly maxConcurrency?: number;
+    /** The requested table entry count. */
     readonly topLogprobsCount?: number;
+    /** True to use the mock provider and no network. */
     readonly dryRun?: boolean;
 }
-/** The status of one session. */
-export interface SessionStatus {
-    readonly sessionCode: string;
-    readonly directory: string;
-    readonly status: string;
-    readonly createdAt: string;
-    readonly taskCount: number;
-    readonly verdicts: Readonly<Record<string, string>>;
-    readonly failures: number;
-}
-/** The summary of one dataset. */
-export interface DatasetSummary {
-    readonly datasetId: string;
-    readonly language: string;
-    readonly taskCount: number;
-    readonly categories: Readonly<Record<string, number>>;
-    readonly firstTaskIds: readonly string[];
-}
-/** The dependencies of the service. */
+/** The options of the experiment service. */
 export interface ExperimentServiceOptions {
-    /** Resolve the workspace directory of one tool call. */
-    readonly resolveWorkspace: (agent: Agent | undefined, signal: AbortSignal) => Promise<string>;
-    /** Read the configured output root. */
+    /** Resolve the workspace directory of one agent. */
+    readonly resolveWorkspace: (agent?: {
+        readonly id?: string;
+    }, signal?: AbortSignal) => Promise<string>;
+    /** The configured output root. */
     readonly outputRoot: () => string;
-    /** The host logger. */
-    readonly logger?: Logger;
-    /** The configured default of the job limit. */
+    /** The configured maximum concurrency. */
     readonly defaultMaxConcurrency?: number;
+    /** The logger of the host. */
+    readonly logger?: {
+        info: (message: string) => void;
+        warn: (message: string) => void;
+        error: (message: string) => void;
+    };
 }
-/** The service that a tool, a command, and the CLI share. */
+/**
+ * Build one run identifier from the start time.
+ *
+ * The identifier has the shape `<timestamp>_<short-unique-id>`.
+ *
+ * @param startedAt - the start time of the run.
+ * @returns the run identifier.
+ */
+export declare function createRunId(startedAt: Date): string;
+/**
+ * The service that runs the experiment.
+ */
 export declare class ExperimentService {
+    /** The options of the service. */
     private readonly options;
     /**
      * Create one service.
      *
-     * @param options - the workspace resolver, the output root reader, and the logger.
+     * @param options - the options of the service.
      */
     constructor(options: ExperimentServiceOptions);
     /**
-     * Run one experiment and write one session directory.
+     * Run one experiment.
      *
-     * @param agent - the agent of the tool call.
+     * @param agent - the agent that asks for the run.
      * @param request - the run request.
-     * @param signal - the cancellation signal of the call.
-     * @returns the result of the run.
-     */
-    run(agent: Agent | undefined, request: RunRequest, signal: AbortSignal): Promise<RunResult>;
-    /**
-     * Run every task and provider pair with a bounded number of concurrent jobs.
-     *
-     * @param directory - the session directory.
-     * @param tasks - the selected tasks.
-     * @param clients - the provider clients.
-     * @param repetitionCount - the repetition count.
-     * @param maxConcurrency - the job limit.
      * @param signal - the cancellation signal.
-     * @returns the task records in dataset order.
+     * @returns the run result.
+     */
+    run(agent: {
+        readonly id?: string;
+    } | undefined, request: RunRequest, signal?: AbortSignal): Promise<RunResult>;
+    /**
+     * List the status of each run below the output root.
+     *
+     * @param agent - the agent that asks.
+     * @param signal - the cancellation signal.
+     * @param limit - the number of runs to report.
+     * @returns the statuses, newest first.
+     */
+    status(agent: {
+        readonly id?: string;
+    } | undefined, signal?: AbortSignal, limit?: number): Promise<SessionStatus[]>;
+    /**
+     * Read the task count and the verdicts of one run directory.
+     *
+     * @param directory - the run directory.
+     * @returns the task count and the verdicts; both are empty when the metrics file is absent.
+     */
+    private readRunDetails;
+    /**
+     * Read one run report.
+     *
+     * @param agent - the agent that asks.
+     * @param signal - the cancellation signal.
+     * @param xid - the run identifier, or an empty string for the newest run.
+     * @returns the report text and the run directory.
+     */
+    report(agent: {
+        readonly id?: string;
+    } | undefined, signal?: AbortSignal, xid?: string): Promise<{
+        xid: string;
+        directory: string;
+        report: string;
+    }>;
+    /**
+     * Describe the dataset of one workspace.
+     *
+     * @param agent - the agent that asks.
+     * @param signal - the cancellation signal.
+     * @param sampleSize - the number of tasks to show per file.
+     * @returns the dataset summaries.
+     */
+    datasetSummary(agent: {
+        readonly id?: string;
+    } | undefined, signal?: AbortSignal, sampleSize?: number): Promise<DatasetSummary[]>;
+    /**
+     * Run each task of each model.
+     *
+     * @param clients - the active clients.
+     * @param tasks - the selected tasks.
+     * @param repetitionCount - the repetition count of one condition.
+     * @param intermediateDirectory - the intermediate directory.
+     * @param resultsDirectory - the results directory.
+     * @param maxConcurrency - the number of tasks that run at the same time.
+     * @param signal - the cancellation signal.
+     * @returns the task records.
      */
     private runJobs;
     /**
-     * Run the repetitions of one task and one provider.
+     * Run one task on one model.
      *
-     * @param directory - the session directory.
+     * @param client - the client.
      * @param task - the task.
-     * @param client - the provider client.
-     * @param repetitionCount - the repetition count.
+     * @param repetitionCount - the repetition count of one condition.
+     * @param intermediateDirectory - the intermediate directory.
+     * @param resultsDirectory - the results directory.
+     * @param signal - the cancellation signal.
      * @returns the task record.
      */
     private runOneTask;
     /**
-     * Report the state of the latest session.
+     * Write one outcome and build its record.
      *
-     * @param agent - the agent of the tool call.
-     * @param signal - the cancellation signal of the call.
-     * @returns the status, or undefined when the output root holds no session.
+     * @param outcome - the outcome to write.
+     * @param taskDirectory - the intermediate task directory.
+     * @param callNumber - the call number of the condition.
+     * @returns the prediction record.
      */
-    status(agent: Agent | undefined, signal: AbortSignal): Promise<SessionStatus | undefined>;
+    private recordOutcome;
     /**
-     * List the sessions below one output root, newest first.
+     * Write the raw exchanges of one prediction.
      *
-     * @param agent - the agent of the tool call.
-     * @param signal - the cancellation signal of the call.
-     * @param limit - the maximum number of sessions.
-     * @returns the session states.
+     * @param outcome - the prediction outcome.
+     * @param taskDirectory - the directory of the task.
+     * @param callNumber - the number of the first call of the outcome.
+     * @returns the raw file names relative to the run directory.
      */
-    listSessions(agent: Agent | undefined, signal: AbortSignal, limit: number): Promise<SessionStatus[]>;
-    /**
-     * Read one session report.
-     *
-     * @param agent - the agent of the tool call.
-     * @param signal - the cancellation signal of the call.
-     * @param sessionCode - the session code, or an empty string for the latest session.
-     * @returns the report text and its path.
-     */
-    report(agent: Agent | undefined, signal: AbortSignal, sessionCode: string): Promise<{
-        readonly sessionCode: string;
-        readonly path: string;
-        readonly text: string;
-    }>;
-    /**
-     * Resolve one session directory.
-     *
-     * @param agent - the agent of the tool call.
-     * @param signal - the cancellation signal of the call.
-     * @param sessionCode - the session code, or an empty string for the latest session.
-     * @returns the absolute session directory.
-     */
-    private sessionDirectory;
-    /**
-     * Summarize the bundled dataset.
-     *
-     * @returns the dataset summary.
-     */
-    datasetSummary(): Promise<DatasetSummary>;
+    private writeExchanges;
 }
-/**
- * Read the state of one session directory.
- *
- * @param directory - the absolute session directory.
- * @returns the session state.
- */
-export declare function readSessionStatus(directory: string): Promise<SessionStatus>;
-/**
- * Limit one correction-table request to the accepted size.
- *
- * @param value - the requested size.
- * @returns the accepted size.
- */
-export declare function clampEntryCount(value: number): number;
