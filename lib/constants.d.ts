@@ -6,7 +6,7 @@
 /** The Cordis plugin name and the npm package name. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The plugin version. Keep it equal to the version in `package.json`. */
-export declare const PLUGIN_VERSION = "0.4.0";
+export declare const PLUGIN_VERSION = "0.5.0";
 /** The host tool names. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 export declare const TOOL_STATUS = "llm_self_prediction_status";

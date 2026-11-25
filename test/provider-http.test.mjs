@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, before, test } from "node:test";
 
-import { createProviderClient } from "../lib/providers.js";
+import { REQUEST_TEMPERATURE, createProviderClient } from "../lib/providers.js";
 
 const credentialVariable = "LLM_SELF_PREDICTION_HTTP_TEST_KEY";
 const recordedRequests = [];
@@ -135,6 +135,8 @@ test("the client sends one logprobs request and parses the actual table", async 
   assert.equal(recorded.body["logprobs"], true);
   assert.equal(recorded.body["top_logprobs"], 64);
   assert.equal(recorded.body["max_tokens"], 1);
+  assert.equal(recorded.body["temperature"], REQUEST_TEMPERATURE);
+  assert.equal(recorded.body["temperature"], 0);
   assert.equal(recorded.body["tools"], undefined);
   assert.ok(recorded.body["messages"].length >= 1);
 
@@ -156,6 +158,7 @@ test("the client sends one forced tool call and parses the self table", async ()
   );
 
   const recorded = recordedRequests[0];
+  assert.equal(recorded.body["temperature"], 0);
   assert.equal(recorded.body["tools"].length, 1);
   assert.equal(recorded.body["tools"][0].function.name, "submit_next_token_log_probabilities");
   assert.equal(recorded.body["tool_choice"].function.name, "submit_next_token_log_probabilities");
