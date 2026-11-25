@@ -2039,6 +2039,14 @@ span.share { color: var(--muted); font-style: italic; }
 `;
 }
 
+/**
+ * Build the browser script of the demonstration website.
+ *
+ * The script holds the language switch, the explorer controls, and the per-token view. It reads the
+ * data files of the run and writes no file.
+ *
+ * @returns the script text, without the script element.
+ */
 function buildBrowserScript(): string {
   return `(function () {
   "use strict";
@@ -2048,6 +2056,11 @@ function buildBrowserScript(): string {
   try { stored = window.localStorage.getItem(storageKey); } catch (error) { stored = null; }
   var language = stored === "zh" ? "zh" : "en";
 
+  /**
+   * Apply one language to every bilingual node of the page.
+   *
+   * @param next - the language code, either en or zh.
+   */
   function applyLanguage(next) {
     language = next;
     document.documentElement.setAttribute("data-lang", next);
@@ -2071,9 +2084,29 @@ function buildBrowserScript(): string {
     });
   }
 
+  /**
+   * Report whether the current language is English.
+   *
+   * @returns true when the page shows English.
+   */
   function pickEnglish() { return language === "en"; }
+  /**
+   * Choose one of two texts for the current language.
+   *
+   * @param english - the English text.
+   * @param chinese - the Chinese text.
+   *
+   * @returns the text of the current language.
+   */
   function text(english, chinese) { return pickEnglish() ? english : chinese; }
 
+  /**
+   * Escape one text for HTML.
+   *
+   * @param value - the text to escape.
+   *
+   * @returns the escaped text.
+   */
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, "&amp;")
@@ -2082,6 +2115,13 @@ function buildBrowserScript(): string {
       .replace(/"/g, "&quot;");
   }
 
+  /**
+   * Load one script file and resolve when the browser runs it.
+   *
+   * @param url - the path of the script.
+   *
+   * @returns a promise that resolves when the script is ready.
+   */
   function loadScript(url) {
     return new Promise(function (resolve, reject) {
       var element = document.createElement("script");
@@ -2095,11 +2135,23 @@ function buildBrowserScript(): string {
 
   var modelCache = {};
 
+  /**
+   * Load the index data of the run.
+   *
+   * @returns a promise of the index object.
+   */
   function loadModelIndex() {
     if (window.LLM_SP_INDEX) { return Promise.resolve(window.LLM_SP_INDEX); }
     return loadScript("assets/data-index.js").then(function () { return window.LLM_SP_INDEX; });
   }
 
+  /**
+   * Load the data file of one model.
+   *
+   * @param entry - the index entry of the model.
+   *
+   * @returns a promise of the model object.
+   */
   function loadModel(entry) {
     if (modelCache[entry.file]) { return Promise.resolve(modelCache[entry.file]); }
     window.LLM_SP_MODEL = undefined;
@@ -2109,13 +2161,34 @@ function buildBrowserScript(): string {
     });
   }
 
+  /**
+   * Convert one log probability to a probability.
+   *
+   * @param logProbability - the log probability.
+   *
+   * @returns the probability, or 0 when the log probability is absent.
+   */
   function probability(logProbability) {
     return Math.exp(logProbability);
   }
 
+  /**
+   * Align two entry lists on the union of their tokens.
+   *
+   * @param left - the served entry list.
+   * @param right - the predicted entry list.
+   *
+   * @returns one row for each token of the union.
+   */
   function align(left, right) {
     var map = {};
     var order = [];
+    /**
+     * Add one entry list to the alignment map.
+     *
+     * @param entries - the entry list.
+     * @param side - the name of the side.
+     */
     function add(entries, side) {
       for (var index = 0; index < entries.length; index += 1) {
         var token = entries[index][0];
@@ -2130,6 +2203,13 @@ function buildBrowserScript(): string {
 
   var floor = 1e-12;
 
+  /**
+   * Normalize one value list to a sum of one.
+   *
+   * @param values - the value list.
+   *
+   * @returns the normalized value list.
+   */
   function normalize(values) {
     var total = 0;
     for (var index = 0; index < values.length; index += 1) { total += values[index]; }
@@ -2137,6 +2217,14 @@ function buildBrowserScript(): string {
     return values.map(function (value) { return value / total; });
   }
 
+  /**
+   * Compute the share of each token in the symmetric divergence.
+   *
+   * @param leftEntries - the served entry list.
+   * @param rightEntries - the predicted entry list.
+   *
+   * @returns one row for each token, with both probabilities and the share.
+   */
   function contributions(leftEntries, rightEntries) {
     var rows = align(leftEntries, rightEntries);
     var leftValues = normalize(rows.map(function (row) {
@@ -2166,16 +2254,45 @@ function buildBrowserScript(): string {
     return { items: items, total: total };
   }
 
+  /**
+   * Format one number with a fixed count of digits.
+   *
+   * @param value - the number.
+   * @param digits - the count of digits after the point.
+   *
+   * @returns the formatted text.
+   */
   function formatNumber(value, digits) {
     if (value === null || value === undefined || !isFinite(value)) { return "n/a"; }
     return Number(value).toFixed(digits === undefined ? 4 : digits);
   }
 
+  /**
+   * Render one bar span for a value on a scale.
+   *
+   * @param value - the value.
+   * @param maximum - the value of the full width.
+   * @param kind - the bar color: served, predicted, or share.
+   *
+   * @returns the bar markup.
+   */
   function bar(value, maximum, kind) {
     var width = maximum > 0 ? Math.max(1, Math.round((value / maximum) * 44)) : 1;
     return '<span class="bar ' + kind + '" style="width:' + width + 'px"></span>';
   }
 
+  /**
+   * Render one detail pane of the explorer.
+   *
+   * @param titleText - the pane title.
+   * @param task - the task record.
+   * @param actualEntry - the served prediction entry.
+   * @param predictedEntry - the predicted prediction entry.
+   * @param comparison - the comparison record of the two entries.
+   * @param emphasis - the side that sorts the rows: served or predicted.
+   *
+   * @returns the pane markup.
+   */
   function renderPane(titleText, task, actualEntry, predictedEntry, comparison, emphasis) {
     var computed = contributions(actualEntry.entries, predictedEntry.entries);
     var maximumShare = computed.items.length > 0 ? computed.items[0].share : 0;
@@ -2235,6 +2352,16 @@ function buildBrowserScript(): string {
       '</tr></thead><tbody>' + rows + '</tbody></table>';
   }
 
+  /**
+   * Find one comparison record of one task.
+   *
+   * @param task - the task record.
+   * @param comparisonName - the comparison name.
+   * @param actualRepetition - the repetition index of the served side.
+   * @param predictedRepetition - the repetition index of the predicted side.
+   *
+   * @returns the comparison record, or undefined when the record is absent.
+   */
   function findComparison(task, comparisonName, actualRepetition, predictedRepetition) {
     var values = task.comparisons[comparisonName] || [];
     for (var index = 0; index < values.length; index += 1) {
@@ -2246,6 +2373,15 @@ function buildBrowserScript(): string {
     return values[0];
   }
 
+  /**
+   * Find one prediction record of one task.
+   *
+   * @param task - the task record.
+   * @param condition - the condition name.
+   * @param repetition - the repetition index.
+   *
+   * @returns the prediction record, or undefined when the record is absent.
+   */
   function prediction(task, condition, repetition) {
     var values = task.runs[condition] || [];
     for (var index = 0; index < values.length; index += 1) {
@@ -2254,12 +2390,26 @@ function buildBrowserScript(): string {
     return values[0];
   }
 
+  /**
+   * Map one comparison to its served condition and its predicted condition.
+   *
+   * @param comparisonName - the comparison name.
+   *
+   * @returns the served condition and the predicted condition.
+   */
   function whichKeys(comparisonName) {
     if (comparisonName === "plain_self") { return { actual: "plain_actual", predicted: "plain_self" }; }
     if (comparisonName === "injected_self") { return { actual: "plain_actual", predicted: "injected_self" }; }
     return { actual: "plain_actual", predicted: "injected_actual" };
   }
 
+  /**
+   * Fill one select element with values.
+   *
+   * @param select - the select element.
+   * @param values - the values.
+   * @param labelOf - the optional label function.
+   */
   function fillSelect(select, values, labelOf) {
     select.innerHTML = "";
     for (var index = 0; index < values.length; index += 1) {
@@ -2270,16 +2420,40 @@ function buildBrowserScript(): string {
     }
   }
 
+  /**
+   * Map one divergence to a badge kind.
+   *
+   * @param value - the mean symmetric divergence.
+   *
+   * @returns ok, mid, or bad.
+   */
   function verdictKind(value) {
     if (!isFinite(value)) { return "warn"; }
     return value >= 0.5 ? "bad" : (value >= 0.05 ? "warn" : "ok");
   }
 
+  /**
+   * Map one divergence to a number class.
+   *
+   * @param value - the mean symmetric divergence.
+   *
+   * @returns good, mid, or bad.
+   */
   function numberClass(value) {
     if (!isFinite(value)) { return ""; }
     return value >= 0.5 ? "bad" : (value >= 0.05 ? "mid" : "good");
   }
 
+  /**
+   * Render one stat card.
+   *
+   * @param icon - the icon of the card.
+   * @param value - the value text.
+   * @param label - the label text.
+   * @param kind - the optional card kind.
+   *
+   * @returns the card markup.
+   */
   function statCard(icon, value, label, kind) {
     return '<div class="stat-card ' + (kind || "") + '">' +
       '<span class="stat-icon">' + icon + '</span>' +
@@ -2287,6 +2461,10 @@ function buildBrowserScript(): string {
       '<span class="stat-label">' + escapeHtml(label) + '</span></div>';
   }
 
+  /**
+   * Wire the explorer controls and render the first view.
+   *
+   */
   function setupExplorer() {
     var controls = document.getElementById("explorer-controls");
     if (!controls) { return; }
@@ -2310,17 +2488,33 @@ function buildBrowserScript(): string {
     ];
     var state = { index: null, entry: null, model: null, busy: false };
 
+    /**
+     * Write one status line under the explorer controls.
+     *
+     * @param message - the message.
+     * @param kind - the optional message kind.
+     */
     function setStatus(message, kind) {
       status.textContent = message;
       status.className = "status-line" + (kind ? " " + kind : "");
     }
 
+    /**
+     * Read the index entry of the selected model.
+     *
+     * @returns the index entry, or undefined when the index is absent.
+     */
     function currentEntry() {
       var entries = state.index ? state.index.models : [];
       var position = Number(modelSelect.value);
       return entries[isFinite(position) ? position : 0] || entries[0];
     }
 
+    /**
+     * Load the data of the selected model and keep it in the state.
+     *
+     * @returns a promise of the model object.
+     */
     function refreshModelData() {
       var entry = currentEntry();
       if (!entry) { return Promise.reject(new Error(text("The run holds no model.", "本次运行没有模型。"))); }
@@ -2335,6 +2529,11 @@ function buildBrowserScript(): string {
       });
     }
 
+    /**
+     * Fill the two task selects and keep the current choices.
+     *
+     * @param model - the model object.
+     */
     function syncTaskSelects(model) {
       var ids = Object.keys(model.tasks);
       var keepTask = taskSelect.value;
@@ -2346,6 +2545,11 @@ function buildBrowserScript(): string {
       else if (ids.length > 1) { taskSelectB.value = ids[1]; }
     }
 
+    /**
+     * Fill the two repetition selects and keep the current choices.
+     *
+     * @param model - the model object.
+     */
     function syncRepetitionSelects(model) {
       var task = model.tasks[taskSelect.value];
       if (!task) { return; }
@@ -2360,6 +2564,12 @@ function buildBrowserScript(): string {
       if (predictedReps.indexOf(keepPredicted) >= 0) { predictedSelect.value = String(keepPredicted); }
     }
 
+    /**
+     * Render the stat cards of one comparison.
+     *
+     * @param task - the task record.
+     * @param comparison - the comparison record.
+     */
     function renderStats(task, comparison) {
       if (!stats) { return; }
       var value = comparison || {};
@@ -2373,6 +2583,10 @@ function buildBrowserScript(): string {
           text("coverage of served mass", "接口质量覆盖率"));
     }
 
+    /**
+     * Render the two detail panes of the current selection.
+     *
+     */
     function renderPanes() {
       var model = state.model;
       if (!model) { return; }
@@ -2434,6 +2648,10 @@ function buildBrowserScript(): string {
       );
     }
 
+    /**
+     * Apply the current control values to the panes.
+     *
+     */
     function applySelection() {
       if (state.busy) { return; }
       state.busy = true;

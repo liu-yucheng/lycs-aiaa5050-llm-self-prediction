@@ -1,8 +1,11 @@
 import type { ProbabilityEntry, TokenDistribution } from "./types.js";
 /** One pair of aligned probability vectors over a shared token list. */
 export interface AlignedDistributions {
+    /** The tokens of the union of both supports, in order. */
     readonly tokens: readonly string[];
+    /** The probability of the left side, one value for each token. */
     readonly left: readonly number[];
+    /** The probability of the right side, one value for each token. */
     readonly right: readonly number[];
 }
 /**
