@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reproducibility — Next-token self-prediction</title>
-<meta name="description" content="Recorded fields, integrity rules, limitations, and test coverage.">
+<title>Reproducibility — plugin documentation</title>
+<meta name="description" content="Recorded versions, the seed rule, the integrity rules, and the known limits.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.5.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -23,198 +23,51 @@
 </header>
 
 <main>
-  <h1>Reproducibility</h1>
-  <p class="lede">What a session records, which rules the plugin never bends, and what one run can
-    and cannot claim.</p>
+  <h1>Reproducibility and limits</h1>
+  <p class="lede">The recorded versions, the seed rule, the integrity rules, the tests, and the
 
-  <h2>1. Recorded fields</h2>
-  <p><code>session.json</code> holds these fields, so a reader can rebuild the run without asking
-    the person who started it.</p>
-  <table>
-    <thead>
-      <tr><th>Field</th><th>Content</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><code>sessionCode</code></td><td>The UTC time, the seed, and six hex characters.</td></tr>
-      <tr>
-        <td><code>datasetId</code>, <code>datasetHash</code></td>
-        <td>The dataset name and the SHA-256 digest of the dataset content.</td>
-      </tr>
-      <tr>
-        <td><code>options</code></td>
-        <td>The providers, the tasks, the limit, the repetitions, the tolerance, the seed, the concurrency, and the
-        dry-run
-          flag.</td>
-      </tr>
-      <tr>
-        <td><code>providers</code></td>
-        <td>Each provider key, label, base URL, model name, and credential variable. The credential itself is
-        absent.</td>
-      </tr>
-      <tr>
-        <td><code>environment</code></td>
-        <td>The Node.js version, the platform, the plugin name and version, the seed, the start
-          time, the end time, the elapsed seconds, the path of the environment file, and whether the
-          run created that file.</td>
-      </tr>
-      <tr>
-        <td><code>status</code></td>
-        <td><code>running</code>, <code>complete</code>, or <code>failed</code>, with the failure message.</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>The model name and the base URL identify the model version that the provider served at the run
-    time. The provider does not always publish a separate version string, so the date of the run is
-    part of the record.</p>
+    known limits.</p>
 
-  <h2>2. Integrity rules</h2>
-  <ul>
-    <li>Every raw reply is stored before parsing, and no run rewrites an existing raw file.</li>
-    <li>The dataset and the provider catalog are inputs. A run reads them and never writes to
-      them.</li>
-    <li>The report only states a number that <code>metrics.json</code> holds.</li>
-    <li>A tolerance, a repetition count, or a seed is recorded with the verdict, because each one
-      changes the verdict.</li>
-    <li>A failed call stays visible as an error file. A run does not drop a failure from the
-      count.</li>
-    <li>The metric never uses the reference token, so a wrong completion cannot improve or spoil a
-      divergence.</li>
+<h2>The recorded versions</h2>
+<p>Each run writes <code>results/environment.json</code> and repeats the record in <code>run.json</code>. The record holds the plugin name, the plugin version, the Node.js version, the platform, the random seed, the start time, the end time, and the elapsed time. A reader can rebuild the run only when the reader knows these values.</p>
+
+<h2>The seed rule</h2>
+<p>The default random seed is 20260815. The seed drives the bootstrap resampling only. The requests use <code>temperature: 0</code>, and the plugin never samples a reply itself, so the provider decides every remaining variation.</p>
+
+<h2>The integrity rules</h2>
+<ul>
+    <li>The plugin writes each raw exchange before the plugin parses the reply.</li>
+    <li>The plugin keeps the raw reply and the parse result in separate files.</li>
+    <li>The plugin never rewrites a raw file.</li>
+    <li>The plugin never changes a task, a prompt, or a parsing rule to make a metric pass.</li>
+    <li>The plugin records a failure in the task record and continues the run.</li>
+    <li>A report states only what the output files support.</li>
   </ul>
 
-  <h2>3. Reproducing a run</h2>
-  <ol>
-    <li>Read <code>session.json</code> and copy the provider list, the task list, the repetitions,
-      the tolerance, and the seed.</li>
-    <li>Fill in the same API keys in the private environment file.</li>
-    <li>Run <code>node lib/cli.js run</code> with those values.</li>
-  </ol>
-  <p>A provider with a live model may serve another model version later, and a sampling parameter
-    may change. The plugin cannot fix that. The record of the model name, the base URL, and the run
-    date is the evidence of the version that the run used.</p>
-  <p>A dry run is fully reproducible: the mock provider derives each table from a SHA-256 hash of the
-    prefix and the token, so the same seed and the same task give the same numbers.</p>
+<h2>The tests</h2>
+<p>The test suite runs with <code>npm test</code>. It covers the dataset validation, the probability normalizer, the divergence measures, the pairing, the bootstrap, the verdict rule, the prompt builders, the reply parser, the request bodies against a local HTTP server, the run directory layout, the tool definitions, the environment file, and the plugin entry point.</p>
 
-  <h2>4. Tool versions of this release</h2>
-  <table>
-    <thead>
-      <tr><th>Item</th><th>Value</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>Plugin version</td><td>0.5.0</td></tr>
-      <tr><td>Node.js of the command line</td><td>26.13.0</td></tr>
-      <tr><td>Node.js of the harness host</td><td>24.21.0</td></tr>
-      <tr><td>TypeScript</td><td>5.9.3</td></tr>
-      <tr><td>Platform</td><td>Windows 11 x64</td></tr>
-      <tr><td>Random seed</td><td>20260815</td></tr>
-      <tr><td>Dataset</td><td><code>llm-self-prediction-zh64-en64-v2</code></td></tr>
-    </tbody>
-  </table>
-
-  <h2>5. Limitations</h2>
-  <ul>
-    <li>One run covers at most 128 tasks in two languages. A verdict describes this dataset and this
-      model version.</li>
-    <li>A top-20 table holds most of the probability mass of a typical next-token distribution. The
-      floor of <code>1e-12</code> keeps a divergence finite, and it slightly changes a value when a
-      tail is missing.</li>
-    <li>The self request depends on a tool call. A provider that ignores a forced tool call gives an
-      invalid response, not a measurement.</li>
-    <li>The same-mode baseline measures sampling noise, and it cannot separate a stable bias from
-      noise when the repetition count is small.</li>
-    <li>The plugin sends <code>temperature=0</code> on every request, so a provider that ignores a
-      zero temperature can still sample a different token. The plugin sends no top-p value.</li>
+<h2>The known limits</h2>
+<ul>
+    <li>The self report is text, so a model can break the JSON rule or write a table that does not sum to one.</li>
+    <li>A provider can return fewer entries than the request asks for, and the plugin cannot add an entry.</li>
+    <li>The divergence of two tables with different supports depends on the probability floor.</li>
+    <li>One run measures one model version at one time. A provider update can move the numbers.</li>
+    <li>The interview of one model does not show the behavior of another model.</li>
   </ul>
 
-  <h2>6. Tests</h2>
-  <p>The test suite runs 35 tests with the Node.js test runner:</p>
-  <table>
-    <thead>
-      <tr><th>File</th><th>Coverage</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>test/probability.test.mjs</code></td>
-        <td>Normalization, aggregation, divergence values, bounds, alignment, coverage.</td>
-      </tr>
-      <tr>
-        <td><code>test/env.test.mjs</code></td>
-        <td>The parser, the section builder, the copy of the example, the placeholder prompt.</td>
-      </tr>
-      <tr>
-        <td><code>test/dataset.test.mjs</code></td>
-        <td>128 tasks, 8 categories, 2 languages, unique identifiers, the prefix rule, selection, the digest.</td>
-      </tr>
-      <tr>
-        <td><code>test/prompts.test.mjs</code></td>
-        <td>Both prompts, the tool schema, the argument parser, and the rejection cases.</td>
-      </tr>
-      <tr>
-        <td><code>test/experiment.test.mjs</code></td>
-        <td>A dry run, the file layout, the status reader, the tolerance effect.</td>
-      </tr>
-      <tr>
-        <td><code>test/tools.test.mjs</code></td>
-        <td>The five definitions, the argument guards, one dry run through the tool.</td>
-      </tr>
-      <tr>
-        <td><code>test/plugin.test.mjs</code></td>
-        <td>The host entry, the five registrations, the effect cleanup.</td>
-      </tr>
-      <tr>
-        <td><code>test/provider-http.test.mjs</code></td>
-        <td>Both request bodies against a local server, the bearer header, a 401 failure.</td>
-      </tr>
-    </tbody>
-  </table>
-  <pre><code>npm run typecheck
-npm test</code></pre>
-
-  <h2>7. Version history</h2>
-  <table>
-    <thead>
-      <tr><th>Version</th><th>Change</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>0.5.0</td>
-        <td>One OpenRouter provider with a model list. The plugin expands the list, probes each model
-          at <code>top_logprobs</code> = 20, turns reasoning off, and excludes a model that returns
-          no table. The dataset becomes 64 Simplified Chinese and 64 US English tasks, and the
-          prompts follow the language of the task.</td>
-      </tr>
-      <tr>
-        <td>0.3.1</td>
-        <td>The unified <code>inputs/</code> and <code>outputs/</code> layout. The environment file
-          moves to <code>inputs/</code>, an old root file is copied into it, and a session writes
-          below <code>outputs/</code>.</td>
-      </tr>
-      <tr>
-        <td>0.3.0</td>
-        <td>The private environment file <code>.env</code> with the public example
-          <code>.env.example</code>, the automatic copy, the credential prompt, and the
-          <code>env</code> command.</td>
-      </tr>
-      <tr>
-        <td>0.2.0</td>
-        <td>The documentation site in <code>docs/</code>, with <code>index.html</code> as the entry. The README links
-        the
-          site.</td>
-      </tr>
-      <tr>
-        <td>0.1.0</td>
-        <td>The first release: five tools, two providers of each family, the dataset, the report, and the tests.</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <p><a href="index.html">Back to the overview →</a></p>
+<h2>How to reproduce a reported run</h2>
+  <pre><code>npm ci
+npm run build
+npm test
+node lib/cli.js env
+node lib/cli.js run --providers=&lt;keys&gt; --repetitions=3 --seed=20260815
+node lib/cli.js report --session=&lt;xid&gt;</code></pre>
 </main>
 
-<footer class="site-footer">
-  <div class="inner">
-    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
-      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
-  </div>
+<footer>
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+    The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
 </html>

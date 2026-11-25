@@ -2,386 +2,114 @@
 // GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
 
 /**
- * The command-line interface of the plugin.
+ * Command line of the plugin.
  *
- * The interface shares the experiment service with the host tools. It exists for a local run and
- * for a check of a session that the host created.
+ * The command line runs the same service as the host tools, so a terminal and a host tool produce
+ * the same files. Each command reads the environment file below the workspace and never prints a
+ * key.
  */
 
+import process from "node:process";
 import { pathToFileURL } from "node:url";
 
-import { loadDataset } from "./dataset.js";
-import { DATASET_FILE_NAME, PROVIDER_FILE_NAME } from "./constants.js";
-import {
-  DEFAULT_RANDOM_SEED,
-  DEFAULT_REPETITION_COUNT,
-  DEFAULT_TOLERANCE_NATS,
-} from "./constants.js";
-import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
-import { resolveInputPath } from "./files.js";
-import { ExperimentError, errorMessage } from "./errors.js";
+import { COMPARISON_NAMES, PLUGIN_NAME, PLUGIN_VERSION } from "./constants.js";
 import { ExperimentService } from "./experiment.js";
-import {
-  applyProviderEnvironments,
-  expandProviderModels,
-  loadProviderCatalog,
-  resolveEnvironmentPrefix,
-  resolveProviderApiKey,
-} from "./providers.js";
-import type { RunRequest } from "./experiment.js";
+import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
+import { resolveProviderApiKey, loadProviderCatalog, applyProviderEnvironments } from "./providers.js";
+import { formatNumber } from "./report.js";
 import { buildHelpText } from "./tools.js";
+import { PROVIDER_FILE_NAME } from "./constants.js";
+import { resolveInputPath } from "./files.js";
 
 /** The exit code of a successful command. */
 const EXIT_SUCCESS = 0;
 
-/** The exit code of a command that fails. */
+/** The exit code of a failed command. */
 const EXIT_FAILURE = 1;
 
-/** The exit code of a command with an invalid argument. */
+/** The exit code of a usage error. */
 const EXIT_USAGE = 2;
 
-/** The parsed option of one command line. */
-interface OptionSet {
-  readonly values: ReadonlyMap<string, string>;
-  readonly flags: ReadonlySet<string>;
-}
-
 /**
- * Run one command line.
+ * Read the options of one command.
  *
- * @param argv - the arguments after the script name.
- * @returns the exit code.
+ * The parser accepts `--name value` and `--name=value`. A flag without a value becomes `true`.
+ *
+ * @param argv - the arguments after the command name.
+ * @returns the options and the positional arguments.
  */
-export async function runCommandLine(argv: readonly string[]): Promise<number> {
-  const command = argv[0] ?? "help";
-  const options = parseOptions(argv.slice(1));
-  const service = new ExperimentService({
-    resolveWorkspace: async (): Promise<string> => process.cwd(),
-    outputRoot: (): string => "",
-  });
-  try {
-    switch (command) {
-      case "run":
-        return await runExperimentCommand(service, options);
-      case "status":
-        return await showStatusCommand(service, options);
-      case "report":
-        return await showReportCommand(service, options);
-      case "dataset":
-        return await showDatasetCommand(options);
-      case "env":
-        return await showEnvironmentCommand();
-      case "help":
-        writeLine(buildCommandLineHelp());
-        return EXIT_SUCCESS;
-      default:
-        writeError(`Unknown command: ${command}`);
-        writeLine(buildCommandLineHelp());
-        return EXIT_USAGE;
-    }
-  } catch (error) {
-    if (error instanceof ExperimentError) {
-      writeError(`${error.code}: ${error.message}`);
-      return EXIT_USAGE;
-    }
-    writeError(errorMessage(error));
-    return EXIT_FAILURE;
-  }
-}
-
-/**
- * Run the run command.
- *
- * @param service - the experiment service.
- * @param options - the parsed options.
- * @returns the exit code.
- */
-async function runExperimentCommand(
-  service: ExperimentService,
-  options: OptionSet,
-): Promise<number> {
-  const request: RunRequest = {
-    providerKeys: splitList(options.values.get("providers")),
-    taskIds: splitList(options.values.get("tasks")),
-    limit: readIntegerOption(options, "limit", 0),
-    repetitions: readIntegerOption(options, "repetitions", DEFAULT_REPETITION_COUNT),
-    toleranceNats: readNumberOption(options, "tolerance", DEFAULT_TOLERANCE_NATS),
-    outputDirectory: options.values.get("output") ?? "",
-    randomSeed: readIntegerOption(options, "seed", DEFAULT_RANDOM_SEED),
-    topLogprobsCount: readOptionalIntegerOption(options, "top-logprobs"),
-    dryRun: options.flags.has("dry-run"),
-  };
-  const result = await service.run(undefined, request, new AbortController().signal);
-  const pairCount = result.metrics.providers.reduce(
-    (total, provider) => total + provider.pairCount,
-    0,
-  );
-  writeLine(`Session: ${result.sessionCode}`);
-  writeLine(`Directory: ${result.outputDirectory}`);
-  writeLine(`Tasks: ${result.metrics.taskCount}`);
-  writeLine(`Pairs: ${pairCount}`);
-  for (const provider of result.metrics.providers) {
-    writeLine(
-      `- ${provider.providerKey} ${provider.provider.model}: ${provider.verdict} ` +
-        `(mean symmetric KL ${provider.summary.meanSymmetricKl.toFixed(4)} nats)`,
-    );
-  }
-  for (const warning of result.warnings) {
-    writeLine(`Warning: ${warning}`);
-  }
-  writeLine(`Report: ${result.reportPath}`);
-  return EXIT_SUCCESS;
-}
-
-/**
- * Run the status command.
- *
- * @param service - the experiment service.
- * @param options - the parsed options.
- * @returns the exit code.
- */
-async function showStatusCommand(
-  service: ExperimentService,
-  options: OptionSet,
-): Promise<number> {
-  const limit = readIntegerOption(options, "limit", 5);
-  const sessions = await service.listSessions(
-    undefined,
-    new AbortController().signal,
-    Math.max(1, limit),
-  );
-  if (sessions.length === 0) {
-    writeLine("No session exists in the output root.");
-    return EXIT_SUCCESS;
-  }
-  for (const session of sessions) {
-    writeLine(
-      `${session.sessionCode} | ${session.status} | tasks ${session.taskCount} | ` +
-        `failures ${session.failures} | ${session.createdAt}`,
-    );
-    for (const [provider, verdict] of Object.entries(session.verdicts)) {
-      writeLine(`  - ${provider}: ${verdict}`);
-    }
-  }
-  return EXIT_SUCCESS;
-}
-
-/**
- * Run the report command.
- *
- * @param service - the experiment service.
- * @param options - the parsed options.
- * @returns the exit code.
- */
-async function showReportCommand(
-  service: ExperimentService,
-  options: OptionSet,
-): Promise<number> {
-  const session = options.values.get("session") ?? "";
-  const result = await service.report(undefined, new AbortController().signal, session);
-  writeLine(result.text);
-  return EXIT_SUCCESS;
-}
-
-/**
- * Run the env command.
- *
- * The command copies `.env.example` to `.env` when the private file is absent, and it reports the
- * usable state of each provider without printing a key.
- *
- * @returns the exit code.
- */
-async function showEnvironmentCommand(): Promise<number> {
-  const workspace = process.cwd();
-  const state = await ensureEnvironmentFile(workspace);
-  const values = state.filePath === undefined ? {} : await readEnvironmentFile(state.filePath);
-  const environments = buildProviderEnvironments(values);
-  const providerPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
-  const catalog = applyProviderEnvironments(await loadProviderCatalog(providerPath), environments);
-  writeLine(`Environment file: ${state.filePath ?? "absent"}`);
-  writeLine(`Example file: ${state.examplePath ?? "absent"}`);
-  writeLine(`Created by this command: ${state.created ? "yes" : "no"}`);
-  writeLine("");
-  writeLine("| Provider | Section | Model | API key |");
-  writeLine("| --- | --- | --- | --- |");
-  for (const provider of expandProviderModels(catalog).providers) {
-    const section = resolveEnvironmentPrefix(provider);
-    const key = resolveProviderApiKey(provider, environments);
-    writeLine(`| ${provider.label} | ${section} | ${provider.model} | ${key === undefined ?
-      "missing" : "set"} |`);
-  }
-  writeLine("");
-  writeLine("Fill in each placeholder value of the environment file, then run the experiment.");
-  return EXIT_SUCCESS;
-}
-
-/**
- * Run the dataset command.
- *
- * @param options - the parsed options.
- * @returns the exit code.
- */
-async function showDatasetCommand(options: OptionSet): Promise<number> {
-  const sample = Math.max(0, readIntegerOption(options, "sample", 8));
-  const datasetPath = await resolveInputPath(process.cwd(), DATASET_FILE_NAME);
-  const dataset = await loadDataset(datasetPath);
-  const categories = new Map<string, number>();
-  for (const task of dataset.tasks) {
-    categories.set(task.category, (categories.get(task.category) ?? 0) + 1);
-  }
-  writeLine(`Dataset: ${dataset.datasetId}`);
-  writeLine(`Language: ${dataset.language}`);
-  writeLine(`Tasks: ${dataset.tasks.length}`);
-  for (const [category, count] of categories) {
-    writeLine(`- ${category}: ${count}`);
-  }
-  for (const task of dataset.tasks.slice(0, sample)) {
-    writeLine(`${task.id} [${task.category}] ${task.prefix} -> ${task.referenceToken}`);
-  }
-  return EXIT_SUCCESS;
-}
-
-/**
- * Parse the options of one command line.
- *
- * @param args - the arguments after the command name.
- * @returns the option set.
- */
-function parseOptions(args: readonly string[]): OptionSet {
-  const values = new Map<string, string>();
-  const flags = new Set<string>();
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index] as string;
-    if (!argument.startsWith("--")) {
-      throw new ExperimentError("INVALID_ARGUMENT", `Unexpected argument: ${argument}`);
-    }
-    const body = argument.slice(2);
-    const equals = body.indexOf("=");
-    if (equals >= 0) {
-      values.set(body.slice(0, equals), body.slice(equals + 1));
+function parseOptions(argv: readonly string[]): {
+  options: Record<string, string | true>;
+  positionals: string[];
+} {
+  const options: Record<string, string | true> = {};
+  const positionals: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index];
+    if (value === undefined) {
       continue;
     }
-    const next = args[index + 1];
-    if (next !== undefined && !next.startsWith("--")) {
-      values.set(body, next);
-      index += 1;
+    if (!value.startsWith("--")) {
+      positionals.push(value);
       continue;
     }
-    flags.add(body);
+    const body = value.slice(2);
+    const separator = body.indexOf("=");
+    if (separator >= 0) {
+      options[body.slice(0, separator)] = body.slice(separator + 1);
+      continue;
+    }
+    const next = argv[index + 1];
+    if (next === undefined || next.startsWith("--")) {
+      options[body] = true;
+      continue;
+    }
+    options[body] = next;
+    index += 1;
   }
-  return { values, flags };
+  return { options, positionals };
 }
 
 /**
- * Split one comma-separated option.
+ * Split one comma-separated list.
  *
- * @param value - the option value, or undefined.
- * @returns the list, or undefined when the value is absent.
+ * @param value - the option value.
+ * @returns the items.
  */
-function splitList(value: string | undefined): string[] | undefined {
-  if (value === undefined) {
-    return undefined;
+function splitList(value: string | true | undefined): string[] {
+  if (typeof value !== "string") {
+    return [];
   }
-  const items = value
+  return value
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item !== "");
-  return items;
 }
 
 /**
  * Read one integer option.
  *
- * @param options - the parsed options.
- * @param name - the option name.
- * @param fallback - the value of an absent option.
- * @returns the integer.
+ * @param value - the option value.
+ * @returns the integer, or undefined.
  */
-function readIntegerOption(options: OptionSet, name: string, fallback: number): number {
-  const value = options.values.get(name);
-  if (value === undefined) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) {
-    throw new ExperimentError("INVALID_ARGUMENT", `The option --${name} is not an integer.`);
-  }
-  return parsed;
-}
-
-/**
- * Read one optional integer option.
- *
- * @param options - the parsed options.
- * @param name - the option name.
- * @returns the integer, or undefined when the option is absent.
- */
-function readOptionalIntegerOption(
-  options: OptionSet,
-  name: string,
-): number | undefined {
-  if (!options.values.has(name)) {
+function readIntegerOption(value: string | true | undefined): number | undefined {
+  if (typeof value !== "string" || !Number.isFinite(Number(value))) {
     return undefined;
   }
-  return readIntegerOption(options, name, 0);
+  return Math.trunc(Number(value));
 }
 
 /**
  * Read one number option.
  *
- * @param options - the parsed options.
- * @param name - the option name.
- * @param fallback - the value of an absent option.
- * @returns the number.
+ * @param value - the option value.
+ * @returns the number, or undefined.
  */
-function readNumberOption(options: OptionSet, name: string, fallback: number): number {
-  const value = options.values.get(name);
-  if (value === undefined) {
-    return fallback;
+function readNumberOption(value: string | true | undefined): number | undefined {
+  if (typeof value !== "string" || value.trim() === "" || !Number.isFinite(Number(value))) {
+    return undefined;
   }
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) {
-    throw new ExperimentError("INVALID_ARGUMENT", `The option --${name} is not a number.`);
-  }
-  return parsed;
-}
-
-/**
- * Build the command-line help text.
- *
- * @returns the help text.
- */
-export function buildCommandLineHelp(): string {
-  return [
-    "Usage: node lib/cli.js <command> [options]",
-    "",
-    "Commands:",
-    "  run       Run one experiment session.",
-    "  status    List the recent sessions.",
-    "  report    Print one session report.",
-    "  dataset   Summarize the bundled dataset.",
-    "  env       Show the environment file and the API key state.",
-    "  help      Print this text.",
-    "",
-    "Run options:",
-    "  --providers=a,b     The provider keys. The default is every enabled provider.",
-    "  --tasks=T001,T002   The task identifiers. The default is every task.",
-    "  --limit=N           The maximum task count. The default is 0, which selects every task.",
-    `  --repetitions=N     The repetition count of each mode. The default is ${DEFAULT_REPETITION_COUNT}.`,
-    "  --tolerance=X       The separation tolerance in nats. The default is 0.05.",
-    "  --output=DIR        The output root. The default is outputs in the workspace.",
-    "  --seed=N            The random seed. The default is 20260815.",
-    "  --concurrency=N     The maximum count of concurrent jobs.",
-    "  --top-logprobs=N    The support size of both modes, from 1 to 64.",
-    "                      The default is the provider section value, else 64.",
-    "  --dry-run           Use the mock provider and no network access.",
-    "",
-    "Status options: --limit=N",
-    "Report options: --session=CODE",
-    "Dataset options: --sample=N",
-    "",
-    buildHelpText(),
-  ].join("\n");
+  return Number(value);
 }
 
 /**
@@ -402,8 +130,159 @@ function writeError(text: string): void {
   process.stderr.write(`${text}\n`);
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void runCommandLine(process.argv.slice(2)).then((code) => {
-    process.exitCode = code;
+/**
+ * Build the usage text of the command line.
+ *
+ * @returns the text.
+ */
+function buildCommandLineHelp(): string {
+  return [
+    `${PLUGIN_NAME} ${PLUGIN_VERSION}`,
+    "",
+    "Usage: node lib/cli.js <command> [options]",
+    "",
+    "Commands:",
+    "  run       Run the four conditions and write one run directory.",
+    "  status    List the recent runs of the output root.",
+    "  report    Print the Markdown report of one run.",
+    "  dataset   Describe the datasets of the workspace.",
+    "  env       Show the environment file and the provider keys.",
+    "  help      Print the protocol of the plugin.",
+    "",
+    "Options of run:",
+    "  --providers a,b        Provider keys or model keys.",
+    "  --tasks Z001,E001      Task identifiers.",
+    "  --repetitions 3        Repetition count of one condition.",
+    "  --tolerance 0.05       Tolerance in nats.",
+    "  --output outputs       Output root.",
+    "  --seed 20260815        Random seed.",
+    "  --concurrency 3        Number of tasks that run at the same time.",
+    "  --entries 20           Table entry count.",
+    "  --dry-run              Use the mock provider.",
+    "",
+    "Options of status:",
+    "  --limit 5              Number of runs to list.",
+    "",
+    "Options of report:",
+    "  --session <xid>        Run identifier. An empty value selects the newest run.",
+    "",
+    "Options of dataset:",
+    "  --sample 8             Number of tasks to show for each file.",
+  ].join("\n");
+}
+
+/**
+ * Run one command line.
+ *
+ * @param argv - the arguments after the program name.
+ * @returns the exit code.
+ */
+export async function runCommandLine(argv: readonly string[]): Promise<number> {
+  const command = argv[0] ?? "help";
+  const { options, positionals } = parseOptions(argv.slice(1));
+  const workspace = process.cwd();
+  const service = new ExperimentService({
+    resolveWorkspace: async () => workspace,
+    outputRoot: () => (typeof options.output === "string" ? options.output : ""),
   });
+  try {
+    if (command === "run") {
+      const result = await service.run(undefined, {
+        providerKeys: splitList(options.providers),
+        taskIds: splitList(options.tasks),
+        repetitions: readIntegerOption(options.repetitions),
+        toleranceNats: readNumberOption(options.tolerance),
+        outputDirectory: typeof options.output === "string" ? options.output : undefined,
+        randomSeed: readIntegerOption(options.seed),
+        maxConcurrency: readIntegerOption(options.concurrency),
+        topLogprobsCount: readIntegerOption(options.entries),
+        dryRun: options["dry-run"] === true,
+      });
+      writeLine(`Run ${result.xid} is complete.`);
+      writeLine(`Run directory: ${result.directory}`);
+      writeLine(`Report: ${result.reportPath}`);
+      writeLine(`Demos: ${result.demosPath}`);
+      for (const provider of result.metrics.providers) {
+        const cells = COMPARISON_NAMES.map((comparison) => {
+          const summary = provider.comparisons.find((entry) => entry.comparison === comparison);
+          return `${comparison}=${
+            summary === undefined ? "n/a" : formatNumber(summary.meanSymmetricKl)
+          }`;
+        });
+        writeLine(`${provider.providerKey} ${provider.model}: ${cells.join(" ")}`);
+      }
+      for (const warning of result.warnings) {
+        writeLine(`Warning: ${warning}`);
+      }
+      return EXIT_SUCCESS;
+    }
+    if (command === "status") {
+      const runs = await service.status(undefined, undefined, readIntegerOption(options.limit) ?? 5);
+      if (runs.length === 0) {
+        writeLine("The output root holds no run.");
+        return EXIT_SUCCESS;
+      }
+      for (const run of runs) {
+        writeLine(`${run.xid}  ${run.status}  ${run.createdAt}  ${run.directory}`);
+      }
+      return EXIT_SUCCESS;
+    }
+    if (command === "report") {
+      const session =
+        typeof options.session === "string" ? options.session : (positionals[0] ?? "");
+      const result = await service.report(undefined, undefined, session);
+      writeLine(result.report);
+      return EXIT_SUCCESS;
+    }
+    if (command === "dataset") {
+      const datasets = await service.datasetSummary(
+        undefined,
+        undefined,
+        readIntegerOption(options.sample) ?? 8,
+      );
+      for (const dataset of datasets) {
+        writeLine(`${dataset.datasetId}  ${dataset.language}  ${dataset.taskCount} tasks`);
+        for (const task of dataset.sample) {
+          writeLine(`  ${task.id}  ${task.prefix}[${task.referenceToken}]`);
+        }
+      }
+      return EXIT_SUCCESS;
+    }
+    if (command === "env") {
+      const state = await ensureEnvironmentFile(workspace);
+      writeLine(`Environment file: ${state.filePath ?? "(none)"}`);
+      writeLine(`Example file: ${state.examplePath ?? "(none)"}`);
+      writeLine(`Created by this command: ${state.created ? "yes" : "no"}`);
+      const values = state.filePath === undefined ? {} : await readEnvironmentFile(state.filePath);
+      const environments = buildProviderEnvironments(values);
+      const catalogPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
+      const catalog = applyProviderEnvironments(await loadProviderCatalog(catalogPath), environments);
+      for (const definition of catalog.providers) {
+        const key = resolveProviderApiKey(definition, environments);
+        writeLine(
+          `${definition.key}  ${definition.enabled ? "enabled" : "disabled"}  ` +
+            `${definition.model}  key=${key === undefined ? "missing" : "present"}`,
+        );
+      }
+      return EXIT_SUCCESS;
+    }
+    if (command === "help") {
+      writeLine(buildCommandLineHelp());
+      writeLine("");
+      writeLine(buildHelpText());
+      return EXIT_SUCCESS;
+    }
+    writeError(`Unknown command: ${command}`);
+    writeError(buildCommandLineHelp());
+    return EXIT_USAGE;
+  } catch (error) {
+    writeError(error instanceof Error ? error.message : String(error));
+    return EXIT_FAILURE;
+  }
+}
+
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
+  const code = await runCommandLine(process.argv.slice(2));
+  process.exitCode = code;
 }

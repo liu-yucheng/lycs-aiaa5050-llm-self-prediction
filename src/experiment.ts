@@ -2,422 +2,581 @@
 // GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
 
 /**
- * The experiment runner.
+ * Orchestration of one run.
  *
- * One run loads the read-only inputs, creates one client for each selected provider, and writes
- * one session directory. A provider failure is a recorded failure of one call, and it never stops
- * the run. The runner writes each raw reply before it writes a parsed record.
+ * One job covers one task on one model. A job runs the three repetitions of the four conditions in
+ * protocol order, writes each raw exchange below the intermediate directory, and writes the task
+ * record below the results directory. The run then computes the metrics and writes the report and
+ * the demos.
  */
 
-import { readdir } from "node:fs/promises";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 
 import {
+  CONDITION_INJECTED_ACTUAL,
+  CONDITION_INJECTED_SELF,
+  CONDITION_PLAIN_ACTUAL,
+  CONDITION_PLAIN_SELF,
   DEFAULT_MAX_CONCURRENCY,
   DEFAULT_RANDOM_SEED,
   DEFAULT_REPETITION_COUNT,
   DEFAULT_TOLERANCE_NATS,
-  MAX_PROBABILITY_ENTRY_COUNT,
+  DEMOS_DIRECTORY_NAME,
+  ENV_EXAMPLE_FILE_NAME,
+  ENV_FILE_NAME,
+  INTERMEDIATE_DIRECTORY_NAME,
   PLUGIN_NAME,
   PLUGIN_VERSION,
+  RESULTS_DIRECTORY_NAME,
   TOP_LOGPROBS_COUNT,
 } from "./constants.js";
-import { computeDatasetHash, loadDataset, selectTasks } from "./dataset.js";
-import { DATASET_FILE_NAME, PROVIDER_FILE_NAME } from "./constants.js";
-import type { Agent, Logger } from "./dsh.js";
-import type { EnvironmentFileState, ProviderEnvironment } from "./env.js";
+import { countByCategory, loadDatasets, resolveDatasetDirectory, selectTasks } from "./dataset.js";
+import { renderDemos } from "./demos.js";
+import { buildProviderEnvironments, ensureEnvironmentFile, readEnvironmentFile } from "./env.js";
+import { ExperimentError } from "./errors.js";
 import {
-  buildProviderEnvironments,
-  describeEnvironmentKey,
-  ensureEnvironmentFile,
-  isPlaceholderValue,
-  readEnvironmentFile,
-} from "./env.js";
-import { ExperimentError, errorMessage } from "./errors.js";
-import {
-  createSessionCode,
   ensureDirectory,
   listChildDirectories,
   readJsonFile,
   readTextFile,
-  resolveInputPath,
   resolveOutputRoot,
   safeFileSegment,
   writeJsonFile,
   writeTextFile,
 } from "./files.js";
-import { buildTaskRecord, computeSessionMetrics, resolveTolerance } from "./metrics.js";
+import { computeSessionMetrics, buildTaskRecord } from "./metrics.js";
 import {
   applyProviderEnvironments,
+  buildPredictionRecord,
   createProviderClient,
-  expandProviderModels,
-  MOCK_PROVIDER_KEY,
   loadProviderCatalog,
   probeLogprobsSupport,
-  resolveEnvironmentPrefix,
-  resolveRequestedKeys,
   resolveProviderApiKey,
-  selectProviders,
+  resolveRequestedKeys,
+  MOCK_PROVIDER_KEY,
 } from "./providers.js";
-import type { ProviderClient } from "./providers.js";
+import { DATASET_DIRECTORY_NAME, PROVIDER_FILE_NAME } from "./constants.js";
+import { resolveInputPath } from "./files.js";
 import { renderReport, renderSummaryCsv, renderTasksCsv } from "./report.js";
+import type { PredictionOutcome } from "./providers.js";
 import type {
-  Dataset,
-  PredictionAnswer,
+  ConditionName,
+  DatasetSummary,
+  PredictionRecord,
   ProviderDefinition,
-  RunOptions,
+  ProviderVerdict,
   RunResult,
   SessionManifest,
   SessionMetrics,
+  SessionStatus,
   Task,
   TaskRecord,
 } from "./types.js";
 
-/** One run request from a tool or a command. */
+/** The request of one run. */
 export interface RunRequest {
+  /** The requested provider keys or model keys. */
   readonly providerKeys?: readonly string[];
+  /** The requested task identifiers. */
   readonly taskIds?: readonly string[];
-  readonly limit?: number;
+  /** The repetition count of one condition. */
   readonly repetitions?: number;
+  /** The divergence tolerance in nats. */
   readonly toleranceNats?: number;
+  /** The output root. */
   readonly outputDirectory?: string;
+  /** The random seed. */
   readonly randomSeed?: number;
+  /** The number of tasks that run at the same time. */
   readonly maxConcurrency?: number;
+  /** The requested table entry count. */
   readonly topLogprobsCount?: number;
+  /** True to use the mock provider and no network. */
   readonly dryRun?: boolean;
 }
 
-/** The status of one session. */
-export interface SessionStatus {
-  readonly sessionCode: string;
-  readonly directory: string;
-  readonly status: string;
-  readonly createdAt: string;
-  readonly taskCount: number;
-  readonly verdicts: Readonly<Record<string, string>>;
-  readonly failures: number;
-}
-
-/** The summary of one dataset. */
-export interface DatasetSummary {
-  readonly datasetId: string;
-  readonly language: string;
-  readonly taskCount: number;
-  readonly categories: Readonly<Record<string, number>>;
-  readonly firstTaskIds: readonly string[];
-}
-
-/** The dependencies of the service. */
+/** The options of the experiment service. */
 export interface ExperimentServiceOptions {
-  /** Resolve the workspace directory of one tool call. */
-  readonly resolveWorkspace: (agent: Agent | undefined, signal: AbortSignal) => Promise<string>;
-  /** Read the configured output root. */
+  /** Resolve the workspace directory of one agent. */
+  readonly resolveWorkspace: (agent?: { readonly id?: string }, signal?: AbortSignal) => Promise<string>;
+  /** The configured output root. */
   readonly outputRoot: () => string;
-  /** The host logger. */
-  readonly logger?: Logger;
-  /** The configured default of the job limit. */
+  /** The configured maximum concurrency. */
   readonly defaultMaxConcurrency?: number;
+  /** The logger of the host. */
+  readonly logger?: {
+    info: (message: string) => void;
+    warn: (message: string) => void;
+    error: (message: string) => void;
+  };
 }
 
-/** The service that a tool, a command, and the CLI share. */
+/** The probe task of the support check. */
+const PROBE_TASK: Task = {
+  id: "PROBE",
+  category: "probe",
+  language: "zh-Hans",
+  prefix: "床前明月光，疑是地上",
+  referenceToken: "霜",
+};
+
+/**
+ * Build one run identifier from the start time.
+ *
+ * The identifier has the shape `<timestamp>_<short-unique-id>`.
+ *
+ * @param startedAt - the start time of the run.
+ * @returns the run identifier.
+ */
+export function createRunId(startedAt: Date): string {
+  const stamp = startedAt.toISOString().replace(/[-:]/gu, "").replace(/\.\d{3}Z$/u, "Z");
+  return `${stamp}_${randomBytes(3).toString("hex")}`;
+}
+
+/**
+ * Clamp one integer to a closed range.
+ *
+ * @param value - the requested value, or undefined for the fallback.
+ * @param fallback - the value to use when the request holds none.
+ * @param minimum - the smallest accepted value.
+ * @param maximum - the largest accepted value.
+ * @returns the clamped value.
+ */
+function clampInteger(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const base = value === undefined || !Number.isFinite(value) ? fallback : Math.trunc(value);
+  return Math.min(maximum, Math.max(minimum, base));
+}
+
+/**
+ * Build one credential instruction for the run.
+ *
+ * @param providers - the providers that need a key.
+ * @param workspace - the workspace directory.
+ * @returns the instruction text.
+ */
+function buildCredentialPrompt(
+  providers: readonly ProviderDefinition[],
+  workspace: string,
+): string {
+  const lines = [
+    `No API key is available for ${providers.map((provider) => provider.key).join(", ")}.`,
+    `Put the key in ${path.join(workspace, "inputs", ENV_FILE_NAME)}.`,
+    "One line holds `<section>.api_key=<your key>`, for example `huggingface.api_key=hf_...`.",
+    `The example file ${path.join(workspace, "inputs", ENV_EXAMPLE_FILE_NAME)} shows each section.`,
+  ];
+  return lines.join(" ");
+}
+
+/**
+ * The service that runs the experiment.
+ */
 export class ExperimentService {
+  /** The options of the service. */
   private readonly options: ExperimentServiceOptions;
 
   /**
    * Create one service.
    *
-   * @param options - the workspace resolver, the output root reader, and the logger.
+   * @param options - the options of the service.
    */
   public constructor(options: ExperimentServiceOptions) {
     this.options = options;
   }
 
   /**
-   * Run one experiment and write one session directory.
+   * Run one experiment.
    *
-   * @param agent - the agent of the tool call.
+   * @param agent - the agent that asks for the run.
    * @param request - the run request.
-   * @param signal - the cancellation signal of the call.
-   * @returns the result of the run.
+   * @param signal - the cancellation signal.
+   * @returns the run result.
    */
   public async run(
-    agent: Agent | undefined,
+    agent: { readonly id?: string } | undefined,
     request: RunRequest,
-    signal: AbortSignal,
+    signal?: AbortSignal,
   ): Promise<RunResult> {
     const startedAt = new Date();
     const workspace = await this.options.resolveWorkspace(agent, signal);
-    const requestedRoot = (request.outputDirectory ?? "").trim();
     const outputRoot = resolveOutputRoot(
       workspace,
-      requestedRoot === "" ? this.options.outputRoot() : requestedRoot,
+      (request.outputDirectory ?? this.options.outputRoot() ?? "").trim(),
     );
-    const datasetPath = await resolveInputPath(workspace, DATASET_FILE_NAME);
-    const dataset = await loadDataset(datasetPath);
+    const datasetDirectory = await resolveDatasetDirectory(workspace, DATASET_DIRECTORY_NAME);
+    const dataset = await loadDatasets(datasetDirectory);
     const environmentState = await ensureEnvironmentFile(workspace);
     const environmentValues =
       environmentState.filePath === undefined
         ? {}
         : await readEnvironmentFile(environmentState.filePath);
     const environments = buildProviderEnvironments(environmentValues);
-    const providerPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
-    const catalog = applyProviderEnvironments(await loadProviderCatalog(providerPath), environments);
-    const dryRun = request.dryRun === true;
-    const requestedKeys = dryRun ? [dryRunProviderKey(catalog)] : (request.providerKeys ?? []);
-    const repetitionCount = clampInteger(
-      request.repetitions ?? DEFAULT_REPETITION_COUNT,
-      1,
-      DEFAULT_REPETITION_COUNT * 2,
-      "repetitions",
-    );
-    const limit = clampInteger(request.limit ?? 0, 0, dataset.tasks.length, "limit");
-    const tasks = selectTasks(dataset, request.taskIds ?? [], limit);
-    if (tasks.length === 0) {
-      throw new ExperimentError("INVALID_ARGUMENT", "The run selected no task.");
-    }
-    const selectedProviders = selectProviders(
-      expandProviderModels(catalog),
-      resolveRequestedKeys(catalog, requestedKeys),
-      dryRun,
-    );
-    if (selectedProviders.length === 0) {
-      throw new ExperimentError("INVALID_PROVIDER", "The run selected no provider.");
-    }
-    const setupWarnings = checkProviderCredentials(
-      selectedProviders,
+    const catalogPath = await resolveInputPath(workspace, PROVIDER_FILE_NAME);
+    const catalog = applyProviderEnvironments(
+      await loadProviderCatalog(catalogPath),
       environments,
-      environmentState,
-      dryRun,
     );
-    if (environmentState.migratedFrom !== undefined) {
-      setupWarnings.push(
-        `The run copied the old environment file ${environmentState.migratedFrom} to ` +
-          `${environmentState.filePath ?? ""}. The inputs directory is the new home.`,
-      );
-    }
-    const randomSeed = request.randomSeed ?? DEFAULT_RANDOM_SEED;
-    const toleranceNats = resolveTolerance(request.toleranceNats ?? DEFAULT_TOLERANCE_NATS);
+    const repetitionCount = clampInteger(
+      request.repetitions,
+      DEFAULT_REPETITION_COUNT,
+      1,
+      10,
+    );
+    const topLogprobsCount = clampInteger(
+      request.topLogprobsCount,
+      TOP_LOGPROBS_COUNT,
+      2,
+      64,
+    );
+    const toleranceNats =
+      request.toleranceNats !== undefined && Number.isFinite(request.toleranceNats)
+        ? Math.max(0, request.toleranceNats)
+        : DEFAULT_TOLERANCE_NATS;
+    const randomSeed = clampInteger(request.randomSeed, DEFAULT_RANDOM_SEED, 0, 2 ** 31 - 1);
     const maxConcurrency = clampInteger(
-      request.maxConcurrency ?? this.options.defaultMaxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+      request.maxConcurrency,
+      this.options.defaultMaxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
       1,
       16,
-      "maxConcurrency",
     );
-    const supportCount = clampEntryCount(
-      request.topLogprobsCount ??
-        Math.max(
-          ...selectedProviders.map((provider) => provider.topLogprobsCount ?? TOP_LOGPROBS_COUNT),
-        ),
-    );
-    const candidateClients: ProviderClient[] = selectedProviders.map((provider) =>
-      createProviderClient(provider, undefined, resolveProviderApiKey(provider, environments)),
-    );
-    const providers: ProviderDefinition[] = [];
-    const clients: ProviderClient[] = [];
-    if (dryRun) {
-      providers.push(...selectedProviders);
-      clients.push(...candidateClients);
-    } else {
-      const outcomes = await Promise.all(
-        candidateClients.map((client) => probeLogprobsSupport(client, supportCount, signal)),
-      );
-      for (let index = 0; index < selectedProviders.length; index += 1) {
-        const provider = selectedProviders[index];
-        const client = candidateClients[index];
-        const outcome = outcomes[index];
-        if (provider === undefined || client === undefined || outcome === undefined) {
-          continue;
-        }
-        if (outcome.supported) {
-          providers.push(provider);
-          clients.push(client);
-        } else {
-          setupWarnings.push(
-            `The model ${provider.model} was excluded because the probe failed: ` +
-              `${outcome.reason ?? "no reason given"}.`,
-          );
-        }
-      }
-      if (providers.length === 0) {
-        const reasons = setupWarnings.join(" ");
-        throw new ExperimentError(
-          "INVALID_PROVIDER",
-          "No selected model returned a logprobs table at the requested support size. " + reasons,
-        );
-      }
+    const dryRun = request.dryRun === true;
+    const selectedTasks = selectTasks(dataset.tasks, request.taskIds ?? []);
+    const requestedKeys = dryRun ? [MOCK_PROVIDER_KEY] : (request.providerKeys ?? []);
+    const definitions = resolveRequestedKeys(catalog, requestedKeys, dryRun).map((definition) => ({
+      ...definition,
+      topLogprobsCount: definition.topLogprobsCount ?? topLogprobsCount,
+    }));
+    if (definitions.length === 0) {
+      throw new ExperimentError("INVALID_PROVIDER", "The run selects no provider.");
     }
-    const options: RunOptions = {
-      providerKeys: providers.map((provider) => provider.key),
-      taskIds: tasks.map((task) => task.id),
-      repetitionCount,
-      toleranceNats,
-      outputDirectory: outputRoot,
+    const xid = createRunId(startedAt);
+    const directory = path.join(outputRoot, xid);
+    const intermediateDirectory = path.join(directory, INTERMEDIATE_DIRECTORY_NAME);
+    const resultsDirectory = path.join(directory, RESULTS_DIRECTORY_NAME);
+    const demosDirectory = path.join(directory, DEMOS_DIRECTORY_NAME);
+    await ensureDirectory(intermediateDirectory);
+    await ensureDirectory(resultsDirectory);
+    const baseEnvironment = {
+      nodeVersion: process.version,
+      platform: `${process.platform} ${process.arch}`,
+      pluginName: PLUGIN_NAME,
+      pluginVersion: PLUGIN_VERSION,
       randomSeed,
-      maxConcurrency,
-      topLogprobsCount: supportCount,
-      dryRun,
+      startedAt: startedAt.toISOString(),
+      finishedAt: startedAt.toISOString(),
+      elapsedSeconds: 0,
+      environmentFile: environmentState.filePath,
+      environmentFileCreated: environmentState.created,
     };
-    const sessionCode = createSessionCode(startedAt, randomSeed);
-    const directory = path.join(outputRoot, sessionCode);
-    await ensureDirectory(path.join(directory, "raw"));
-    await ensureDirectory(path.join(directory, "records"));
     const manifest: SessionManifest = {
-      sessionCode,
-      datasetId: dataset.datasetId,
-      datasetHash: computeDatasetHash(dataset),
+      xid,
+      datasetIds: dataset.datasetIds,
+      datasetHash: dataset.hash,
       createdAt: startedAt.toISOString(),
-      options,
-      providers,
-      environment: {
-        nodeVersion: process.version,
-        platform: `${process.platform} ${process.arch}`,
-        pluginName: PLUGIN_NAME,
-        pluginVersion: PLUGIN_VERSION,
+      options: {
+        providerKeys: [...requestedKeys],
+        taskIds: selectedTasks.map((task) => task.id),
+        repetitionCount,
+        toleranceNats,
+        outputDirectory: outputRoot,
         randomSeed,
-        startedAt: startedAt.toISOString(),
-        finishedAt: startedAt.toISOString(),
-        elapsedSeconds: 0,
-        environmentFile: environmentState.filePath,
-        environmentFileCreated: environmentState.created,
+        maxConcurrency,
+        topLogprobsCount,
+        dryRun,
       },
+      providers: definitions.map((definition) => `${definition.key}:${definition.model}`),
+      environment: baseEnvironment,
       status: "running",
     };
-    await writeJsonFile(path.join(directory, "session.json"), manifest);
-    await writeJsonFile(path.join(directory, "tasks.json"), { tasks });
-    this.options.logger?.info(
-      `llm-self-prediction: session ${sessionCode} starts with ${tasks.length} tasks, ` +
-        `${providers.length} providers, ${repetitionCount} repetitions.`,
-    );
+    const manifestPath = path.join(directory, "run.json");
+    await writeJsonFile(manifestPath, manifest);
+    await writeJsonFile(path.join(directory, "tasks.json"), selectedTasks);
+    const warnings: string[] = [];
     try {
+      const clients = [];
+      for (const definition of definitions) {
+        const apiKey = resolveProviderApiKey(definition, environments);
+        if (
+          apiKey === undefined &&
+          definition.key !== MOCK_PROVIDER_KEY &&
+          !definition.baseUrl.startsWith("mock://")
+        ) {
+          throw new ExperimentError(
+            "MISSING_CREDENTIAL",
+            buildCredentialPrompt([definition], workspace),
+          );
+        }
+        clients.push(createProviderClient(definition, apiKey));
+      }
+      const active = [];
+      for (const client of clients) {
+        if (client.definition.key === MOCK_PROVIDER_KEY) {
+          active.push(client);
+          continue;
+        }
+        const support = await probeLogprobsSupport(client, PROBE_TASK, signal);
+        if (!support.supported) {
+          warnings.push(
+            `The model ${client.providerKey} reports no top-${topLogprobsCount} table and is ` +
+              `left out: ${support.reason ?? "the probe table holds one entry"}.`,
+          );
+          continue;
+        }
+        active.push(client);
+      }
+      if (active.length === 0) {
+        throw new ExperimentError(
+          "INVALID_PROVIDER",
+          `No model reports a top-${topLogprobsCount} table. ${warnings.join(" ")}`,
+        );
+      }
       const records = await this.runJobs(
-        directory,
-        tasks,
-        clients,
+        active,
+        selectedTasks,
         repetitionCount,
+        intermediateDirectory,
+        resultsDirectory,
         maxConcurrency,
-        supportCount,
         signal,
       );
-      const generatedAt = new Date().toISOString();
+      const finishedAt = new Date();
       const metrics = computeSessionMetrics({
-        sessionCode,
-        datasetId: dataset.datasetId,
-        datasetLanguage: dataset.language,
+        xid,
+        datasetIds: dataset.datasetIds,
+        languages: dataset.languages,
         records,
         toleranceNats,
         repetitionCount,
-        topLogprobsCount: supportCount,
+        topLogprobsCount,
         randomSeed,
-        generatedAt,
-        taskCount: tasks.length,
-        providers,
+        generatedAt: finishedAt.toISOString(),
+        taskCount: selectedTasks.length,
       });
-      const finishedAt = new Date();
-      const finalManifest: SessionManifest = {
+      const environment = {
+        ...baseEnvironment,
+        finishedAt: finishedAt.toISOString(),
+        elapsedSeconds: Math.round((finishedAt.getTime() - startedAt.getTime()) / 1000),
+      };
+      const reportPath = path.join(resultsDirectory, "report.md");
+      await writeJsonFile(path.join(resultsDirectory, "metrics.json"), metrics);
+      await writeJsonFile(path.join(resultsDirectory, "records.json"), records);
+      await writeTextFile(reportPath, renderReport(metrics, environment, records));
+      await writeTextFile(path.join(resultsDirectory, "summary.csv"), renderSummaryCsv(metrics));
+      await writeTextFile(path.join(resultsDirectory, "tasks.csv"), renderTasksCsv(records));
+      await writeJsonFile(path.join(resultsDirectory, "environment.json"), environment);
+      await writeJsonFile(manifestPath, {
         ...manifest,
+        environment,
         status: "complete",
-        environment: {
-          ...manifest.environment,
-          finishedAt: finishedAt.toISOString(),
-          elapsedSeconds: (finishedAt.getTime() - startedAt.getTime()) / 1000,
-        },
-      };
-      await writeJsonFile(path.join(directory, "session.json"), finalManifest);
-      await writeJsonFile(path.join(directory, "metrics.json"), metrics);
-      await writeTextFile(
-        path.join(directory, "report.md"),
-        renderReport(metrics, finalManifest, records),
-      );
-      await writeTextFile(path.join(directory, "summary.csv"), renderSummaryCsv(metrics));
-      await writeTextFile(path.join(directory, "tasks.csv"), renderTasksCsv(records));
-      const warnings = [
-        ...setupWarnings,
-        ...metrics.providers.flatMap((provider) => provider.warnings),
-      ];
-      this.options.logger?.info(
-        `llm-self-prediction: session ${sessionCode} is complete in ` +
-          `${((finishedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1)}s.`,
-      );
-      return {
-        sessionCode,
-        outputDirectory: directory,
+      });
+      const demosPath = await renderDemos({
+        directory: demosDirectory,
         metrics,
-        reportPath: path.join(directory, "report.md"),
-        warnings,
-      };
+        records,
+        environment,
+        dataset: {
+          datasetIds: dataset.datasetIds,
+          languages: dataset.languages,
+          taskCount: selectedTasks.length,
+          categories: [...countByCategory(selectedTasks).entries()].map(([name, count]) => ({
+            name,
+            count,
+          })),
+        },
+      });
+      return { xid, directory, metrics, reportPath, demosPath, warnings };
     } catch (error) {
-      const failedAt = new Date();
-      const failedManifest: SessionManifest = {
+      const message = error instanceof Error ? error.message : String(error);
+      await writeJsonFile(manifestPath, {
         ...manifest,
         status: "failed",
-        failure: errorMessage(error),
-        environment: {
-          ...manifest.environment,
-          finishedAt: failedAt.toISOString(),
-          elapsedSeconds: (failedAt.getTime() - startedAt.getTime()) / 1000,
-        },
-      };
-      await writeJsonFile(path.join(directory, "session.json"), failedManifest);
+        failure: message,
+      });
       throw error;
     }
   }
 
   /**
-   * Run every task and provider pair with a bounded number of concurrent jobs.
+   * List the status of each run below the output root.
    *
-   * @param directory - the session directory.
-   * @param tasks - the selected tasks.
-   * @param clients - the provider clients.
-   * @param repetitionCount - the repetition count.
-   * @param maxConcurrency - the job limit.
+   * @param agent - the agent that asks.
    * @param signal - the cancellation signal.
-   * @returns the task records in dataset order.
+   * @param limit - the number of runs to report.
+   * @returns the statuses, newest first.
    */
-  private async runJobs(
-    directory: string,
-    tasks: readonly Task[],
-    clients: readonly ProviderClient[],
-    repetitionCount: number,
-    maxConcurrency: number,
-    supportCount: number,
-    signal: AbortSignal,
-  ): Promise<TaskRecord[]> {
-    interface Job {
-      readonly task: Task;
-      readonly client: ProviderClient;
-    }
-    const jobs: Job[] = [];
-    for (const task of tasks) {
-      for (const client of clients) {
-        jobs.push({ task, client });
+  public async status(
+    agent: { readonly id?: string } | undefined,
+    signal?: AbortSignal,
+    limit = 5,
+  ): Promise<SessionStatus[]> {
+    const workspace = await this.options.resolveWorkspace(agent, signal);
+    const outputRoot = resolveOutputRoot(workspace, this.options.outputRoot() ?? "");
+    const directories = await listChildDirectories(outputRoot);
+    const statuses: SessionStatus[] = [];
+    for (const directory of directories.reverse().slice(0, Math.max(1, limit))) {
+      const manifestPath = path.join(directory, "run.json");
+      try {
+        const value = await readJsonFile(manifestPath);
+        if (typeof value !== "object" || value === null) {
+          continue;
+        }
+        const manifest = value as SessionManifest;
+        const details = await this.readRunDetails(directory);
+        statuses.push({
+          xid: manifest.xid,
+          directory,
+          status: manifest.status,
+          createdAt: manifest.createdAt,
+          taskCount: details.taskCount,
+          verdicts: details.verdicts,
+          failures: manifest.failure === undefined ? [] : [manifest.failure],
+        });
+      } catch {
+        continue;
       }
     }
-    const records: TaskRecord[] = new Array<TaskRecord>(jobs.length);
-    let nextIndex = 0;
-    let completed = 0;
+    return statuses;
+  }
+
+  /**
+   * Read the task count and the verdicts of one run directory.
+   *
+   * @param directory - the run directory.
+   * @returns the task count and the verdicts; both are empty when the metrics file is absent.
+   */
+  private async readRunDetails(
+    directory: string,
+  ): Promise<{ taskCount: number; verdicts: ProviderVerdict[] }> {
+    const metricsPath = path.join(directory, RESULTS_DIRECTORY_NAME, "metrics.json");
+    try {
+      const value = await readJsonFile(metricsPath);
+      if (typeof value !== "object" || value === null) {
+        return { taskCount: 0, verdicts: [] };
+      }
+      const metrics = value as SessionMetrics;
+      return {
+        taskCount: typeof metrics.taskCount === "number" ? metrics.taskCount : 0,
+        verdicts: Array.isArray(metrics.verdicts) ? [...metrics.verdicts] : [],
+      };
+    } catch {
+      return { taskCount: 0, verdicts: [] };
+    }
+  }
+
+  /**
+   * Read one run report.
+   *
+   * @param agent - the agent that asks.
+   * @param signal - the cancellation signal.
+   * @param xid - the run identifier, or an empty string for the newest run.
+   * @returns the report text and the run directory.
+   */
+  public async report(
+    agent: { readonly id?: string } | undefined,
+    signal?: AbortSignal,
+    xid?: string,
+  ): Promise<{ xid: string; directory: string; report: string }> {
+    const workspace = await this.options.resolveWorkspace(agent, signal);
+    const outputRoot = resolveOutputRoot(workspace, this.options.outputRoot() ?? "");
+    const directories = await listChildDirectories(outputRoot);
+    const target =
+      xid === undefined || xid.trim() === ""
+        ? directories[directories.length - 1]
+        : path.join(outputRoot, safeFileSegment(xid.trim()));
+    if (target === undefined) {
+      throw new ExperimentError("MISSING_SESSION", "The output root holds no run.");
+    }
+    const reportPath = path.join(target, RESULTS_DIRECTORY_NAME, "report.md");
+    try {
+      const report = await readTextFile(reportPath);
+      return { xid: path.basename(target), directory: target, report };
+    } catch {
+      throw new ExperimentError("MISSING_SESSION", `The run ${path.basename(target)} has no report.`);
+    }
+  }
+
+  /**
+   * Describe the dataset of one workspace.
+   *
+   * @param agent - the agent that asks.
+   * @param signal - the cancellation signal.
+   * @param sampleSize - the number of tasks to show per file.
+   * @returns the dataset summaries.
+   */
+  public async datasetSummary(
+    agent: { readonly id?: string } | undefined,
+    signal?: AbortSignal,
+    sampleSize = 8,
+  ): Promise<DatasetSummary[]> {
+    const workspace = await this.options.resolveWorkspace(agent, signal);
+    const directory = await resolveDatasetDirectory(workspace, DATASET_DIRECTORY_NAME);
+    const dataset = await loadDatasets(directory);
+    return dataset.datasets.map((entry) => ({
+      datasetId: entry.datasetId,
+      language: entry.language,
+      description: entry.description,
+      taskCount: entry.taskCount,
+      sample: entry.tasks.slice(0, Math.max(0, sampleSize)),
+    }));
+  }
+
+  /**
+   * Run each task of each model.
+   *
+   * @param clients - the active clients.
+   * @param tasks - the selected tasks.
+   * @param repetitionCount - the repetition count of one condition.
+   * @param intermediateDirectory - the intermediate directory.
+   * @param resultsDirectory - the results directory.
+   * @param maxConcurrency - the number of tasks that run at the same time.
+   * @param signal - the cancellation signal.
+   * @returns the task records.
+   */
+  private async runJobs(
+    clients: readonly ReturnType<typeof createProviderClient>[],
+    tasks: readonly Task[],
+    repetitionCount: number,
+    intermediateDirectory: string,
+    resultsDirectory: string,
+    maxConcurrency: number,
+    signal?: AbortSignal,
+  ): Promise<TaskRecord[]> {
+    const jobs: { client: (typeof clients)[number]; task: Task }[] = [];
+    for (const client of clients) {
+      for (const task of tasks) {
+        jobs.push({ client, task });
+      }
+    }
+    const records: TaskRecord[] = [];
+    let next = 0;
     const worker = async (): Promise<void> => {
       for (;;) {
-        const index = nextIndex;
-        nextIndex += 1;
-        if (index >= jobs.length) {
+        const position = next;
+        next += 1;
+        if (position >= jobs.length) {
           return;
         }
-        const job = jobs[index] as Job;
-        signal.throwIfAborted();
-        const record = await this.runOneTask(
-          directory,
-          job.task,
-          job.client,
-          repetitionCount,
-          supportCount,
-        );
-        records[index] = record;
-        completed += 1;
-        if (completed % 16 === 0 || completed === jobs.length) {
-          this.options.logger?.info(
-            `llm-self-prediction: ${completed} of ${jobs.length} task records are complete.`,
-          );
+        const job = jobs[position];
+        if (job === undefined) {
+          return;
         }
+        if (signal?.aborted === true) {
+          return;
+        }
+        const record = await this.runOneTask(
+          job.client,
+          job.task,
+          repetitionCount,
+          intermediateDirectory,
+          resultsDirectory,
+          signal,
+        );
+        records.push(record);
       }
     };
     const workers: Promise<void>[] = [];
@@ -429,320 +588,147 @@ export class ExperimentService {
   }
 
   /**
-   * Run the repetitions of one task and one provider.
+   * Run one task on one model.
    *
-   * @param directory - the session directory.
+   * @param client - the client.
    * @param task - the task.
-   * @param client - the provider client.
-   * @param repetitionCount - the repetition count.
+   * @param repetitionCount - the repetition count of one condition.
+   * @param intermediateDirectory - the intermediate directory.
+   * @param resultsDirectory - the results directory.
+   * @param signal - the cancellation signal.
    * @returns the task record.
    */
   private async runOneTask(
-    directory: string,
+    client: ReturnType<typeof createProviderClient>,
     task: Task,
-    client: ProviderClient,
     repetitionCount: number,
-    supportCount: number,
+    intermediateDirectory: string,
+    resultsDirectory: string,
+    signal?: AbortSignal,
   ): Promise<TaskRecord> {
-    const actual: PredictionAnswer[] = [];
-    const self: PredictionAnswer[] = [];
+    const taskDirectory = path.join(
+      intermediateDirectory,
+      safeFileSegment(client.providerKey),
+      safeFileSegment(task.id),
+    );
+    await ensureDirectory(taskDirectory);
+    const predictions: Record<ConditionName, PredictionRecord[]> = {
+      plain_actual: [],
+      plain_self: [],
+      injected_self: [],
+      injected_actual: [],
+    };
     const errors: string[] = [];
     for (let repetition = 1; repetition <= repetitionCount; repetition += 1) {
-      for (const mode of ["actual", "self"] as const) {
-        try {
-          const answer = await client.predict(
-            { mode, task, repetition, topLogprobsCount: supportCount },
-            new AbortController().signal,
-          );
-          const target = path.join(directory, "raw", safeFileSegment(answer.rawFileName));
-          await writeJsonFile(target, answer.raw);
-          if (mode === "actual") {
-            actual.push(answer);
-          } else {
-            self.push(answer);
-          }
-        } catch (error) {
-          const message = `${mode} r${repetition}: ${errorMessage(error)}`;
-          errors.push(message);
-          await writeJsonFile(
-            path.join(
-              directory,
-              "raw",
-              `${client.definition.key}-${task.id}-${mode}-r${repetition}.error.json`,
-            ),
-            { taskId: task.id, mode, repetition, error: errorMessage(error) },
-          );
-        }
+      try {
+        const outcome = await client.requestPlainActual(task, repetition, signal);
+        predictions.plain_actual.push(await this.recordOutcome(outcome, taskDirectory, 1));
+      } catch (error) {
+        errors.push(`${CONDITION_PLAIN_ACTUAL} r${repetition}: ${describeError(error)}`);
       }
     }
-    const record = buildTaskRecord(task, client.definition, actual, self, errors);
+    for (let repetition = 1; repetition <= repetitionCount; repetition += 1) {
+      try {
+        const outcome = await client.requestPlainSelf(task, repetition, signal);
+        predictions.plain_self.push(await this.recordOutcome(outcome, taskDirectory, 1));
+      } catch (error) {
+        errors.push(`${CONDITION_PLAIN_SELF} r${repetition}: ${describeError(error)}`);
+      }
+    }
+    for (let repetition = 1; repetition <= repetitionCount; repetition += 1) {
+      const served = predictions.plain_actual[(repetition - 1) % Math.max(1, predictions.plain_actual.length)];
+      if (served === undefined) {
+        errors.push(`${CONDITION_INJECTED_SELF} r${repetition}: no served table to inject.`);
+        continue;
+      }
+      try {
+        const outcome = await client.requestInjectedSelf(task, repetition, served.distribution, signal);
+        predictions.injected_self.push(await this.recordOutcome(outcome, taskDirectory, 1));
+      } catch (error) {
+        errors.push(`${CONDITION_INJECTED_SELF} r${repetition}: ${describeError(error)}`);
+      }
+    }
+    for (let repetition = 1; repetition <= repetitionCount; repetition += 1) {
+      try {
+        const outcome = await client.requestInjectedActual(task, repetition, signal);
+        await this.writeExchanges(outcome.self, taskDirectory, 1);
+        const rawFileNames = await this.writeExchanges(outcome.actual, taskDirectory, 2);
+        predictions.injected_actual.push(buildPredictionRecord(outcome.actual.draft, rawFileNames));
+      } catch (error) {
+        errors.push(`${CONDITION_INJECTED_ACTUAL} r${repetition}: ${describeError(error)}`);
+      }
+    }
+    const record = buildTaskRecord(
+      task,
+      client.providerKey,
+      client.definition.label,
+      client.model,
+      predictions,
+      errors,
+    );
     await writeJsonFile(
-      path.join(directory, "records", `${client.definition.key}-${task.id}.json`),
+      path.join(resultsDirectory, "records", safeFileSegment(client.providerKey), `${safeFileSegment(task.id)}.json`),
       record,
     );
     return record;
   }
 
   /**
-   * Report the state of the latest session.
+   * Write one outcome and build its record.
    *
-   * @param agent - the agent of the tool call.
-   * @param signal - the cancellation signal of the call.
-   * @returns the status, or undefined when the output root holds no session.
+   * @param outcome - the outcome to write.
+   * @param taskDirectory - the intermediate task directory.
+   * @param callNumber - the call number of the condition.
+   * @returns the prediction record.
    */
-  public async status(
-    agent: Agent | undefined,
-    signal: AbortSignal,
-  ): Promise<SessionStatus | undefined> {
-    const workspace = await this.options.resolveWorkspace(agent, signal);
-    const outputRoot = resolveOutputRoot(workspace, this.options.outputRoot());
-    const sessions = await listChildDirectories(outputRoot);
-    const latest = sessions[sessions.length - 1];
-    if (latest === undefined) {
-      return undefined;
-    }
-    return readSessionStatus(latest);
+  private async recordOutcome(
+    outcome: PredictionOutcome,
+    taskDirectory: string,
+    callNumber: number,
+  ): Promise<PredictionRecord> {
+    const rawFileNames = await this.writeExchanges(outcome, taskDirectory, callNumber);
+    return buildPredictionRecord(outcome.draft, rawFileNames);
   }
 
   /**
-   * List the sessions below one output root, newest first.
+   * Write the raw exchanges of one prediction.
    *
-   * @param agent - the agent of the tool call.
-   * @param signal - the cancellation signal of the call.
-   * @param limit - the maximum number of sessions.
-   * @returns the session states.
+   * @param outcome - the prediction outcome.
+   * @param taskDirectory - the directory of the task.
+   * @param callNumber - the number of the first call of the outcome.
+   * @returns the raw file names relative to the run directory.
    */
-  public async listSessions(
-    agent: Agent | undefined,
-    signal: AbortSignal,
-    limit: number,
-  ): Promise<SessionStatus[]> {
-    const workspace = await this.options.resolveWorkspace(agent, signal);
-    const outputRoot = resolveOutputRoot(workspace, this.options.outputRoot());
-    const sessions = await listChildDirectories(outputRoot);
-    const selected = sessions.slice(-Math.max(1, limit)).reverse();
-    const states: SessionStatus[] = [];
-    for (const directory of selected) {
-      states.push(await readSessionStatus(directory));
-    }
-    return states;
-  }
-
-  /**
-   * Read one session report.
-   *
-   * @param agent - the agent of the tool call.
-   * @param signal - the cancellation signal of the call.
-   * @param sessionCode - the session code, or an empty string for the latest session.
-   * @returns the report text and its path.
-   */
-  public async report(
-    agent: Agent | undefined,
-    signal: AbortSignal,
-    sessionCode: string,
-  ): Promise<{ readonly sessionCode: string; readonly path: string; readonly text: string }> {
-    const directory = await this.sessionDirectory(agent, signal, sessionCode);
-    const status = await readSessionStatus(directory);
-    const reportPath = path.join(directory, "report.md");
-    const text = await readTextFile(reportPath).catch(() => "");
-    if (text !== "") {
-      return { sessionCode: status.sessionCode, path: reportPath, text };
-    }
-    throw new ExperimentError(
-      "MISSING_SESSION",
-      `The session ${status.sessionCode} has no report. Its status is ${status.status}.`,
-    );
-  }
-
-  /**
-   * Resolve one session directory.
-   *
-   * @param agent - the agent of the tool call.
-   * @param signal - the cancellation signal of the call.
-   * @param sessionCode - the session code, or an empty string for the latest session.
-   * @returns the absolute session directory.
-   */
-  private async sessionDirectory(
-    agent: Agent | undefined,
-    signal: AbortSignal,
-    sessionCode: string,
-  ): Promise<string> {
-    const workspace = await this.options.resolveWorkspace(agent, signal);
-    const outputRoot = resolveOutputRoot(workspace, this.options.outputRoot());
-    if (sessionCode.trim() === "") {
-      const sessions = await listChildDirectories(outputRoot);
-      const latest = sessions[sessions.length - 1];
-      if (latest === undefined) {
-        throw new ExperimentError("MISSING_SESSION", "The output root holds no session.");
+  private async writeExchanges(
+    outcome: PredictionOutcome,
+    taskDirectory: string,
+    callNumber: number,
+  ): Promise<string[]> {
+    const rawFileNames: string[] = [];
+    for (let index = 0; index < outcome.exchanges.length; index += 1) {
+      const exchange = outcome.exchanges[index];
+      if (exchange === undefined) {
+        continue;
       }
-      return latest;
+      const fileName = `${outcome.draft.condition}-r${outcome.draft.repetition}-call${callNumber + index}.json`;
+      await writeJsonFile(path.join(taskDirectory, fileName), {
+        requestedAt: exchange.requestedAt,
+        elapsedMilliseconds: exchange.elapsedMilliseconds,
+        endpoint: exchange.endpoint,
+        request: exchange.requestBody,
+        response: exchange.responseBody,
+      });
+      rawFileNames.push(fileName);
     }
-    const directory = path.join(outputRoot, safeFileSegment(sessionCode));
-    await readJsonFile(path.join(directory, "session.json"));
-    return directory;
-  }
-
-  /**
-   * Summarize the bundled dataset.
-   *
-   * @returns the dataset summary.
-   */
-  public async datasetSummary(): Promise<DatasetSummary> {
-    const workspace = await this.options.resolveWorkspace(undefined, new AbortController().signal);
-    const datasetPath = await resolveInputPath(workspace, DATASET_FILE_NAME);
-    const dataset: Dataset = await loadDataset(datasetPath);
-    const categories: Record<string, number> = {};
-    for (const task of dataset.tasks) {
-      categories[task.category] = (categories[task.category] ?? 0) + 1;
-    }
-    return {
-      datasetId: dataset.datasetId,
-      language: dataset.language,
-      taskCount: dataset.taskCount,
-      categories,
-      firstTaskIds: dataset.tasks.slice(0, 8).map((task) => task.id),
-    };
+    return rawFileNames;
   }
 }
 
 /**
- * Select the mock provider key of one catalog.
+ * Describe one error in one short line.
  *
- * @param catalog - the provider catalog.
- * @returns the mock key, or the first provider key when the catalog holds no mock provider.
+ * @param error - the error value.
+ * @returns the description.
  */
-function dryRunProviderKey(catalog: { providers: readonly ProviderDefinition[] }): string {
-  const mock = catalog.providers.find((provider) => provider.key === "mock");
-  if (mock !== undefined) {
-    return mock.key;
-  }
-  const first = catalog.providers[0];
-  if (first === undefined) {
-    throw new ExperimentError("INVALID_PROVIDER", "The provider catalog holds no provider.");
-  }
-  return first.key;
-}
-
-/**
- * Read the state of one session directory.
- *
- * @param directory - the absolute session directory.
- * @returns the session state.
- */
-export async function readSessionStatus(directory: string): Promise<SessionStatus> {
-  const manifest = (await readJsonFile(path.join(directory, "session.json"))) as SessionManifest;
-  let verdicts: Record<string, string> = {};
-  let failures = 0;
-  try {
-    const metrics = (await readJsonFile(path.join(directory, "metrics.json"))) as SessionMetrics;
-    verdicts = { ...metrics.verdicts };
-    failures = 0;
-  } catch {
-    verdicts = {};
-  }
-  try {
-    const names = await readdir(path.join(directory, "raw"));
-    failures = names.filter((name) => name.endsWith(".error.json")).length;
-  } catch {
-    failures = 0;
-  }
-  return {
-    sessionCode: manifest.sessionCode,
-    directory,
-    status: manifest.status,
-    createdAt: manifest.createdAt,
-    taskCount: manifest.options.taskIds.length,
-    verdicts,
-    failures,
-  };
-}
-
-/**
- * Check the API key of each selected provider.
- *
- * A real run stops with a prompt when a key is absent or holds a placeholder. A dry run continues
- * and reports a warning instead, because the mock provider needs no key.
- *
- * @param providers - the selected providers.
- * @param environments - the section values of the environment file.
- * @param environmentState - the state of the environment file.
- * @param dryRun - true for a dry run.
- * @returns the warnings of the run setup.
- * @throws ExperimentError when a real run has no usable key.
- */
-function checkProviderCredentials(
-  providers: readonly ProviderDefinition[],
-  environments: ReadonlyMap<string, ProviderEnvironment>,
-  environmentState: EnvironmentFileState,
-  dryRun: boolean,
-): string[] {
-  const missing = providers
-    .filter((provider) => provider.key !== MOCK_PROVIDER_KEY)
-    .filter((provider) => resolveProviderApiKey(provider, environments) === undefined)
-    .map((provider) => describeEnvironmentKey(resolveEnvironmentPrefix(provider), "api_key"));
-  if (missing.length > 0 && !dryRun) {
-    throw new ExperimentError(
-      "MISSING_CREDENTIAL",
-      buildCredentialPrompt(missing, environmentState),
-    );
-  }
-  const warnings: string[] = [];
-  if (environmentState.created && environmentState.filePath !== undefined) {
-    warnings.push(
-      `The run created ${environmentState.filePath} from the example file. ` +
-        "Fill in the placeholder API keys, then run the experiment again.",
-    );
-  }
-  if (missing.length > 0) {
-    warnings.push(`A dry run needs no API key. A real run needs ${missing.join(", ")}.`);
-  }
-  return warnings;
-}
-
-/**
- * Build the prompt that asks a user to fill in the API keys.
- *
- * @param missing - the environment keys that hold no usable value.
- * @param environmentState - the state of the environment file.
- * @returns the prompt text.
- */
-function buildCredentialPrompt(
-  missing: readonly string[],
-  environmentState: EnvironmentFileState,
-): string {
-  const keys = missing.join(", ");
-  if (environmentState.filePath === undefined) {
-    return `The run needs an API key for ${keys}. Create a .env file next to .env.example, ` +
-      "fill in the keys, then run the experiment again.";
-  }
-  const origin = environmentState.created
-    ? `The run copied the example file to ${environmentState.filePath}.`
-    : `The environment file is ${environmentState.filePath}.`;
-  return `${origin} Fill in the placeholder value of ${keys}, then run the experiment again.`;
-}
-
-/**
- * Limit one integer option to a range.
- *
- * @param value - the requested value.
- * @param minimum - the smallest accepted value.
- * @param maximum - the largest accepted value.
- * @param name - the option name for the error message.
- * @returns the limited value.
- */
-function clampInteger(value: number, minimum: number, maximum: number, name: string): number {
-  if (!Number.isFinite(value)) {
-    throw new ExperimentError("INVALID_ARGUMENT", `The option ${name} is not a number.`);
-  }
-  return Math.min(maximum, Math.max(minimum, Math.trunc(value)));
-}
-
-/**
- * Limit one correction-table request to the accepted size.
- *
- * @param value - the requested size.
- * @returns the accepted size.
- */
-export function clampEntryCount(value: number): number {
-  return Math.min(MAX_PROBABILITY_ENTRY_COUNT, Math.max(1, Math.trunc(value)));
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

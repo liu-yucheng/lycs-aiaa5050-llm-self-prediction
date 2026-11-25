@@ -1,42 +1,72 @@
 import type { Dataset, Task } from "./types.js";
+/** The merged dataset of one run. */
+export interface LoadedDataset {
+    /** The dataset files in canonical order. */
+    readonly datasets: readonly Dataset[];
+    /** The merged tasks in file order. */
+    readonly tasks: readonly Task[];
+    /** The comma-separated dataset identifiers. */
+    readonly datasetIds: readonly string[];
+    /** The language tags in file order. */
+    readonly languages: readonly string[];
+    /** The digest of the merged task list. */
+    readonly hash: string;
+}
 /**
- * Validate one dataset value.
+ * Validate one task.
  *
- * @param value - the parsed JSON value.
+ * @param value - the value to check.
+ * @param index - the position of the task in the file.
+ * @returns the validated task.
+ * @throws ExperimentError when the value is not a valid task.
+ */
+export declare function validateTask(value: unknown, index: number): Task;
+/**
+ * Validate one dataset file.
+ *
+ * @param value - the parsed file value.
  * @returns the validated dataset.
- * @throws ExperimentError when a field is absent or inconsistent.
+ * @throws ExperimentError when the value is not a valid dataset.
  */
 export declare function validateDataset(value: unknown): Dataset;
 /**
- * Load the bundled dataset.
+ * Compute the digest of one task list.
  *
- * @param filePath - the path of the dataset file. The default is the packaged file.
- * @returns the validated dataset.
+ * @param tasks - the tasks to hash.
+ * @returns the SHA-256 digest as lowercase hexadecimal.
  */
-export declare function loadDataset(filePath?: string): Promise<Dataset>;
+export declare function computeDatasetHash(tasks: readonly Task[]): string;
 /**
- * Compute the SHA-256 digest of the canonical dataset text.
+ * Resolve the testing dataset directory of one workspace.
  *
- * The digest identifies the exact tasks of one session.
+ * A workspace copy wins over the packaged copy.
  *
- * @param dataset - the validated dataset.
- * @returns the digest as lowercase hexadecimal.
+ * @param workspace - the absolute workspace directory.
+ * @param directoryName - the directory name below the inputs directory.
+ * @returns the absolute directory path of the copy to read.
  */
-export declare function computeDatasetHash(dataset: Dataset): string;
+export declare function resolveDatasetDirectory(workspace: string, directoryName: string): Promise<string>;
 /**
- * Select the tasks of one run.
+ * Load and merge the dataset files of one directory.
  *
- * @param dataset - the validated dataset.
+ * @param directory - the directory that holds the dataset files.
+ * @returns the merged dataset.
+ * @throws ExperimentError when the directory holds no dataset file.
+ */
+export declare function loadDatasets(directory: string): Promise<LoadedDataset>;
+/**
+ * Select the requested tasks.
+ *
+ * @param tasks - the tasks in file order.
  * @param taskIds - the requested identifiers; an empty list selects every task.
- * @param limit - the maximum number of tasks; a value of 0 keeps every selected task.
- * @returns the selected tasks in dataset order.
+ * @returns the selected tasks in file order.
  * @throws ExperimentError when a requested identifier is absent.
  */
-export declare function selectTasks(dataset: Dataset, taskIds: readonly string[], limit: number): Task[];
+export declare function selectTasks(tasks: readonly Task[], taskIds: readonly string[]): Task[];
 /**
- * Group the tasks by category and count each group.
+ * Count the tasks of each category.
  *
- * @param tasks - the tasks to group.
- * @returns the category names in sorted order with their counts.
+ * @param tasks - the tasks to count.
+ * @returns a map from the category name to the task count, in first-seen order.
  */
-export declare function countByCategory(tasks: readonly Task[]): Record<string, number>;
+export declare function countByCategory(tasks: readonly Task[]): Map<string, number>;

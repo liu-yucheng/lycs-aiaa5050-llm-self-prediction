@@ -1,87 +1,111 @@
 // Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
 // GNU AGPL 3.0 License: https://www.gnu.org/licenses/agpl-3.0.txt.
 
-import assert from "node:assert/strict";
 import test from "node:test";
+import assert from "node:assert/strict";
 
-import { SELF_PREDICTION_TOOL_NAME } from "../lib/constants.js";
-import { ExperimentError } from "../lib/errors.js";
 import {
   buildActualPredictionPrompt,
+  buildInjectedActualPrompt,
+  buildInjectedSelfPredictionPrompt,
+  buildInjectedTableMessage,
   buildSelfPredictionPrompt,
-  buildSelfPredictionTool,
-  parseSelfPredictionArguments,
+  formatTableJson,
+  isEnglishTask,
+  parseSelfReport,
 } from "../lib/prompts.js";
 
-/** One task that the prompt tests use. */
-const TASK = {
-  id: "T001",
+const chineseTask = {
+  id: "Z001",
   category: "poetry",
+  language: "zh-Hans",
   prefix: "床前明月光，疑是地上",
   referenceToken: "霜",
 };
 
-test("the actual prompt names the prefix and asks for one token", () => {
-  const prompt = buildActualPredictionPrompt(TASK);
-  assert.match(prompt.system, /下一个词/);
-  assert.match(prompt.user, /床前明月光/);
-  assert.match(prompt.user, /一个词/);
+const englishTask = {
+  id: "E001",
+  category: "daily",
+  language: "en-US",
+  prefix: "The cat sat on the",
+  referenceToken: "mat",
+};
+
+test("the language check follows the task language prefix", () => {
+  assert.equal(isEnglishTask(englishTask), true);
+  assert.equal(isEnglishTask(chineseTask), false);
 });
 
-test("the self prompt asks for the forced tool call", () => {
-  const prompt = buildSelfPredictionPrompt(TASK, 20);
-  assert.match(prompt.user, /床前明月光/);
-  assert.match(prompt.user, new RegExp(SELF_PREDICTION_TOOL_NAME));
-  assert.match(prompt.user, /20/);
-  assert.match(prompt.system, /JSON/);
+test("the actual prompt holds the prefix and asks for the one next token", () => {
+  const prompt = buildActualPredictionPrompt(chineseTask);
+  assert.ok(prompt.user.includes("床前明月光，疑是地上"));
+  assert.ok(prompt.system.length > 0);
+  assert.equal(prompt.user.includes("霜"), false);
 });
 
-test("an English task gets an English prompt pair", () => {
-  const task = {
-    id: "E001",
-    category: "poetry",
-    language: "en-US",
-    prefix: "Roses are red, violets are",
-    referenceToken: "blue",
-  };
-  const actual = buildActualPredictionPrompt(task);
-  assert.match(actual.system, /next-token prediction/u);
-  assert.match(actual.user, /Roses are red/u);
-  assert.match(actual.user, /one word/u);
-  const selfPrompt = buildSelfPredictionPrompt(task, 20);
-  assert.match(selfPrompt.system, /self-prediction/u);
-  assert.match(selfPrompt.user, /Roses are red/u);
-  assert.match(selfPrompt.user, new RegExp(SELF_PREDICTION_TOOL_NAME));
+test("the self prompt asks for the requested entry count in both languages", () => {
+  const chinese = buildSelfPredictionPrompt(chineseTask, 20);
+  const english = buildSelfPredictionPrompt(englishTask, 12);
+  assert.ok(chinese.user.includes("20"));
+  assert.ok(english.user.includes("12"));
+  assert.ok(chinese.user.includes("床前明月光，疑是地上"));
+  assert.ok(english.user.includes("The cat sat on the"));
 });
 
-test("the self-prediction tool bounds the entry count", () => {
-  const tool = buildSelfPredictionTool(64);
-  assert.equal(tool.name, SELF_PREDICTION_TOOL_NAME);
-  const entries = tool.parameters.properties.entries;
-  assert.equal(entries.type, "array");
-  assert.equal(entries.minItems, 1);
-  assert.equal(entries.maxItems, 64);
-  const wide = buildSelfPredictionTool(1000);
-  assert.equal(wide.parameters.properties.entries.maxItems, 64);
+test("the self prompt explains the tokenize cut rule", () => {
+  const prompt = buildSelfPredictionPrompt(englishTask, 20);
+  assert.match(prompt.user, /cut|piece|fragment|tokeniz/iu);
 });
 
-test("parseSelfPredictionArguments accepts a JSON string and an object", () => {
-  const expected = [
-    { token: "霜", logProbability: Math.log(0.6) },
-    { token: "月", logProbability: Math.log(0.4) },
-  ];
-  const fromString = parseSelfPredictionArguments(JSON.stringify({ entries: expected }));
-  assert.deepEqual(fromString, expected);
-  const fromObject = parseSelfPredictionArguments({ entries: expected });
-  assert.deepEqual(fromObject, expected);
+test("the injected table message repeats each entry of the table", () => {
+  const text = buildInjectedTableMessage({
+    entries: [
+      { token: "a", logProbability: -0.1 },
+      { token: "b", logProbability: -2.3 },
+    ],
+  });
+  assert.ok(text.includes('"a"'));
+  assert.ok(text.includes('"b"'));
+  assert.ok(text.includes("-2.3"));
 });
 
-test("parseSelfPredictionArguments rejects a malformed answer", () => {
-  assert.throws(() => parseSelfPredictionArguments("not json"), ExperimentError);
-  assert.throws(() => parseSelfPredictionArguments({}), ExperimentError);
-  assert.throws(() => parseSelfPredictionArguments({ entries: [] }), ExperimentError);
-  assert.throws(
-    () => parseSelfPredictionArguments({ entries: [{ token: "霜", logProbability: "x" }] }),
-    ExperimentError,
+test("the injected prompts refer to the table already in the context", () => {
+  const self = buildInjectedSelfPredictionPrompt(englishTask, 20);
+  const actual = buildInjectedActualPrompt(englishTask);
+  assert.ok(self.length > 0);
+  assert.ok(actual.includes("The cat sat on the"));
+  assert.match(actual, /table|predict|log ?prob/iu);
+});
+
+test("the table format rounds a log probability and stays valid JSON", () => {
+  const text = formatTableJson({ entries: [{ token: "a", logProbability: -0.123456789 }] });
+  const parsed = JSON.parse(text);
+  assert.equal(parsed.entries[0].logProbability, -0.123457);
+});
+
+test("the self report parser reads a plain object", () => {
+  const entries = parseSelfReport(
+    '{"entries":[{"token":"霜","logProbability":-1.25},{"token":"光","logProbability":-2.5}]}',
   );
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].token, "霜");
+});
+
+test("the self report parser reads a fenced block with a surrounding sentence", () => {
+  const entries = parseSelfReport(
+    'Sure, here it is:\n```json\n{"entries":[{"token":"mat","logProbability":-0.3}]}\n```\n',
+  );
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].logProbability, -0.3);
+});
+
+test("the self report parser reads an array and an alternative key name", () => {
+  const entries = parseSelfReport('[{"word":"mat","logprob":-0.7}]');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].token, "mat");
+  assert.equal(entries[0].logProbability, -0.7);
+});
+
+test("the self report parser rejects a reply without a table", () => {
+  assert.throws(() => parseSelfReport("I cannot answer that."), /table|JSON|entr/iu);
 });

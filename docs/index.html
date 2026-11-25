@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Next-token self-prediction — plugin documentation</title>
-<meta name="description" content="Documentation of the DeepSeek Harness plugin lycs-aiaa5050-llm-self-prediction.">
+<title>Overview — plugin documentation</title>
+<meta name="description" content="Overview of the plugin lycs-aiaa5050-llm-self-prediction.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.5.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.6.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html" aria-current="page">Overview</a>
       <a href="design.html">Design</a>
@@ -24,107 +24,94 @@
 
 <main>
   <h1>Does a model know its own next token?</h1>
-  <p class="lede">A DeepSeek Harness plugin that measures the distance between the next-token
-    distribution that a language model actually produces and the distribution that the same model
-    reports through a tool call.</p>
+  <p class="lede">A DeepSeek Harness plugin that measures how far the next-token table of a
+
+    language model stands from the table that the same model reports about itself.</p>
 
   <div class="callout">
-    <p><strong>The two questions.</strong> For one sentence prefix, the plugin asks the model for
-      the top 20 next-token log probabilities, then asks the model to report that same table itself.
-      The divergence between the two tables is the measurement.</p>
+    <p><strong>The question.</strong> A model reads a sentence prefix. The provider reports the top 20 next-token choices. Does the model know that table? The plugin asks the model to write the table, compares the two tables, and repeats the comparison under two injections.</p>
   </div>
 
   <dl class="facts">
-    <dt>Dataset</dt><dd>64 Simplified Chinese and 64 US English tasks in 8 categories, dataset
-      <code>llm-self-prediction-zh64-en64-v2</code></dd>
-    <dt>Providers</dt><dd>DeepSeek, Qwen, GLM flash models, plus a deterministic mock provider</dd>
-    <dt>Table size</dt><dd>20 entries for the actual request, at most 64 entries for the self request</dd>
-    <dt>Pairs</dt><dd>4 actual answers × 4 self answers = 16 pairs for each task and provider</dd>
+    <dt>Dataset</dt><dd>32 Simplified Chinese and 32 US English tasks in 8 categories in <code>inputs/testing-dataset/</code></dd>
+    <dt>Providers</dt><dd>Hugging Face router models, plus a deterministic mock provider</dd>
+    <dt>Conditions</dt><dd>plain actual, plain self, injected self, injected actual; 3 repetitions each</dd>
+    <dt>Comparisons</dt><dd>3: plain self, injected self, and injected actual against the plain actual table</dd>
     <dt>Verdict</dt><dd>Bootstrap interval of the mean symmetric KL against a tolerance of 0.05 nats</dd>
   </dl>
 
-  <h2>Why the comparison is fair</h2>
-  <p>A raw divergence mixes two causes: the model reports a different table, or the model samples
-    a different token. The run separates them.</p>
-  <ul>
-    <li>Each task gives four actual answers and four self answers, so sampling noise appears in both
-      groups.</li>
-    <li>Two same-mode baselines compare actual with actual and self with self, and they show the
-      noise floor of the provider.</li>
-    <li>A bootstrap interval states how much of the difference the sample size supports.</li>
-    <li>The plugin never uses the reference token of the dataset in the metric, so a wrong sentence
-      completion cannot flatter or spoil a divergence.</li>
+<h2>Why four conditions</h2>
+<ul>
+    <li>The plain actual table is the ground truth, because the provider computes it and the model does not write it.</li>
+    <li>The plain self table shows what the model says when it must state its own prediction.</li>
+    <li>The injected self table shows whether the true table moves the self report toward the truth.</li>
+    <li>The injected actual table shows whether the self report distorts the served table that follows it.</li>
   </ul>
 
-  <h2>Install and first run</h2>
+<h2>What one run writes</h2>
+<ul>
+    <li><code>outputs/&lt;xid&gt;/intermediate/</code> holds every raw exchange, one file for each call.</li>
+    <li><code>outputs/&lt;xid&gt;/results/</code> holds the metrics, the records, the report, and the tables.</li>
+    <li><code>outputs/&lt;xid&gt;/demos/</code> holds the static bilingual demonstration website.</li>
+  </ul>
+
+<h2>Install and first run</h2>
   <pre><code># register the package directory as a bundle
 plugin_manager install_bundle target=&lt;absolute path of this package&gt;
 
-# in a DeepSeek Harness session, ask the agent:
-use lycs-aiaa5050-llm-self-prediction to run an experiment</code></pre>
-  <p>A dry run needs no credential and no network.</p>
-  <pre><code>node lib/cli.js run --dry-run --limit=3 --repetitions=2</code></pre>
-  <p>A real run needs an API key. The workspace holds two directories: <code>inputs/</code> for the
-    private file <code>.env</code>, the example file, and optional replacements of the dataset and the
-    provider catalog, and <code>outputs/</code> for one directory of each session. The first run copies
-    the public example file to <code>inputs/.env</code> and stops with a prompt that names the keys to
-    fill in. The command below shows the path and the state of each key:</p>
-  <pre><code>node lib/cli.js env</code></pre>
+# a dry run needs no credential and no network
+node lib/cli.js run --dry-run --tasks=Z001,E001 --repetitions=1
 
-  <h2>The five tools</h2>
+# a real run reads the key from inputs/.env
+node lib/cli.js env
+node lib/cli.js run</code></pre>
+
+<h2>The five tools</h2>
   <table>
     <thead>
       <tr><th>Tool</th><th>Purpose</th></tr>
     </thead>
     <tbody>
       <tr><td><code>llm_self_prediction_run</code></td><td>Run one session and write the session directory.</td></tr>
-      <tr>
-        <td><code>llm_self_prediction_status</code></td>
-        <td>List the recent sessions with the verdict of each provider.</td>
-      </tr>
+      <tr><td><code>llm_self_prediction_status</code></td><td>List the recent sessions with their verdicts.</td></tr>
       <tr><td><code>llm_self_prediction_report</code></td><td>Read the Markdown report of one session.</td></tr>
-      <tr>
-        <td><code>llm_self_prediction_dataset</code></td>
-        <td>Summarize the dataset and list the first tasks.</td>
-      </tr>
-      <tr><td><code>llm_self_prediction_help</code></td><td>Explain the experiment and the provider setup.</td></tr>
+      <tr><td><code>llm_self_prediction_dataset</code></td><td>Summarize the two dataset files.</td></tr>
+      <tr><td><code>llm_self_prediction_help</code></td><td>Explain the protocol and the provider setup.</td></tr>
     </tbody>
   </table>
 
-  <h2>Read next</h2>
+<h2>Read next</h2>
   <div class="cards">
     <a class="card" href="design.html">
       <strong>Design</strong>
-      <span>Hypotheses, run flow, dataset rules, prompts, and pairing.</span>
+      <span>Hypotheses, run flow, dataset rules, and pairing.</span>
     </a>
     <a class="card" href="protocol.html">
       <strong>Protocol</strong>
-      <span>Request bodies, the forced tool schema, and the reply rules.</span>
+      <span>Requests, prompts, injections, and reply rules.</span>
     </a>
     <a class="card" href="measures.html">
       <strong>Measures</strong>
-      <span>Alignment, KL, JS, TV, coverage, the bootstrap, and the verdict.</span>
+      <span>Alignment, KL, JS, TV, coverage, bootstrap, and verdict.</span>
     </a>
     <a class="card" href="reference.html">
       <strong>Reference</strong>
-      <span>Tool arguments, command line, settings, output layout, failures.</span>
+      <span>Tool arguments, command line, settings, and output layout.</span>
     </a>
     <a class="card" href="reproducibility.html">
       <strong>Reproducibility</strong>
-      <span>Recorded versions, integrity rules, limitations, test coverage.</span>
+      <span>Recorded versions, integrity rules, and tests.</span>
     </a>
     <a class="card" href="DETAIL.md">
       <strong>Design note</strong>
-      <span>The Markdown source that the plugin detail page shows.</span>
+      <span>The Markdown source of the plugin detail page.</span>
     </a>
   </div>
 </main>
 
-<footer class="site-footer">
-  <div class="inner">
-    <p>Copyright (C) 2026 Yucheng Liu. Released under the GNU AGPL 3.0 License.
-      See <a href="../LICENSE">LICENSE</a> and <a href="../license-2">license-2</a>.</p>
-  </div>
+<footer>
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.6.0. Released under the GNU AGPL 3.0 License.
+    The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
 </html>

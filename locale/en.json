@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "LLM self-prediction",
-    "description": "Runs the 128-task next-token and next-token self-prediction experiment on DeepSeek, Qwen, and GLM, then reports two-way KL divergences.",
+    "description": "Runs the four-condition next-token self-prediction experiment on 64 tasks, compares three self reports against the served table, and writes a bilingual demonstration website.",
     "detail": "docs/DETAIL.md"
   }
 }
