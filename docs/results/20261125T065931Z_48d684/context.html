@@ -10,16 +10,18 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <span class="brand-mark">NTP</span>
-      <span class="brand-text"><span data-lang="en">Can LLMs predict their own next token predictions?</span><span data-lang="zh" hidden>大模型能预测自己的下一个词块吗？</span></span>
+      <span class="brand-mark">AIAA5050</span>
+      <span class="brand-text"><span data-lang="en">Next-token self-prediction</span><span data-lang="zh" hidden>下一个词块自我预测</span></span>
     </div>
-    <nav class="nav"><a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
-<a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
-<a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
-<a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
-<a href="context.html" class="active"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
-<a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
-<a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a></nav>
+    <nav class="nav" aria-label="Chapters">
+      <a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+      <a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+      <a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+      <a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+      <a href="context.html" aria-current="page"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+      <a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+      <a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a>
+    </nav>
     <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
       <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
     </button>
@@ -31,28 +33,51 @@
   <p class="lede"><span data-lang="en">How this run connects to the lectures, the debates, and the final assessment.</span><span data-lang="zh" hidden>本运行与课程、辩论和期末考核的关系。</span></p>
   
 <h2><span data-lang="en">Why I built this</span><span data-lang="zh" hidden>我为什么做这个实验</span></h2>
-<p><span data-lang="en">The course asks a hard question: does a large language model have anything like a self? I cannot answer that question with a definition. I can measure one narrow, checkable part of it. If a model holds a distribution over the next token, and if it can also report that distribution, then the model carries a usable model of its own computation. If it cannot, then the phrase the model knows itself needs a narrower meaning.</span><span data-lang="zh" hidden>课程提出一个很难的问题：大模型有没有类似自我的东西？我不能用定义回答这个问题，但可以测量其中一个狭窄且可检验的部分。如果模型持有下一个词块的分布，并且也能报告这个分布，那么模型就带有自己计算过程的可用的模型。如果做不到，那么模型认识自己这句话就需要更窄的含义。</span></p>
-<p><span data-lang="en">The gap between the two is the measurement. That is the whole experiment: no introspection claim, no consciousness claim, one number with an interval.</span><span data-lang="zh" hidden>两者之间的差距就是测量结果。整个实验只有这个：不主张内省，不主张意识，只给出一个带区间的数字。</span></p>
-<h2><span data-lang="en">Course topics</span><span data-lang="zh" hidden>课程主题</span></h2>
-<p><span data-lang="en">The course module Understanding LLMs builds the pipeline of a decoder: tokenize, embed, attend, feed forward, decode one token at a time. Next-token prediction is the loop of that pipeline. This experiment reads the output of the loop in two ways, once from the interface and once from the model as text.</span><span data-lang="zh" hidden>课程模块《理解大模型》讲清解码器的流程：分词、嵌入、注意力、前馈、逐个解码。下一个词块预测就是这个流程的循环。本实验用两种方式读取该循环的输出：一次从接口读，一次让模型用文字写出。</span></p>
-<p><span data-lang="en">The module Seventy Years at a Glance sorts the literature by question. The third question is does it know itself. This experiment turns that question into a protocol with four conditions, three repetitions, and one divergence.</span><span data-lang="zh" hidden>模块《研究全景》按问题给文献分类。第三个问题是它认得自己吗。本实验把这个问题变成一个协议：四个条件、三次重复、一个散度。</span></p>
-<p><span data-lang="en">The module Are LLMs Conscious separates the whole question into parts: the whole picture, the self, the stake, and measuring it. This experiment belongs to the last part. It measures a capability, and it states no position on experience.</span><span data-lang="zh" hidden>模块《大模型有意识吗》把整个问题拆成几部分：整体图景、自我、利害、一起去量。本实验属于最后一部分。它测量一项能力，不对体验表态。</span></p>
-<p><span data-lang="en">The modules on consciousness theory and on the Turing test give two habits that this experiment keeps. First, a claim about a machine needs an operational test. Second, a test measures the test and not the thing behind it.</span><span data-lang="zh" hidden>意识理论与图灵测试两个模块给出两个习惯，本实验都保留。第一，关于机器的判断需要可操作的检验。第二，检验测量的是检验本身，不是它背后的东西。</span></p>
-<h2><span data-lang="en">Debate topics</span><span data-lang="zh" hidden>辩论主题</span></h2>
-<p><span data-lang="en">The debate class runs two rounds, one technical and one beyond technology, and every motion asks for a position that a measurement can inform but cannot settle. Three motions sit close to this experiment.</span><span data-lang="zh" hidden>辩论课有两场，一场技术向，一场非技术向。每道辩题都要求一个立场，测量可以支持这个立场，但不能决定它。三道辩题与本实验接近。</span></p>
 <ul>
-<li><span data-lang="en">Motion: a model that reports its own distribution understands itself. The experiment supplies the first half of the premise and refuses the second half.</span><span data-lang="zh" hidden>辩题：能报告自己分布的模型理解自己。实验提供前提的前半部分，不对后半部分表态。</span></li>
-<li><span data-lang="en">Motion: self-report is evidence of inner life. The experiment shows that self-report can be measured and can be wrong, so the motion needs a further step.</span><span data-lang="zh" hidden>辩题：自我报告是内在生命的证据。实验表明自我报告可以被测量，也可能出错，因此该辩题还需要一步论证。</span></li>
-<li><span data-lang="en">Motion: we should trust a model about its own computation more than we trust its output. The divergence between the two is the quantity that the motion needs.</span><span data-lang="zh" hidden>辩题：关于自己的计算，我们应该更相信模型的说明，而不是它的输出。两者之间的散度正是该辩题需要的量。</span></li>
+<li><span data-lang="en">❓ The course asks a hard question: does a large language model have a self?</span><span data-lang="zh" hidden>❓ 课程提出一个难题：大模型有没有自我？</span></li>
+<li><span data-lang="en">📏 I do not answer that question with a definition. I measure one narrow part of it.</span><span data-lang="zh" hidden>📏 我不用定义回答这个问题。我只测量其中狭窄的一部分。</span></li>
+<li><span data-lang="en">Σ If a model can report its own distribution, it carries a usable model of its own step.</span><span data-lang="zh" hidden>Σ 如果模型能报告自己的分布，它就带有自己步骤的可用的模型。</span></li>
+<li><span data-lang="en">🔬 If it cannot, the phrase knows itself needs a narrower meaning.</span><span data-lang="zh" hidden>🔬 如果做不到，“认识自己”这个说法就需要更窄的含义。</span></li>
+</ul>
+<aside class="callout"><span data-lang="en">🎯 One experiment, one number, one interval. No introspection claim. No consciousness claim.</span><span data-lang="zh" hidden>🎯 一个实验、一个数字、一个区间。不主张内省。不主张意识。</span></aside>
+<h2><span data-lang="en">Course topics</span><span data-lang="zh" hidden>课程主题</span></h2>
+<table>
+<thead><tr><th><span data-lang="en">Module</span><span data-lang="zh" hidden>模块</span></th><th><span data-lang="en">Connection</span><span data-lang="zh" hidden>与本实验的关系</span></th></tr></thead>
+<tbody>
+<tr><td>08 理解大模型</td>
+<td>Tokenize, embed, attend, feed forward, decode. Next-token prediction is that
+ loop.</td></tr>
+<tr><td>05 研究全景</td>
+<td>The third question is does it know itself. This run turns that question into a
+ protocol.</td></tr>
+<tr><td>09 大模型有意识吗</td>
+<td>The module separates the whole picture, the self, the stake, and the measure.
+ This run is the measure.</td></tr>
+<tr><td>03 意识定义 · 04 图灵测试</td>
+<td>A claim about a machine needs an operational test. A test measures the test.</td></tr>
+</tbody>
+</table>
+<aside class="callout"><span data-lang="en">🧭 This page states the position of the run, not the position of the course.</span><span data-lang="zh" hidden>🧭 本页说明运行的立场，不说明课程的立场。</span></aside>
+<h2><span data-lang="en">Debate topics</span><span data-lang="zh" hidden>辩论主题</span></h2>
+<ul>
+<li><span data-lang="en">🗣️ Motion: a model that reports its own distribution understands itself. The run supplies the first half only.</span><span data-lang="zh" hidden>🗣️ 辩题：能报告自己分布的模型理解自己。本运行只提供前半部分。</span></li>
+<li><span data-lang="en">🧠 Motion: self-report is evidence of inner life. The run shows that self-report can be measured and can be wrong.</span><span data-lang="zh" hidden>🧠 辩题：自我报告是内在生命的证据。本运行表明自我报告可测量，也可能出错。</span></li>
+<li><span data-lang="en">⚖️ Motion: we should trust a model about its own computation more than its output. The divergence is the quantity that the motion needs.</span><span data-lang="zh" hidden>⚖️ 辩题：关于自己的计算，应更相信模型的说明而非其输出。两者散度正是该辩题需要的量。</span></li>
 </ul>
 <h2><span data-lang="en">Final requirements</span><span data-lang="zh" hidden>期末要求</span></h2>
-<p><span data-lang="en">The final assessment asks for a paper that is complete, deep, and new, and for a four-minute talk that states one finding. This site supports both. The Summary page gives the finding, the Method page gives the procedure, and the Result Explorer gives the evidence for one case at the finest detail that the run records.</span><span data-lang="zh" hidden>期末考核要求一篇记得全、想得深、做得新的论文，以及一个说明一个发现的四分钟报告。本网站支持这两项。结果页给出发现，方法页给出流程，结果浏览器给出单个案例的最细证据。</span></p>
-<aside class="callout"><span data-lang="en">The site states one finding per comparison. It does not claim that a model is conscious, and it does not claim that a model is not conscious.</span><span data-lang="zh" hidden>网站对每个比较只给出一个发现。它不主张模型有意识，也不主张模型没有意识。</span></aside>
+<ul>
+<li><span data-lang="en">📄 A paper that is complete, deep, and new.</span><span data-lang="zh" hidden>📄 一篇记得全、想得深、做得新的论文。</span></li>
+<li><span data-lang="en">🎤 A four-minute talk that states one finding.</span><span data-lang="zh" hidden>🎤 一个四分钟报告，说明一个发现。</span></li>
+<li><span data-lang="en">📊 The Summary page gives the finding. The Method page gives the procedure.</span><span data-lang="zh" hidden>📊 结果页给出发现。方法页给出流程。</span></li>
+<li><span data-lang="en">🔬 The Result Explorer gives the evidence for one case at the finest detail.</span><span data-lang="zh" hidden>🔬 结果浏览器给出单个案例的最细证据。</span></li>
+</ul>
 
 </main>
 <footer class="page-footer">
-  <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.7.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.7.0 生成。随机种子 20260815。</span></p>
-  <p><span data-lang="en">This page is a record of one run. The files below the run directory hold every number.</span><span data-lang="zh" hidden>本页记录一次运行。运行目录下的文件保存每一个数字。</span></p>
+  <div class="footer-inner">
+    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.8.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.8.0 生成。随机种子 20260815。</span></p>
+    <p><span data-lang="en">Tolerance 0.050 nats. Every number comes from the run directory.</span><span data-lang="zh" hidden>容差 0.050 nat。每个数字都来自运行目录。</span></p>
+  </div>
 </footer>
 <script src="assets/app.js"></script>
 </body>
