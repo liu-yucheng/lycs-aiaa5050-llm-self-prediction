@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform · 20261125T065931Z_48d684</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">NTP</span>
+      <span class="brand-text"><span data-lang="en">Can LLMs predict their own next token predictions?</span><span data-lang="zh" hidden>大模型能预测自己的下一个词块吗？</span></span>
+    </div>
+    <nav class="nav"><a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+<a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+<a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+<a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+<a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+<a href="implementation.html" class="active"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+<a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a></nav>
+    <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
+      <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
+    </button>
+  </div>
+</header>
+<main class="page">
+  <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261125T065931Z_48d684</code></p>
+  <h1><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></h1>
+  <p class="lede"><span data-lang="en">How the plugin, the presets, and the providers produce this run.</span><span data-lang="zh" hidden>插件、预设与提供方如何产生本次运行。</span></p>
+  
+<h2><span data-lang="en">The platform</span><span data-lang="zh" hidden>平台</span></h2>
+<p><span data-lang="en">The platform is a plugin of DeepSeek Harness, a terminal and web harness that hosts tools and agent presets. The plugin registers five tools and one command line. A run is one tool call or one command, and the run writes a directory that holds every input and every output.</span><span data-lang="zh" hidden>平台是 DeepSeek Harness 的插件。DeepSeek Harness 是承载工具和智能体预设的终端与网页运行环境。插件注册五个工具和一套命令行。一次运行是一次工具调用或一条命令，运行写出的目录保存每个输入和每个输出。</span></p>
+<ul>
+<li><span data-lang="en">llm_self_prediction_run: run the four conditions on a set of tasks.</span><span data-lang="zh" hidden>llm_self_prediction_run：对一组任务运行四个条件。</span></li>
+<li><span data-lang="en">llm_self_prediction_status: list the recent runs of the output root.</span><span data-lang="zh" hidden>llm_self_prediction_status：列出输出根目录下最近的运行。</span></li>
+<li><span data-lang="en">llm_self_prediction_report: read the Markdown report of one run.</span><span data-lang="zh" hidden>llm_self_prediction_report：读取一次运行的 Markdown 报告。</span></li>
+<li><span data-lang="en">llm_self_prediction_dataset: describe the packaged datasets.</span><span data-lang="zh" hidden>llm_self_prediction_dataset：说明随包的数据集。</span></li>
+<li><span data-lang="en">llm_self_prediction_help: print the protocol and the file layout.</span><span data-lang="zh" hidden>llm_self_prediction_help：打印协议与文件布局。</span></li>
+</ul>
+<h2><span data-lang="en">Preset creation</span><span data-lang="zh" hidden>预设的创建</span></h2>
+<p><span data-lang="en">The experiment compares many models with one protocol, so the work splits into three agent roles. A planner reads the design and writes the task list. An operator runs the conditions and keeps each raw reply. A reviewer checks the report against the records and states the defects.</span><span data-lang="zh" hidden>本实验用同一协议比较多个模型，因此工作分为三种智能体角色。规划者读设计并写出任务清单。操作者运行各条件并保存每次原始回复。审阅者把报告与记录对照，指出缺陷。</span></p>
+<p><span data-lang="en">Each role gets its own preset with three parts: a system prompt that states the role, a tool allow list that limits what the role can do, and an output contract that names the files the role must write. The preset is data, so the run records the preset version next to the result.</span><span data-lang="zh" hidden>每个角色有自己的预设，预设分三部分：说明角色的系统提示词、限制角色权限的工具白名单、规定角色必须写哪些文件的输出契约。预设是数据，因此运行会把预设版本与结果一起记录。</span></p>
+<h2><span data-lang="en">Providers</span><span data-lang="zh" hidden>模型提供方</span></h2>
+<p><span data-lang="en">The run reaches each model through an OpenAI-compatible chat endpoint. The plain actual condition sets logprobs and top_logprobs. The self conditions send no log-probability parameter at all, so the model must write the table as text.</span><span data-lang="zh" hidden>运行通过兼容 OpenAI 的对话接口访问每个模型。普通实际条件设置 logprobs 与 top_logprobs。自我条件完全不发送对数概率参数，因此模型必须用文字写出表格。</span></p>
+<h2><span data-lang="en">This run</span><span data-lang="zh" hidden>本次运行</span></h2>
+<table>
+<thead><tr><th><span data-lang="en">Item</span><span data-lang="zh" hidden>项目</span></th><th><span data-lang="en">Value</span><span data-lang="zh" hidden>值</span></th></tr></thead>
+<tbody>
+<tr><td>Plugin</td><td><code>lycs-aiaa5050-llm-self-prediction 0.7.0</code></td></tr>
+<tr><td>Node.js</td><td><code>v26.13.0</code> on <code>win32 x64</code></td></tr>
+<tr><td>Started</td><td><code>2026-11-25T06:59:31.700Z</code></td></tr>
+<tr><td>Finished</td><td><code>2026-11-25T08:31:41.279Z</code></td></tr>
+<tr><td>Elapsed</td><td>5530 s</td></tr>
+<tr><td>Seed</td><td><code>20260815</code></td></tr>
+<tr><td>Tolerance</td><td>0.05 nats</td></tr>
+<tr><td>Repetitions</td><td>3</td></tr>
+<tr><td>Table entries</td><td>20</td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">File layout</span><span data-lang="zh" hidden>文件布局</span></h2>
+<pre class="tree">outputs/20261125T065931Z_48d684/
+  run.json            the manifest of the run
+  tasks.json          the selected tasks
+  task-summary.json   the table of each condition and each call
+  intermediate/       each raw request and each raw reply
+  results/            metrics, records, report, and tables
+  demos/              this website</pre>
+
+</main>
+<footer class="page-footer">
+  <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.7.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.7.0 生成。随机种子 20260815。</span></p>
+  <p><span data-lang="en">This page is a record of one run. The files below the run directory hold every number.</span><span data-lang="zh" hidden>本页记录一次运行。运行目录下的文件保存每一个数字。</span></p>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>

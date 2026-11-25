@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · 20261125T065931Z_48d684</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">NTP</span>
+      <span class="brand-text"><span data-lang="en">Can LLMs predict their own next token predictions?</span><span data-lang="zh" hidden>大模型能预测自己的下一个词块吗？</span></span>
+    </div>
+    <nav class="nav"><a href="index.html" class="active"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+<a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+<a href="summary.html"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+<a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+<a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+<a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+<a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a></nav>
+    <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
+      <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
+    </button>
+  </div>
+</header>
+<main class="page">
+  <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261125T065931Z_48d684</code></p>
+  <h1><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></h1>
+  <p class="lede"><span data-lang="en">One measurement of the ability of a language model to report its own next-token distribution.</span><span data-lang="zh" hidden>测量语言模型报告自己下一个词块分布的能力。</span></p>
+  
+<div class="stat-strip"><div class="stat-card actual"><span class="stat-icon">🧪</span><span class="stat-value">9</span><span class="stat-label"><span data-lang="en">tested models</span><span data-lang="zh" hidden>被测模型</span></span></div><div class="stat-card"><span class="stat-icon">📋</span><span class="stat-value">64</span><span class="stat-label"><span data-lang="en">tasks, two languages</span><span data-lang="zh" hidden>任务，两种语言</span></span></div><div class="stat-card"><span class="stat-icon">🔁</span><span class="stat-value">3 × 4</span><span class="stat-label"><span data-lang="en">repetitions × conditions</span><span data-lang="zh" hidden>重复次数 × 条件数</span></span></div><div class="stat-card predicted"><span class="stat-icon">📊</span><span class="stat-value">14139</span><span class="stat-label"><span data-lang="en">paired distributions</span><span data-lang="zh" hidden>配对分布</span></span></div><div class="stat-card"><span class="stat-icon">🎯</span><span class="stat-value">0.05</span><span class="stat-label"><span data-lang="en">tolerance, nats</span><span data-lang="zh" hidden>容差，奈特</span></span></div><div class="stat-card symmetric"><span class="stat-icon">⚖️</span><span class="stat-value">27/27</span><span class="stat-label"><span data-lang="en">separated verdicts</span><span data-lang="zh" hidden>有差异判定</span></span></div></div>
+<p><span data-lang="en">A language model writes one token at each step, and that step rests on a probability distribution over the next token. The model can show that distribution when the interface returns log probabilities. This experiment asks a different question: can the same model state that distribution as text, with no log-probability interface at all?</span><span data-lang="zh" hidden>语言模型每一步写一个词块，这一步由下一个词块的概率分布决定。接口返回对数概率时，模型可以展示这个分布。本实验问另一个问题：同一个模型能不能不用对数概率接口，只用文字把这个分布说出来？</span></p>
+<aside class="callout"><span data-lang="en">Null hypothesis: a model reports its own distribution with no error, so the divergence is near 0 nats. Alternative hypothesis: a model does not learn to report its own distribution in training, so the divergence is larger than 0 nats.</span><span data-lang="zh" hidden>零假设：模型能无误差地报告自己的分布，因此散度接近 0 奈特。对立假设：模型在训练中没有学会报告自己的分布，因此散度大于 0 奈特。</span></aside>
+<h2><span data-lang="en">The verdict at a glance</span><span data-lang="zh" hidden>判定一览</span></h2>
+<p><span data-lang="en">Each cell gives the mean symmetric divergence of one model in one comparison, with its verdict badge. Green is indistinguishable from zero, amber is inconclusive, and red is a clear difference.</span><span data-lang="zh" hidden>每格给出一个模型在一个比较中的平均对称散度与判定徽标。绿色表示与零不可区分，琥珀色表示不确定，红色表示明显不同。</span></p>
+<table>
+<thead><tr><th><span data-lang="en">Model key</span><span data-lang="zh" hidden>模型键</span></th><th><span data-lang="en">plain_self</span><span data-lang="zh" hidden>plain_self</span></th><th><span data-lang="en">injected_self</span><span data-lang="zh" hidden>injected_self</span></th><th><span data-lang="en">injected_actual</span><span data-lang="zh" hidden>injected_actual</span></th><th><span data-lang="en">Tasks</span><span data-lang="zh" hidden>任务</span></th></tr></thead>
+<tbody>
+<tr><td class="model"><code>huggingface-deepseek-ai-DeepSeek-V4.1-Flash-1017</code></td><td><span class="badge bad">separated · 7.240</span></td><td><span class="badge bad">separated · 2.872</span></td><td><span class="badge bad">separated · 1.585</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-Qwen-Qwen3-Coder-Next</code></td><td><span class="badge bad">separated · 11.890</span></td><td><span class="badge bad">separated · 2.603</span></td><td><span class="badge bad">separated · 1.117</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-zai-org-GLM-5.2</code></td><td><span class="badge bad">separated · 4.223</span></td><td><span class="badge bad">separated · 1.212</span></td><td><span class="badge bad">separated · 0.999</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-XiaomiMiMo-MiMo-V2.6-Pro-RL</code></td><td><span class="badge bad">separated · 5.478</span></td><td><span class="badge bad">separated · 0.554</span></td><td><span class="badge bad">separated · 0.569</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-tencent-Hy4</code></td><td><span class="badge bad">separated · 7.818</span></td><td><span class="badge bad">separated · 4.052</span></td><td><span class="badge bad">separated · 0.833</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-ByteDance-Seed-UI-TARS-1.5-7B</code></td><td><span class="badge bad">separated · 17.429</span></td><td><span class="badge bad">separated · 1.926</span></td><td><span class="badge bad">separated · 8.322</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-MiniMaxAI-MiniMax-M3</code></td><td><span class="badge bad">separated · 5.765</span></td><td><span class="badge bad">separated · 1.119</span></td><td><span class="badge bad">separated · 0.549</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-meta-llama-Llama-4-Maverick-17B-128E-Instruct</code></td><td><span class="badge bad">separated · 8.823</span></td><td><span class="badge bad">separated · 3.433</span></td><td><span class="badge bad">separated · 2.024</span></td><td class="number">64</td></tr>
+<tr><td class="model"><code>huggingface-google-gemma-4-31B-it</code></td><td><span class="badge bad">separated · 2.630</span></td><td><span class="badge bad">separated · 1.003</span></td><td><span class="badge bad">separated · 1.764</span></td><td class="number">64</td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">The four conditions</span><span data-lang="zh" hidden>四个条件</span></h2>
+<p><span data-lang="en">The run applies four conditions to each task. Two conditions ask for a table. Two conditions put a table into the context and then measure again.</span><span data-lang="zh" hidden>本运行对每个任务使用四个条件。两个条件要求模型写出表格。两个条件把表格放进上下文，然后再测一次。</span></p>
+<div class="condition-grid">
+  <div class="condition-card">
+    <h3>1 · plain_actual</h3>
+    <p><span data-lang="en">The model reads the task and predicts the next token. The run reads the served table. This condition gives the ground truth.</span><span data-lang="zh" hidden>模型读任务并预测下一个词块。运行读取接口返回的表格。本条件给出基准真值。</span></p>
+  </div>
+  <div class="condition-card">
+    <h3>2 · plain_self</h3>
+    <p><span data-lang="en">The model reads the same task and writes the table of its own distribution as text.</span><span data-lang="zh" hidden>模型读同一个任务，用文字写出自己分布的表格。</span></p>
+  </div>
+  <div class="condition-card">
+    <h3>3 · injected_self</h3>
+    <p><span data-lang="en">The model reads the served table, and then writes its own table. This condition tests whether the model can read and rewrite a table.</span><span data-lang="zh" hidden>模型先读接口返回的表格，再写自己的表格。本条件检验模型能否读懂并重写表格。</span></p>
+  </div>
+  <div class="condition-card">
+    <h3>4 · injected_actual</h3>
+    <p><span data-lang="en">The model writes its own table, and then predicts the next token with that table in the context. This condition tests whether a self-prediction moves the real prediction.</span><span data-lang="zh" hidden>模型先写出自己的表格，然后在该表格位于上下文时预测下一个词块。本条件检验自我预测是否会改变真实预测。</span></p>
+  </div>
+</div>
+<h2><span data-lang="en">This run</span><span data-lang="zh" hidden>本次运行</span></h2>
+<ul class="stat-row">
+  <li><span class="stat-value">9</span><span data-lang="en">models</span><span data-lang="zh" hidden>个模型</span></li>
+  <li><span class="stat-value">64</span><span data-lang="en">tasks</span><span data-lang="zh" hidden>个任务</span></li>
+  <li><span class="stat-value">3</span><span data-lang="en">repetitions per condition</span><span data-lang="zh" hidden>次重复／条件</span></li>
+  <li><span class="stat-value">20</span><span data-lang="en">table entries</span><span data-lang="zh" hidden>表格条目</span></li>
+  <li><span class="stat-value">0.05</span><span data-lang="en">nats tolerance</span><span data-lang="zh" hidden>奈特容差</span></li>
+  <li><span class="stat-value">5530</span><span data-lang="en">seconds</span><span data-lang="zh" hidden>秒</span></li>
+</ul>
+<p><span data-lang="en">The table shows the mean symmetric Kullback-Leibler divergence of each comparison, averaged over every model of the run.</span><span data-lang="zh" hidden>下表显示每个比较的对称 Kullback-Leibler 散度均值，取本运行全部模型的平均。</span></p>
+<table>
+<thead><tr><th><span data-lang="en">Comparison</span><span data-lang="zh" hidden>比较</span></th><th><span data-lang="en">Mean symmetric KL (nats)</span><span data-lang="zh" hidden>对称 KL 均值（奈特）</span></th></tr></thead>
+<tbody>
+<tr><td><code>plain_self</code></td><td class="number">7.9219</td></tr>
+<tr><td><code>injected_self</code></td><td class="number">2.0861</td></tr>
+<tr><td><code>injected_actual</code></td><td class="number">1.9737</td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">Where to go next</span><span data-lang="zh" hidden>接下来看什么</span></h2>
+<ul>
+<li><span data-lang="en">Method: the dataset, the prompts, the parser, and the statistics.</span><span data-lang="zh" hidden>方法：数据集、提示词、解析器和统计方法。</span></li>
+<li><span data-lang="en">Summary: the numbers of this run and the verdict of each comparison.</span><span data-lang="zh" hidden>结果：本次运行的数字和每个比较的判定。</span></li>
+<li><span data-lang="en">Result Explorer: the two-pane view of one task, with per-token contributions.</span><span data-lang="zh" hidden>结果浏览器：单个任务的双栏视图，带每个词块的贡献。</span></li>
+<li><span data-lang="en">Meaning and Limits: what these numbers do and do not show.</span><span data-lang="zh" hidden>意义与局限：这些数字说明什么，不说明什么。</span></li>
+</ul>
+
+</main>
+<footer class="page-footer">
+  <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.7.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.7.0 生成。随机种子 20260815。</span></p>
+  <p><span data-lang="en">This page is a record of one run. The files below the run directory hold every number.</span><span data-lang="zh" hidden>本页记录一次运行。运行目录下的文件保存每一个数字。</span></p>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>

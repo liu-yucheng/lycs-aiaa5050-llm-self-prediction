@@ -380,3 +380,30 @@ test("a rate-limited request repeats and then succeeds", async () => {
   assert.equal(rateLimitCount, 0);
   assert.equal(requests.length > 0, true);
 });
+
+test("the served table reader drops a placeholder entry", () => {
+  const body = {
+    choices: [
+      {
+        message: { role: "assistant", content: "霜" },
+        logprobs: {
+          content: [
+            {
+              token: "霜",
+              logprob: 0,
+              top_logprobs: [
+                { token: "霜", logprob: 0 },
+                { token: "箱", logprob: -9999 },
+                { token: "双", logprob: -9999 },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const served = readServedTable(body, 20);
+  assert.equal(served.token, "霜");
+  assert.equal(served.distribution.supportSize, 1);
+  assert.equal(served.distribution.topToken, "霜");
+});

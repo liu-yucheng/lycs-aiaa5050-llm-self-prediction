@@ -22,6 +22,7 @@ import {
   PROBABILITY_FLOOR,
   REQUEST_ATTEMPT_COUNT,
   REQUEST_RETRY_DELAY_MILLISECONDS,
+  SERVED_TABLE_ATTEMPT_COUNT,
   SLOW_REQUEST_THRESHOLD_MILLISECONDS,
 } from "./constants.js";
 import { ExperimentError, errorMessage, isRecord } from "./errors.js";
@@ -610,7 +611,25 @@ function applySwitches(
   if (definition.reasoning !== undefined && definition.reasoning.trim() !== "") {
     body["reasoning"] = { enabled: definition.reasoning.trim().toLowerCase() === "enabled" };
   }
+  if (isHuggingFaceRoute(definition.baseUrl)) {
+    body["provider"] = { require_parameters: true };
+  }
   return body;
+}
+
+/**
+ * Test whether one base URL routes through the Hugging Face router.
+ *
+ * The router spreads a request over many upstream services. An upstream service may ignore the
+ * requested parameters and answer without a log probability table. The router accepts a routing
+ * hint that keeps the request on an upstream service that honours the parameters, so the client
+ * sends the hint for this route only.
+ *
+ * @param baseUrl - the base URL of the provider.
+ * @returns true when the base URL belongs to the router.
+ */
+function isHuggingFaceRoute(baseUrl: string): boolean {
+  return /huggingface\.co\//iu.test(baseUrl);
 }
 
 /** One chat message. */
@@ -1112,9 +1131,26 @@ export class OpenAiCompatibleClient implements ProviderClient {
       },
       this.definition,
     );
-    const exchange = await this.send(endpoint, body, signal);
+    let exchange = await this.send(endpoint, body, signal);
+    let served: { token: string; distribution: TokenDistribution } | undefined;
+    for (let attempt = 1; attempt <= SERVED_TABLE_ATTEMPT_COUNT; attempt += 1) {
+      try {
+        served = readServedTable(exchange.responseBody, this.topLogprobsCount);
+        break;
+      } catch (error) {
+        const retryable =
+          error instanceof ExperimentError && error.code === "INVALID_RESPONSE";
+        if (!retryable || attempt === SERVED_TABLE_ATTEMPT_COUNT) {
+          throw error;
+        }
+        await sleep(REQUEST_RETRY_DELAY_MILLISECONDS, signal);
+        exchange = await this.send(endpoint, body, signal);
+      }
+    }
+    if (served === undefined) {
+      throw new ExperimentError("INVALID_RESPONSE", "The reply holds no logprobs table.");
+    }
     const choice = readFirstChoice(exchange.responseBody);
-    const served = readServedTable(exchange.responseBody, this.topLogprobsCount);
     const content = readMessageContent(choice);
     return {
       draft: {

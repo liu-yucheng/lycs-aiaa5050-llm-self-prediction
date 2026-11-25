@@ -294,6 +294,18 @@ npm run docs
 The command writes `docs/index.html`, `docs/design.html`, `docs/protocol.html`,
 `docs/measures.html`, `docs/reference.html`, `docs/reproducibility.html`, and `docs/DETAIL.md`.
 
+## Published results
+
+```bash
+npm run publish                       # publish every complete run of outputs/
+node scripts/publish-results.mjs <xid>  # publish the named run only
+```
+
+The command copies the demonstration website of each complete run to
+`docs/results/<xid>/` and writes `docs/results.html` with one row for each published run. A row
+gives the run identifier, the end time, the model count, the task count, the served table size,
+the separated verdict count, and one link for each of the seven chapter pages.
+
 ## License
 
 GNU Affero General Public License 3.0 or later. See `LICENSE` and `license-2`.
