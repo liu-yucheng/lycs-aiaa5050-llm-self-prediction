@@ -341,6 +341,7 @@ function renderShell(options: {
 <body>
 <header class="topbar">
   <div class="topbar-inner">
+    <a class="home-link" href="index.html" title="Home" aria-label="Home">&#8962;</a>
     <div class="brand">
       <span class="brand-mark">AIAA5050</span>
       <span class="brand-text">${bilingual(
@@ -1519,6 +1520,9 @@ function buildStyleSheet(): string {
 
 * { box-sizing: border-box; }
 
+table th,
+table td { overflow-wrap: anywhere; }
+
 [hidden] { display: none !important; }
 
 html { scroll-behavior: smooth; }
@@ -1545,16 +1549,39 @@ header.topbar {
 }
 
 header.topbar .topbar-inner {
-  max-width: 60rem;
+  width: 95%;
   margin: 0 auto;
   padding: 0.9rem 1.25rem;
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0.5rem 1.25rem;
 }
 
 header.topbar .brand { display: flex; align-items: baseline; gap: 0.5rem; }
+
+header.topbar .home-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+header.topbar .home-link:hover,
+header.topbar .home-link:focus {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
 
 header.topbar .brand-mark {
   background: var(--accent);
@@ -1604,7 +1631,7 @@ footer.page-footer {
 }
 
 footer.page-footer .footer-inner {
-  max-width: 60rem;
+  width: 95%;
   margin: 0 auto;
   padding: 1rem 1.25rem 1.6rem;
 }
@@ -1614,7 +1641,7 @@ footer.page-footer p { margin: 0.2rem 0; }
 /* ---------- page frame ---------- */
 
 main.page {
-  max-width: 60rem;
+  width: 95%;
   margin: 0 auto;
   padding: 2rem 1.25rem 3rem;
 }

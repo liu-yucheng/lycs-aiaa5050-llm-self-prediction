@@ -6,11 +6,103 @@
 <title>Published results — plugin documentation</title>
 <meta name="description" content="The demonstration website of each published run.">
 <link rel="stylesheet" href="assets/site.css">
+<style>
+    .explorer {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      margin: 1rem 0 1.5rem;
+      overflow: hidden;
+    }
+    .explorer-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 0.6rem;
+    }
+    .explorer-toolbar button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      line-height: 1;
+      color: var(--text);
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      cursor: pointer;
+    }
+    .explorer-toolbar button:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .explorer-toolbar button:disabled { opacity: 0.45; cursor: default; }
+    .explorer-path {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.32rem 0.5rem;
+    }
+    .explorer-files {
+      max-height: 15rem;
+      overflow-y: auto;
+      background: var(--background);
+      border-bottom: 1px solid var(--border);
+    }
+    .explorer-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.32rem 0.7rem;
+      font-size: 0.92rem;
+    }
+    .explorer-row:hover { background: var(--accent-soft); }
+    .explorer-row.selected { background: var(--accent-soft); font-weight: 650; }
+    .explorer-chip {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0 0.28rem;
+      background: var(--surface);
+    }
+    .explorer-chip.folder { color: var(--accent); border-color: var(--accent); }
+    .explorer-name { font-family: var(--mono); font-size: 0.85rem; }
+    .explorer-label { color: var(--muted); font-size: 0.85rem; }
+    .explorer-preview { background: var(--background); }
+    .explorer-preview iframe {
+      display: block;
+      width: 100%;
+      height: 32rem;
+      border: 0;
+    }
+    .explorer-hint {
+      margin: 0;
+      padding: 0.6rem 0.8rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+    .explorer-status {
+      padding: 0.4rem 0.7rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+</style>
 </head>
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.8.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.9.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -25,13 +117,34 @@
 
 <main>
   <h1>Published results</h1>
-  <p class="lede">The demonstration website of every published run. Each link opens one
-    chapter page of that run. The pages read the recorded tables of the run, so a reader can
-    recompute a divergence in the browser.</p>
+  <p class="lede">The demonstration website of every published run, in a file explorer.
+    Each run is one folder of seven chapter pages. The pages read the recorded tables of the
+    run, so a reader can recompute a divergence in the browser.</p>
 
-  <div class="callout">The list holds <strong>1</strong> run. A run publishes seven pages. The number column counts the separated verdicts against
-    the compared verdicts, so <code>3/3</code> means that every comparison of every model
+  <div class="callout">The list holds <strong>1</strong> run. A run publishes seven pages. The table below counts the separated verdicts against
+    the compared verdicts, so <code>27/27</code> means that every comparison of every model
     stays above the tolerance.</div>
+
+    <section class="explorer" aria-label="Published results explorer">
+      <div class="explorer-toolbar">
+        <button type="button" data-act="up" title="Up one folder">&#8593;</button>
+        <button type="button" data-act="home" title="Back to the root folder">&#8962;</button>
+        <button type="button" data-act="newtab" title="Open the selected page in a new tab">
+          &#8599;
+        </button>
+        <input id="explorer-path" class="explorer-path" type="text" readonly
+          aria-label="Current folder" value="/">
+      </div>
+      <div id="explorer-files" class="explorer-files" role="listbox"
+        aria-label="Published runs and pages"></div>
+      <div class="explorer-preview">
+        <iframe id="explorer-frame" title="Page preview" src="results/20261125T065931Z_48d684/index.html">
+        </iframe>
+        <p class="explorer-hint">Single click a row to preview the page here. Double click a
+          page to open it in a new tab.</p>
+      </div>
+      <div id="explorer-status" class="explorer-status">&mdash;</div>
+    </section>
 
   <table class="zebra">
     <thead>
@@ -63,8 +176,118 @@
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.8.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.9.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
+<script>
+(function () {
+  "use strict";
+  var TREE = [{"name":"20261125T065931Z_48d684","folder":true,"children":[{"name":"index.html","label":"Overview","path":"results/20261125T065931Z_48d684/index.html"},{"name":"method.html","label":"Method","path":"results/20261125T065931Z_48d684/method.html"},{"name":"summary.html","label":"Summary","path":"results/20261125T065931Z_48d684/summary.html"},{"name":"explorer.html","label":"Result Explorer","path":"results/20261125T065931Z_48d684/explorer.html"},{"name":"context.html","label":"Course and Debates","path":"results/20261125T065931Z_48d684/context.html"},{"name":"implementation.html","label":"Platform","path":"results/20261125T065931Z_48d684/implementation.html"},{"name":"meaning.html","label":"Meaning and Limits","path":"results/20261125T065931Z_48d684/meaning.html"}]}];
+  var state = { path: [], selected: null };
+  var files = document.getElementById("explorer-files");
+  var frame = document.getElementById("explorer-frame");
+  var pathInput = document.getElementById("explorer-path");
+  var status = document.getElementById("explorer-status");
+  var upButton = document.querySelector('[data-act="up"]');
+
+  function currentFolder() {
+    var node = { children: TREE };
+    for (var index = 0; index < state.path.length; index += 1) {
+      var name = state.path[index];
+      var match = (node.children || []).filter(function (item) {
+        return item.folder && item.name === name;
+      })[0];
+      if (!match) {
+        return { children: [] };
+      }
+      node = match;
+    }
+    return node;
+  }
+
+  function render() {
+    files.textContent = "";
+    var folder = currentFolder();
+    (folder.children || []).forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "explorer-row" + (item.folder ? " folder" : "");
+      var chip = document.createElement("span");
+      chip.className = "explorer-chip" + (item.folder ? " folder" : "");
+      chip.textContent = item.folder ? "D" : "F";
+      var name = document.createElement("span");
+      name.className = "explorer-name";
+      name.textContent = item.name;
+      row.appendChild(chip);
+      row.appendChild(name);
+      if (!item.folder && item.label && item.name !== "index.html") {
+        var label = document.createElement("span");
+        label.className = "explorer-label";
+        label.textContent = item.label;
+        row.appendChild(label);
+      }
+      row.tabIndex = 0;
+      row.setAttribute("role", "option");
+      row.addEventListener("click", function () { select(item, row); });
+      row.addEventListener("dblclick", function () { open(item); });
+      row.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") { select(item, row); }
+        if (event.key === " ") { event.preventDefault(); open(item); }
+      });
+      files.appendChild(row);
+    });
+    pathInput.value = "/" + state.path.join("/") + (state.path.length ? "/" : "");
+    upButton.disabled = state.path.length === 0;
+  }
+
+  function enter(item) {
+    state.path = state.path.concat([item.name]);
+    state.selected = null;
+    render();
+  }
+
+  function select(item, row) {
+    if (item.folder) {
+      enter(item);
+      return;
+    }
+    state.selected = item;
+    document.querySelectorAll(".explorer-row").forEach(function (other) {
+      other.classList.remove("selected");
+    });
+    row.classList.add("selected");
+    frame.src = item.path;
+    status.textContent = item.path;
+  }
+
+  function open(item) {
+    if (item.folder) {
+      enter(item);
+      return;
+    }
+    window.open(item.path, "_blank", "noopener");
+  }
+
+  upButton.addEventListener("click", function () {
+    if (state.path.length === 0) {
+      return;
+    }
+    state.path = state.path.slice(0, -1);
+    state.selected = null;
+    render();
+  });
+  document.querySelector('[data-act="home"]').addEventListener("click", function () {
+    state.path = [];
+    state.selected = null;
+    render();
+  });
+  document.querySelector('[data-act="newtab"]').addEventListener("click", function () {
+    if (state.selected) {
+      window.open(state.selected.path, "_blank", "noopener");
+    }
+  });
+
+  render();
+})();
+</script>
 </body>
 </html>
