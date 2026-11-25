@@ -12,7 +12,7 @@
 export const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 
 /** The semantic version of the plugin. */
-export const PLUGIN_VERSION = "0.8.0";
+export const PLUGIN_VERSION = "0.8.1";
 
 /** The name of the tool that runs the experiment. */
 export const TOOL_RUN = "llm_self_prediction_run";
@@ -146,7 +146,12 @@ export const DEFAULT_MAX_CONCURRENCY = 3;
 /** The default number of bootstrap resamples of one confidence interval. */
 export const DEFAULT_BOOTSTRAP_SAMPLE_COUNT = 2000;
 
-/** The default random seed of a run. */
+/**
+ * The default random seed of a run.
+ *
+ * The number is the date 2026-08-15. On that day Yucheng Liu first tried DeepSeek Harness.
+ * The seed drives the bootstrap resampling of one confidence interval, and every run records it.
+ */
 export const DEFAULT_RANDOM_SEED = 20260815;
 
 /** The default time limit of one provider request. */
