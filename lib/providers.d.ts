@@ -85,13 +85,6 @@ export interface ProviderClient {
  */
 export declare function validateProviderCatalog(value: unknown): ProviderCatalog;
 /**
- * Load one provider catalog file.
- *
- * @param filePath - the path of the file, or undefined for the packaged catalog.
- * @returns the catalog.
- */
-export declare function loadProviderCatalog(filePath?: string): Promise<ProviderCatalog>;
-/**
  * Select the providers to run.
  *
  * @param catalog - the catalog.

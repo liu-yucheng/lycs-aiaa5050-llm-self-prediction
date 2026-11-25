@@ -50,6 +50,14 @@ export interface ProviderDefinition {
     readonly environmentPrefix?: string;
     /** The table entry count of the provider. */
     readonly topLogprobsCount?: number;
+    /**
+     * The shape of the served distribution.
+     *
+     * A value of full means that the endpoint serves a real table of candidate tokens. A value of
+     * chosen-only means that the endpoint serves the chosen token only and fills every other entry
+     * with a placeholder.
+     */
+    readonly distribution?: "full" | "chosen-only";
     /** The network edge that carries a request when the base URL host is blocked. */
     readonly edgeHost?: string;
     /** The `thinking` switch, as in `disabled`. */
@@ -323,6 +331,8 @@ export interface SessionEnvironment {
     readonly environmentFile?: string;
     /** True when the run created the environment file. */
     readonly environmentFileCreated?: boolean;
+    /** The path of the models file. */
+    readonly modelsFile?: string;
 }
 /** The manifest of one run. */
 export interface SessionManifest {
