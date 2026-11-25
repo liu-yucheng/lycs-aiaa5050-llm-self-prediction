@@ -7,7 +7,7 @@
 /** The package name of the plugin. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The semantic version of the plugin. */
-export declare const PLUGIN_VERSION = "0.8.1";
+export declare const PLUGIN_VERSION = "0.9.0";
 /** The name of the tool that runs the experiment. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 /** The name of the tool that lists the sessions. */

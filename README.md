@@ -319,9 +319,15 @@ node scripts/publish-results.mjs <xid>  # publish the named run only
 ```
 
 The command copies the demonstration website of each complete run to
-`docs/results/<xid>/` and writes `docs/results.html` with one row for each published run. A row
-gives the run identifier, the end time, the model count, the task count, the served table size,
-the separated verdict count, and one link for each of the seven chapter pages.
+`docs/results/<xid>/` and writes `docs/results.html`. The list page holds a file explorer with one
+folder for each published run. A single click previews a page in the same window. A double click
+opens the page in a new tab. A facts table below the explorer gives the run identifier, the end
+time, the model count, the task count, the served table size, the separated verdict count, and one
+link for each of the seven chapter pages.
+
+The copy sends the home button of the top bar to `docs/results.html`. The demonstration website of
+the run directory sends the same button to its own `index.html`, so each copy returns to its own
+entry point.
 
 ## License
 
