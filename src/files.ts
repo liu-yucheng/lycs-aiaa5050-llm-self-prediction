@@ -20,6 +20,7 @@ import { ExperimentError } from "./errors.js";
  * Create one directory and its parents.
  *
  * @param directory - the absolute or working-directory-relative path.
+ * @returns a promise that resolves when the directory exists.
  */
 export async function ensureDirectory(directory: string): Promise<void> {
   await mkdir(directory, { recursive: true });
@@ -66,6 +67,7 @@ export async function readJsonFile(filePath: string): Promise<unknown> {
  *
  * @param filePath - the path of the file.
  * @param value - the value to write.
+ * @returns a promise that resolves when the file is written.
  */
 export async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
   await ensureDirectory(path.dirname(filePath));
@@ -78,6 +80,7 @@ export async function writeJsonFile(filePath: string, value: unknown): Promise<v
  *
  * @param filePath - the path of the file.
  * @param text - the text to write.
+ * @returns a promise that resolves when the file is written.
  */
 export async function writeTextFile(filePath: string, text: string): Promise<void> {
   await ensureDirectory(path.dirname(filePath));

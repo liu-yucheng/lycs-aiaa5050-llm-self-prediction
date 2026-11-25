@@ -1,12 +1,20 @@
 /** The override values of one provider section. */
 export interface ProviderEnvironment {
+    /** The base URL of the endpoint. */
     readonly baseUrl?: string;
+    /** The single model of the provider. */
     readonly model?: string;
+    /** The model list of the provider. */
     readonly models?: readonly string[];
+    /** The API key of the provider. */
     readonly apiKey?: string;
+    /** The count of the served table entries. */
     readonly topLogprobsCount?: number;
+    /** The edge host that carries the request to the endpoint. */
     readonly edgeHost?: string;
+    /** The thinking switch of the endpoint. */
     readonly thinking?: string;
+    /** The reasoning switch of the endpoint. */
     readonly reasoning?: string;
 }
 /** The state of the environment file of one directory. */

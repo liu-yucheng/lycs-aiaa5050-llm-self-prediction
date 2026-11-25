@@ -32,8 +32,11 @@ export interface ExperimentServiceOptions {
     readonly defaultMaxConcurrency?: number;
     /** The logger of the host. */
     readonly logger?: {
+        /** Write one information line. */
         info: (message: string) => void;
+        /** Write one warning line. */
         warn: (message: string) => void;
+        /** Write one error line. */
         error: (message: string) => void;
     };
 }

@@ -62,6 +62,7 @@ function findSummary(
  * Render one comparison table of one result.
  *
  * @param summaries - the comparison summaries.
+ * @param toleranceNats - the tolerance of the verdict, in nats.
  * @returns the Markdown table.
  */
 function renderComparisonTable(summaries: readonly ComparisonSummary[], toleranceNats: number): string {

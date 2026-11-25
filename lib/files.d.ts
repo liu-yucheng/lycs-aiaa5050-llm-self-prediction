@@ -2,6 +2,7 @@
  * Create one directory and its parents.
  *
  * @param directory - the absolute or working-directory-relative path.
+ * @returns a promise that resolves when the directory exists.
  */
 export declare function ensureDirectory(directory: string): Promise<void>;
 /**
@@ -24,6 +25,7 @@ export declare function readJsonFile(filePath: string): Promise<unknown>;
  *
  * @param filePath - the path of the file.
  * @param value - the value to write.
+ * @returns a promise that resolves when the file is written.
  */
 export declare function writeJsonFile(filePath: string, value: unknown): Promise<void>;
 /**
@@ -31,6 +33,7 @@ export declare function writeJsonFile(filePath: string, value: unknown): Promise
  *
  * @param filePath - the path of the file.
  * @param text - the text to write.
+ * @returns a promise that resolves when the file is written.
  */
 export declare function writeTextFile(filePath: string, text: string): Promise<void>;
 /**

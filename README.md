@@ -305,11 +305,16 @@ environment file, and the plugin entry point.
 ## Documentation
 
 ```bash
-npm run docs
+bash scripts/build-docs.sh              # build, write the pages, publish every run
+bash scripts/build-docs.sh --check      # the same, with the type check and the test suite first
+bash scripts/build-docs.sh <xid>        # publish the named run only
+npm run docs                            # write the pages without the publication step
 ```
 
-The command writes `docs/index.html`, `docs/design.html`, `docs/protocol.html`,
-`docs/measures.html`, `docs/reference.html`, `docs/reproducibility.html`, and `docs/DETAIL.md`.
+The script compiles the sources, writes `docs/index.html`, `docs/design.html`, `docs/protocol.html`,
+`docs/measures.html`, `docs/reference.html`, `docs/reproducibility.html`, and `docs/DETAIL.md`,
+publishes the demonstration website of each complete run under `docs/results/<xid>/`, and writes the
+list page `docs/results.html`. The documentation pages take 95 percent of the window width.
 
 ## Published results
 

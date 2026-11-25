@@ -115,6 +115,7 @@ function readNumberOption(value: string | true | undefined): number | undefined 
  * Write one line to the standard output.
  *
  * @param text - the text.
+ * @returns nothing. The function writes the text and ends.
  */
 function writeLine(text: string): void {
   process.stdout.write(`${text}\n`);
@@ -124,6 +125,7 @@ function writeLine(text: string): void {
  * Write one line to the standard error.
  *
  * @param text - the text.
+ * @returns nothing. The function writes the text and ends.
  */
 function writeError(text: string): void {
   process.stderr.write(`${text}\n`);
