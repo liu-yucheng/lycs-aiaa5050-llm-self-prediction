@@ -62,7 +62,7 @@ header.site-header {
 header.site-header .inner,
 main,
 footer.site-footer .inner {
-  max-width: 54rem;
+  width: 95%;
   margin: 0 auto;
   padding: 0 1.25rem;
 }
