@@ -1,11 +1,11 @@
 import type { SessionEnvironment, SessionMetrics, TaskRecord } from "./types.js";
-/** The description of one dataset, as the demos show it. */
+/** The description of the datasets of one run. */
 export interface DemoDatasetDescription {
-    /** The identifiers of the datasets of the run. */
+    /** The dataset identifiers. */
     readonly datasetIds: readonly string[];
-    /** The languages of the run. */
+    /** The language of each dataset. */
     readonly languages: readonly string[];
-    /** The task count of the run. */
+    /** The task count. */
     readonly taskCount: number;
     /** The task count of each category. */
     readonly categories: readonly {
@@ -13,19 +13,30 @@ export interface DemoDatasetDescription {
         readonly count: number;
     }[];
 }
-/** The options of the demonstration website. */
+/** The options of one demonstration site. */
 export interface DemoOptions {
-    /** The demos directory. */
+    /** The demos directory of the run. */
     readonly directory: string;
-    /** The session metrics. */
+    /** The metrics of the run. */
     readonly metrics: SessionMetrics;
-    /** The task records. */
+    /** The task records of the run. */
     readonly records: readonly TaskRecord[];
-    /** The run environment. */
+    /** The recorded environment of the run. */
     readonly environment: SessionEnvironment;
-    /** The dataset description. */
+    /** The description of the datasets of the run. */
     readonly dataset: DemoDatasetDescription;
 }
+/**
+ * Read the options of one demonstration site from a run directory.
+ *
+ * The function reads the metrics, the records, and the environment of the run. It rebuilds the
+ * dataset description from the metrics and the records, so a reader can render the site again
+ * without the dataset files.
+ *
+ * @param runDirectory - the directory of one run.
+ * @returns the demo options.
+ */
+export declare function readDemoOptions(runDirectory: string): Promise<DemoOptions>;
 /**
  * Write the demonstration website of one run.
  *
