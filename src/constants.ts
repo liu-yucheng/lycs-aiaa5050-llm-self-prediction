@@ -12,7 +12,7 @@
 export const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 
 /** The semantic version of the plugin. */
-export const PLUGIN_VERSION = "0.9.1";
+export const PLUGIN_VERSION = "0.9.2";
 
 /** The name of the tool that runs the experiment. */
 export const TOOL_RUN = "llm_self_prediction_run";

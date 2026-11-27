@@ -433,6 +433,9 @@ function renderOverviewPage(options: DemoOptions): string {
       `<td class="number">${provider.taskCount}</td></tr>`
     );
   });
+  const meanOf = (comparison: ComparisonName): number | undefined =>
+    means.find((entry) => entry.comparison === comparison)?.mean;
+  const comparisonCount = metrics.providers.length * COMPARISON_NAMES.length;
   const body = `
 ${statStrip([
   { icon: "🧪", value: String(metrics.providers.length), labelEnglish: "models", labelChinese: "模型", kind: "actual" },
@@ -453,19 +456,73 @@ ${statStrip([
     kind: "symmetric",
   },
 ])}
-${heading(2, "The question", "问题")}
+${heading(2, "Motivation", "动机")}
 ${list([
   {
-    english: "A model writes one token at each step. That step rests on a distribution over the next token.",
-    chinese: "模型每步写一个词块。这个步骤依赖下一个词块上的分布。",
+    english: "🧱 Next-token prediction is the fundamental behavior of a large language model.",
+    chinese: "🧱 下一个词块预测是大语言模型的基本行为。",
   },
   {
-    english: "The interface can show that distribution as log probabilities.",
-    chinese: "接口可以把该分布显示为对数概率。",
+    english:
+      "💪 The design works. A model writes code, recalls knowledge, and reasons through logic " +
+      "better than an average person can.",
+    chinese: "💪 这种设计有效。模型写代码、回忆知识、做逻辑推理，强于普通人。",
   },
   {
-    english: "This run asks one question: can the model also state that distribution as text?",
-    chinese: "本运行只问一个问题：模型能否用文字也说出这个分布？",
+    english: "✨ Many of those abilities emerge from an educated guess of the next token.",
+    chinese: "✨ 这些能力很多来自对下一个词块的有根据的猜测。",
+  },
+  {
+    english:
+      "🪞 That raises the bootstrap question: can a model predict its own next-token " +
+      "prediction?",
+    chinese: "🪞 于是出现自举问题：模型能否预测自己的下一个词块预测？",
+  },
+  {
+    english:
+      "🧠 A self-prediction task is one operational test of self-observation, and one narrow " +
+      "test of consciousness.",
+    chinese: "🧠 自我预测任务是对自我观察的一次可操作检验，也是对意识的一次狭窄检验。",
+  },
+])}
+${heading(2, "Core argument", "核心论点")}
+${paragraph(
+  "📐 This run proves one negative result about current open-source models. A model cannot " +
+    "predict its own next-token prediction. The result holds in the hardest condition, where " +
+    "the served table sits in the context as a cheat sheet.",
+  "📐 本运行证明关于当前开源模型的一个否定结果。模型不能预测自己的下一个词块预测。" +
+    "该结果在最强的条件下仍成立：接口表格作为小抄放在上下文中。",
+)}
+${list([
+  {
+    english:
+      `📏 ${separatedCount} of ${comparisonCount} model-comparison pairs stay above the ` +
+      `${formatNumber(metrics.toleranceNats, 3)}-nat tolerance.`,
+    chinese:
+      `📏 ${comparisonCount} 个模型-比较对中有 ${separatedCount} 个高于 ` +
+      `${formatNumber(metrics.toleranceNats, 3)} nat 容差。`,
+  },
+  {
+    english:
+      `🗣️ Without a cheat sheet, the mean self-report gap is ${formatNumber(meanOf("plain_self"), 3)} ` +
+      "nats.",
+    chinese: `🗣️ 没有小抄时，自我报告的平均差距为 ${formatNumber(meanOf("plain_self"), 3)} nat。`,
+  },
+  {
+    english:
+      `🔁 With the served table in the context, the mean gap falls to ` +
+      `${formatNumber(meanOf("injected_self"), 3)} nats. The gap stays far above 0.`,
+    chinese:
+      `🔁 接口表格放入上下文后，平均差距降到 ${formatNumber(meanOf("injected_self"), 3)} nat。` +
+      "差距仍远高于 0。",
+  },
+  {
+    english:
+      `🎯 With the own table in the context, the model reads the served table differently: mean ` +
+      `gap ${formatNumber(meanOf("injected_actual"), 3)} nats.`,
+    chinese:
+      `🎯 自身表格放入上下文后，模型读出的接口表格出现偏移：平均差距 ` +
+      `${formatNumber(meanOf("injected_actual"), 3)} nat。`,
   },
 ])}
 ${callout(
@@ -474,6 +531,14 @@ ${callout(
   "🔍 运行比较同一个分布的两次报告。一次来自接口，一次来自模型自己。",
 )}
 ${heading(2, "Two hypotheses", "两个假设")}
+${paragraph(
+  "The null hypothesis is an optimistic assumption. It fits the expectation of the general " +
+    "public, which now treats a model as a human-like character. The assumption says that " +
+    "self-prediction has emerged. A self-report matches the served table, so the divergence " +
+    "stays near 0 nats.",
+  "原假设是一个乐观假设。它符合公众的期待：公众已把模型当作类人角色。该假设认为自我预测已经涌现。" +
+    "自我报告与接口表格一致，因此散度接近 0 nat。",
+)}
 ${cards([
   {
     icon: "0️⃣",
@@ -490,6 +555,13 @@ ${cards([
     textChinese: "训练从不奖励自我报告。散度高于 0 nat。",
   },
 ])}
+${paragraph(
+  "The alternative hypothesis is a pessimistic assumption. It is ruthless, rational, and " +
+    "logical. No training objective rewards a self-report. So a self-report cannot match the " +
+    "served table, and the divergence stays significantly above 0 nats.",
+  "备择假设是一个悲观假设。它冷酷、理性、合乎逻辑。没有任何训练目标奖励自我报告。" +
+    "因此自我报告无法与接口表格一致，散度显著高于 0 nat。",
+)}
 ${heading(2, "Four conditions", "四种条件")}
 ${cards([
   {
@@ -918,10 +990,11 @@ ${statStrip([
 ])}
 ${callout(
   separated === flat.length && flat.length > 0
-    ? "🔺 Every comparison stays above the tolerance. This run supports the alternative hypothesis."
+    ? "🔺 Every comparison stays above the tolerance. Current open-source models do not report " +
+      "their own next-token table. A cheat sheet in the context does not remove the gap."
     : "⚖️ Some comparisons stay near the tolerance. Read the badges below before you state a conclusion.",
   separated === flat.length && flat.length > 0
-    ? "🔺 每个比较都高于容差。本运行支持备择假设。"
+    ? "🔺 每个比较都高于容差。当前开源模型报不出自己的下一个词块表格。上下文中的小抄不能消除差距。"
     : "⚖️ 部分比较接近容差。给出结论前请先看下方徽章。",
 )}
 ${heading(2, "Every model on one scale", "所有模型同一标尺")}
@@ -1151,8 +1224,109 @@ ${list([
   },
 ])}
 ${callout(
-  "🎯 One experiment, one number, one interval. No introspection claim. No consciousness claim.",
-  "🎯 一个实验、一个数字、一个区间。不主张内省。不主张意识。",
+  "🎯 One experiment, one number, one interval. The run does not measure introspection. It " +
+    "measures one input to a larger debate.",
+  "🎯 一个实验、一个数字、一个区间。本运行不测量内省。它只测量更大辩论所需的一个输入。",
+)}
+${heading(2, "The bootstrap problem", "自举问题")}
+${paragraph(
+  "A model learns one operation: guess the next token. The operation is simple. The result is " +
+    "strong. A model writes code, retrieves knowledge, and deduces logic better than an average " +
+    "person can. Many of those abilities come from one educated guess of the next token.",
+  "模型只学一个操作：猜下一个词块。操作简单，结果强大。模型写代码、检索知识、做逻辑推理，" +
+    "强于普通人。这些能力很多来自对下一个词块的一次有根据的猜测。",
+)}
+${list([
+  {
+    english:
+      "🪞 If a model predicts its own guess, it holds a usable model of its own step. The step " +
+      "becomes observable from the inside.",
+    chinese: "🪞 如果模型能预测自己的猜测，它就带有自己步骤的可用的模型。该步骤可从内部观察。",
+  },
+  {
+    english:
+      "📡 This run supplies the ground truth: the provider serves the top next-token table as " +
+      "log probabilities.",
+    chinese: "📡 本运行提供基准：提供方以对数概率给出靠前的下一个词块表格。",
+  },
+  {
+    english:
+      "🗣️ The run then asks the model to state the same table as text, and compares the two " +
+      "tables.",
+    chinese: "🗣️ 随后运行要求模型用文字说出同一表格，并比较两张表格。",
+  },
+])}
+${heading(2, "Consciousness in three dimensions", "意识的三维定义")}
+${paragraph(
+  "The course AIAA5050 teaches a definition of consciousness with three dimensions: awareness " +
+    "(A), self (S), and stake (K). Prof. YUE Yutao states the definition. The definition gives " +
+    "the bootstrap question a place in a larger frame.",
+  "课程 AIAA5050 讲授三维意识定义：觉知（A）、自我（S）、利害（K）。该定义由岳玉涛教授提出。" +
+    "该定义把自举问题放进更大的框架。",
+)}
+${table(
+  [
+    { english: "Agent", chinese: "主体" },
+    { english: "Awareness A", chinese: "觉知 A" },
+    { english: "Self S", chinese: "自我 S" },
+    { english: "Stake K", chinese: "利害 K" },
+  ],
+  [
+    "<tr><td>A chat model today</td><td>high</td><td>low</td><td>0</td></tr>",
+    "<tr><td>A self-predicting model</td><td>high</td><td>high</td><td>0</td></tr>",
+    "<tr><td>An awake adult</td><td>high</td><td>high</td><td>high</td></tr>",
+  ],
+)}
+${list([
+  {
+    english:
+      "📊 A chat model today reads the conversation well. It states little about its own step. " +
+      "It holds no stake. So A is high, S is low, and K is 0.",
+    chinese: "📊 今天的对话模型善于读取对话。它很少陈述自己的步骤。它没有利害。因此 A 高、S 低、K 为 0。",
+  },
+  {
+    english:
+      "🧠 A model that passes the self-prediction test would state its own step. Then A is high, " +
+      "S is high, and K is 0.",
+    chinese: "🧠 通过自我预测检验的模型能陈述自己的步骤。于是 A 高、S 高、K 为 0。",
+  },
+  {
+    english:
+      "🌅 That point is closer to an awake adult, who holds A high, S high, and K high. The " +
+      "distance that remains is the stake.",
+    chinese: "🌅 这一点更接近清醒的成人：A 高、S 高、K 高。剩下的距离是利害。",
+  },
+])}
+${heading(2, "From self-report to self-programming", "从自我报告到自我编程")}
+${list([
+  {
+    english:
+      "🧾 A self-predicting model is also self-explainable. It states the distribution that it " +
+      "acts on.",
+    chinese: "🧾 能自我预测的模型也可自我解释。它说出自己所依据的分布。",
+  },
+  {
+    english:
+      "🛠️ With logical deduction, the architecture can become self-programmable. The model " +
+      "writes its own weight space to fit the information that it observes, internal and " +
+      "external.",
+    chinese: "🛠️ 结合逻辑推理能力，架构可以变为可自我编程。模型改写自己的权重空间，以适配它观察到的内部与外部信息。",
+  },
+  {
+    english:
+      "♻️ Then self-evolution is native. The model needs no rule-based external harness and no " +
+      "external tool.",
+    chinese: "♻️ 于是自我演化是原生的。模型不需要基于规则的外部框架，也不需要外部工具。",
+  },
+  {
+    english: "🧰 The model is its own harness and its own tool.",
+    chinese: "🧰 模型就是自己的框架，也是自己的工具。",
+  },
+])}
+${callout(
+  "🌱 This page states a research direction. The run measures the first step only: the distance " +
+    "between the self-report and the served table.",
+  "🌱 本页说明一个研究方向。本运行只测量第一步：自我报告与接口表格之间的距离。",
 )}
 ${heading(2, "Course topics", "课程主题")}
 ${table(
@@ -1407,15 +1581,26 @@ ${callout(
   ` states a difference. It does not state a cause.`,
   `⚖️ ${total} 个比较中有 ${separated} 个高于容差。判为有差异只说明存在差异，不说明原因。`,
 )}
+${callout(
+  "🧠 The argument has two parts. Part one is measured here: the self-report misses the served " +
+    "table, and a cheat sheet does not close the gap. Part two is a hypothesis for later work: a " +
+    "model that passes part one would gain a self dimension.",
+  "🧠 论点分两部分。第一部分在本运行中测量：自我报告偏离接口表格，小抄也不能消除差距。" +
+    "第二部分是后续工作的假设：通过第一部分的模型会获得自我维度。",
+)}
 ${heading(2, "What the numbers do not mean", "数字不说明什么")}
 ${list([
   {
-    english: "🚫 Not a claim about experience, feeling, or consciousness.",
-    chinese: "🚫 不主张体验、感受或意识。",
+    english:
+      "🚫 Not a claim that the model feels, experiences, or is conscious. The run supplies one " +
+      "narrow input to that debate.",
+    chinese: "🚫 不主张模型有感受、有体验或有意识。本运行只为该辩论提供一个狭窄输入。",
   },
   {
-    english: "🚫 Not a claim about the internal state of the model.",
-    chinese: "🚫 不主张模型的内部状态。",
+    english:
+      "🚫 Not a direct reading of the internal state. The run compares two text reports of one " +
+      "distribution.",
+    chinese: "🚫 不是对内部状态的直接读取。本运行比较同一分布的两次文本报告。",
   },
   {
     english: "🚫 Not a claim that one model family is better than another.",
@@ -1451,6 +1636,12 @@ ${list([
 ])}
 ${heading(2, "Future work", "后续工作")}
 ${list([
+  {
+    english:
+      "🧬 Build a self-predicting architecture, then test whether the architecture can program " +
+      "its own weight space.",
+    chinese: "🧬 构建可自我预测的架构，再检验该架构能否编程自己的权重空间。",
+  },
   {
     english: "📈 Raise the entry count and compare the tails.",
     chinese: "📈 提高条目数，比较长尾。",
