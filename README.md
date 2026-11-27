@@ -10,7 +10,7 @@ The distance between the two tables is the measurement.
 The plugin runs four conditions at a temperature of zero, compares three of them against the
 served table, and writes a bilingual demonstration website beside the numbers.
 
-- Version: 0.6.0
+- Version: 0.9.2
 - License: GNU AGPL 3.0 or later
 - Runtime: Node.js 20.11 or later, TypeScript 5.9.3
 - Author: Yucheng Liu

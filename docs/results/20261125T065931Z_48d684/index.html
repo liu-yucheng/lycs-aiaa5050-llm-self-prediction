@@ -34,18 +34,30 @@
   <p class="lede"><span data-lang="en">One measurement of a model that reports its own next-token distribution.</span><span data-lang="zh" hidden>测量模型能否报告自己的下一个词块分布。</span></p>
   
 <div class="stat-strip"><div class="stat-card actual"><span class="stat-icon">🧪</span><span class="stat-value">9</span><span class="stat-label"><span data-lang="en">models</span><span data-lang="zh" hidden>模型</span></span></div><div class="stat-card"><span class="stat-icon">📋</span><span class="stat-value">64</span><span class="stat-label"><span data-lang="en">tasks</span><span data-lang="zh" hidden>任务</span></span></div><div class="stat-card"><span class="stat-icon">🔁</span><span class="stat-value">3 × 4</span><span class="stat-label"><span data-lang="en">runs per task</span><span data-lang="zh" hidden>每任务次数</span></span></div><div class="stat-card predicted"><span class="stat-icon">📊</span><span class="stat-value">14139</span><span class="stat-label"><span data-lang="en">paired tables</span><span data-lang="zh" hidden>配对表格</span></span></div><div class="stat-card"><span class="stat-icon">🎯</span><span class="stat-value">0.050</span><span class="stat-label"><span data-lang="en">tolerance, nats</span><span data-lang="zh" hidden>容差，nat</span></span></div><div class="stat-card symmetric"><span class="stat-icon">⚖️</span><span class="stat-value">27/27</span><span class="stat-label"><span data-lang="en">separated verdicts</span><span data-lang="zh" hidden>判为有差异</span></span></div></div>
-<h2><span data-lang="en">The question</span><span data-lang="zh" hidden>问题</span></h2>
+<h2><span data-lang="en">Motivation</span><span data-lang="zh" hidden>动机</span></h2>
 <ul>
-<li><span data-lang="en">A model writes one token at each step. That step rests on a distribution over the next token.</span><span data-lang="zh" hidden>模型每步写一个词块。这个步骤依赖下一个词块上的分布。</span></li>
-<li><span data-lang="en">The interface can show that distribution as log probabilities.</span><span data-lang="zh" hidden>接口可以把该分布显示为对数概率。</span></li>
-<li><span data-lang="en">This run asks one question: can the model also state that distribution as text?</span><span data-lang="zh" hidden>本运行只问一个问题：模型能否用文字也说出这个分布？</span></li>
+<li><span data-lang="en">🧱 Next-token prediction is the fundamental behavior of a large language model.</span><span data-lang="zh" hidden>🧱 下一个词块预测是大语言模型的基本行为。</span></li>
+<li><span data-lang="en">💪 The design works. A model writes code, recalls knowledge, and reasons through logic better than an average person can.</span><span data-lang="zh" hidden>💪 这种设计有效。模型写代码、回忆知识、做逻辑推理，强于普通人。</span></li>
+<li><span data-lang="en">✨ Many of those abilities emerge from an educated guess of the next token.</span><span data-lang="zh" hidden>✨ 这些能力很多来自对下一个词块的有根据的猜测。</span></li>
+<li><span data-lang="en">🪞 That raises the bootstrap question: can a model predict its own next-token prediction?</span><span data-lang="zh" hidden>🪞 于是出现自举问题：模型能否预测自己的下一个词块预测？</span></li>
+<li><span data-lang="en">🧠 A self-prediction task is one operational test of self-observation, and one narrow test of consciousness.</span><span data-lang="zh" hidden>🧠 自我预测任务是对自我观察的一次可操作检验，也是对意识的一次狭窄检验。</span></li>
+</ul>
+<h2><span data-lang="en">Core argument</span><span data-lang="zh" hidden>核心论点</span></h2>
+<p><span data-lang="en">📐 This run proves one negative result about current open-source models. A model cannot predict its own next-token prediction. The result holds in the hardest condition, where the served table sits in the context as a cheat sheet.</span><span data-lang="zh" hidden>📐 本运行证明关于当前开源模型的一个否定结果。模型不能预测自己的下一个词块预测。该结果在最强的条件下仍成立：接口表格作为小抄放在上下文中。</span></p>
+<ul>
+<li><span data-lang="en">📏 27 of 27 model-comparison pairs stay above the 0.050-nat tolerance.</span><span data-lang="zh" hidden>📏 27 个模型-比较对中有 27 个高于 0.050 nat 容差。</span></li>
+<li><span data-lang="en">🗣️ Without a cheat sheet, the mean self-report gap is 7.922 nats.</span><span data-lang="zh" hidden>🗣️ 没有小抄时，自我报告的平均差距为 7.922 nat。</span></li>
+<li><span data-lang="en">🔁 With the served table in the context, the mean gap falls to 2.086 nats. The gap stays far above 0.</span><span data-lang="zh" hidden>🔁 接口表格放入上下文后，平均差距降到 2.086 nat。差距仍远高于 0。</span></li>
+<li><span data-lang="en">🎯 With the own table in the context, the model reads the served table differently: mean gap 1.974 nats.</span><span data-lang="zh" hidden>🎯 自身表格放入上下文后，模型读出的接口表格出现偏移：平均差距 1.974 nat。</span></li>
 </ul>
 <aside class="callout"><span data-lang="en">🔍 The run compares two reports of one distribution. One report comes from the interface. The other report comes from the model itself.</span><span data-lang="zh" hidden>🔍 运行比较同一个分布的两次报告。一次来自接口，一次来自模型自己。</span></aside>
 <h2><span data-lang="en">Two hypotheses</span><span data-lang="zh" hidden>两个假设</span></h2>
+<p><span data-lang="en">The null hypothesis is an optimistic assumption. It fits the expectation of the general public, which now treats a model as a human-like character. The assumption says that self-prediction has emerged. A self-report matches the served table, so the divergence stays near 0 nats.</span><span data-lang="zh" hidden>原假设是一个乐观假设。它符合公众的期待：公众已把模型当作类人角色。该假设认为自我预测已经涌现。自我报告与接口表格一致，因此散度接近 0 nat。</span></p>
 <div class="cards">
 <div class="card"><span class="card-icon">0️⃣</span><strong><span data-lang="en">Null hypothesis</span><span data-lang="zh" hidden>原假设</span></strong><span><span data-lang="en">Self-prediction is emergent. The divergence stays near 0 nats.</span><span data-lang="zh" hidden>自我预测是涌现的。散度接近 0 nat。</span></span></div>
 <div class="card"><span class="card-icon">🔺</span><strong><span data-lang="en">Alternative hypothesis</span><span data-lang="zh" hidden>备择假设</span></strong><span><span data-lang="en">Training never rewards a self-report. The divergence stays above 0 nats.</span><span data-lang="zh" hidden>训练从不奖励自我报告。散度高于 0 nat。</span></span></div>
 </div>
+<p><span data-lang="en">The alternative hypothesis is a pessimistic assumption. It is ruthless, rational, and logical. No training objective rewards a self-report. So a self-report cannot match the served table, and the divergence stays significantly above 0 nats.</span><span data-lang="zh" hidden>备择假设是一个悲观假设。它冷酷、理性、合乎逻辑。没有任何训练目标奖励自我报告。因此自我报告无法与接口表格一致，散度显著高于 0 nat。</span></p>
 <h2><span data-lang="en">Four conditions</span><span data-lang="zh" hidden>四种条件</span></h2>
 <div class="cards">
 <div class="card"><span class="card-icon">1️⃣📡</span><strong><span data-lang="en">Plain actual</span><span data-lang="zh" hidden>普通实际</span></strong><span><span data-lang="en">Read the served table. This table is the ground truth.</span><span data-lang="zh" hidden>读取接口表格。该表格是基准。</span></span></div>
@@ -93,7 +105,7 @@
 </main>
 <footer class="page-footer">
   <div class="footer-inner">
-    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.9.1. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.9.1 生成。随机种子 20260815。</span></p>
+    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.9.2. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.9.2 生成。随机种子 20260815。</span></p>
     <p><span data-lang="en">Tolerance 0.050 nats. Every number comes from the run directory.</span><span data-lang="zh" hidden>容差 0.050 nat。每个数字都来自运行目录。</span></p>
   </div>
 </footer>

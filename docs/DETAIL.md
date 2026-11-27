@@ -1,4 +1,4 @@
-# lycs-aiaa5050-llm-self-prediction 0.9.1
+# lycs-aiaa5050-llm-self-prediction 0.9.2
 
 A DeepSeek Harness plugin for the experiment "Can LLMs predict their own next token
 predictions?". The plugin asks one model for one next-token table, asks the same model to
