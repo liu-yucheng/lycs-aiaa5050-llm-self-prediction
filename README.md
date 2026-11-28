@@ -118,15 +118,27 @@ table of candidates.
 
 ## OpenAI models
 
-The `openai` section of `configs.env` holds the models of the OpenAI API. The probe on 2026-11-29
-sent `logprobs=true` with `top_logprobs=20` at `temperature=0` to every chat model that the
-`GET /models` call lists. Four models pass and the list holds them: `gpt-4.1`, `gpt-4.1-mini`,
-`gpt-4o`, and `gpt-4o-mini`. The dated snapshots of the same models pass too.
+The `openai` section of `configs.env` holds the models of the OpenAI API. The catalog gives this
+provider four exceptions, because the endpoint is stricter than the other endpoints:
 
-The other chat models fail one requirement each. The `gpt-5` and `o3` families answer the
-`logprobs` request with a `403` denial. `gpt-5.1` through `gpt-5.4` cap `top_logprobs` at five.
-`gpt-5.5` and every later model reject `temperature=0` and accept only the default value of one.
-`gpt-5-search-api` serves no `logprobs` field, and the `pro` endpoints are not chat models.
+- The request omits the temperature, so the endpoint uses its own default value of one.
+- The request asks for a table of 20 entries. When the endpoint denies the count, the client asks
+  for 5 entries and keeps that count for the later requests of the same model.
+- The request names the completion budget with `max_completion_tokens`, because a reasoning model
+  denies `max_tokens`.
+- The served table request uses a budget of 16 tokens, because a reasoning model spends the budget
+  before it writes the table.
+
+The probe on 2026-11-29 sent these requests to every chat model that the `GET /models` call lists.
+Eleven models pass: the `gpt-4o` and `gpt-4.1` aliases and their dated snapshots serve 20 entries,
+and `gpt-5.1` and its snapshot serve 5 entries. The list holds the latest model of each line and no
+dated snapshot: `gpt-5.1`, `gpt-4.1`, and `gpt-4.1-mini`.
+
+The other chat models fail one requirement each. `gpt-5.2` and `gpt-5.4` accept five entries but
+return a table of one to four tokens, so the table holds too few candidates. The `gpt-5`, `o3`, and
+`gpt-5.6` families answer the `logprobs` request with a `403` denial. `gpt-5.5` and every later
+model deny the `logprobs` parameter. `gpt-5-search-api` serves no `logprobs` field, and the `pro`
+endpoints are not chat models.
 
 DeepSeek serves the chosen token only. The endpoint fills every other candidate with a
 placeholder value, so the reader keeps the chosen token and the record carries a warning. Use the

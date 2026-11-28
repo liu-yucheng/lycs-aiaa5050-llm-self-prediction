@@ -51,6 +51,34 @@ export interface ProviderDefinition {
     /** The table entry count of the provider. */
     readonly topLogprobsCount?: number;
     /**
+     * The lower table entry counts that the provider may accept.
+     *
+     * An endpoint can cap the entry count. The client requests the configured count and retries
+     * with the next lower count of this list when the endpoint denies the request.
+     */
+    readonly topLogprobsFallbackCounts?: readonly number[];
+    /**
+     * The name of the completion budget field.
+     *
+     * A value of `max_tokens` is the classic field. A value of `max_completion_tokens` is the field
+     * of a reasoning endpoint, which denies the classic field.
+     */
+    readonly completionTokenField?: "max_tokens" | "max_completion_tokens";
+    /**
+     * The completion budget of one served table request.
+     *
+     * A reasoning endpoint spends the budget on its reasoning before it writes the table, so such
+     * an endpoint needs a budget above one.
+     */
+    readonly servedTableTokenBudget?: number;
+    /**
+     * The request temperature.
+     *
+     * A number sets the field of every request. A value of `default` omits the field, so the
+     * endpoint uses its own default value. A reasoning endpoint can deny a value of zero.
+     */
+    readonly temperature?: number | "default";
+    /**
      * The shape of the served distribution.
      *
      * A value of full means that the endpoint serves a real table of candidate tokens. A value of

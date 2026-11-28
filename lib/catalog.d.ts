@@ -1,11 +1,13 @@
 /**
  * The built-in provider catalog.
  *
- * The plugin serves three providers. Hugging Face serves the tested models. OpenAI serves a model
- * that returns a strict table of twenty candidate tokens. DeepSeek serves the pre-test, because a
- * short DeepSeek run is cheap and it shows that the protocol works. The catalog holds no API key.
- * The private environment file holds the key and the endpoint, and `configs.env` holds the model
- * list and the switches.
+ * The plugin serves three providers. Hugging Face serves the tested models. OpenAI serves the
+ * models that return a strict table of candidate tokens. The OpenAI endpoint can cap the table at
+ * five entries, can deny a temperature of zero, and can deny the classic budget field, so the
+ * OpenAI definition names these exceptions. DeepSeek serves the pre-test, because a short DeepSeek
+ * run is cheap and it shows that the protocol works. The catalog holds no API key. The private
+ * environment file holds the key and the endpoint, and `configs.env` holds the model list and the
+ * switches.
  */
 import type { ProviderCatalog } from "./types.js";
 /** The provider key of Hugging Face. */

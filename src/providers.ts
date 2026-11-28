@@ -50,7 +50,7 @@ import type {
 /** The provider key of the mock client. */
 export const MOCK_PROVIDER_KEY = "mock";
 
-/** The temperature of every request. */
+/** The temperature of a request when the provider definition names none. */
 const REQUEST_TEMPERATURE = 0;
 
 /** The number of tokens of one self report. */
@@ -138,6 +138,55 @@ export interface ProviderClient {
 }
 
 /**
+ * Read the fallback table entry counts of one definition value.
+ *
+ * @param value - the raw value.
+ * @returns the entry counts that the definition accepts, in file order.
+ */
+function readFallbackCounts(value: unknown): number[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const counts = value.filter(
+    (entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 1,
+  );
+  return counts.length === 0 ? undefined : counts;
+}
+
+/**
+ * Read the completion budget field name of one definition value.
+ *
+ * @param value - the raw value.
+ * @returns the field name, or undefined when the value names none.
+ */
+function readCompletionTokenField(value: unknown): "max_tokens" | "max_completion_tokens" | undefined {
+  return value === "max_completion_tokens" || value === "max_tokens" ? value : undefined;
+}
+
+/**
+ * Read the served table budget of one definition value.
+ *
+ * @param value - the raw value.
+ * @returns the budget, or undefined when the value names none.
+ */
+function readTokenBudget(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * Read the temperature of one definition value.
+ *
+ * @param value - the raw value.
+ * @returns the temperature, or undefined when the value names none.
+ */
+function readTemperature(value: unknown): number | "default" | undefined {
+  if (value === "default") {
+    return "default";
+  }
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/**
  * Validate one provider definition.
  *
  * @param value - the value to check.
@@ -187,6 +236,10 @@ function validateProviderDefinition(value: unknown, index: number): ProviderDefi
       typeof rawTopLogprobs === "number" && Number.isInteger(rawTopLogprobs)
         ? rawTopLogprobs
         : undefined,
+    topLogprobsFallbackCounts: readFallbackCounts(value["topLogprobsFallbackCounts"]),
+    completionTokenField: readCompletionTokenField(value["completionTokenField"]),
+    servedTableTokenBudget: readTokenBudget(value["servedTableTokenBudget"]),
+    temperature: readTemperature(value["temperature"]),
     thinking: typeof value["thinking"] === "string" ? (value["thinking"] as string) : undefined,
     reasoning: typeof value["reasoning"] === "string" ? (value["reasoning"] as string) : undefined,
     enabled: value["enabled"] !== false,
@@ -641,6 +694,36 @@ interface ChatMessage {
 }
 
 /**
+ * Build the temperature field of one request body.
+ *
+ * A reasoning endpoint can deny a temperature of zero and accept only its own default value.
+ * The provider definition turns the field off for such an endpoint, so the request omits it.
+ *
+ * @param definition - the provider definition.
+ * @returns the field, or an empty object when the request omits the field.
+ */
+function buildTemperatureField(definition: ProviderDefinition): Record<string, number> {
+  const temperature = definition.temperature;
+  if (temperature === "default") {
+    return {};
+  }
+  return { temperature: typeof temperature === "number" ? temperature : REQUEST_TEMPERATURE };
+}
+
+/**
+ * Test one failure for a denied table entry count.
+ *
+ * An endpoint can cap the entry count of a log probability table. The denial names the count
+ * parameter, so the client can request a lower count instead of the failed count.
+ *
+ * @param error - the failure.
+ * @returns true when the endpoint denied the entry count.
+ */
+function isTableCountDenial(error: unknown): boolean {
+  return /top_logprobs|topLogprobs|logprobs\.top/iu.test(errorMessage(error));
+}
+
+/**
  * Build the options of one request that travels through a permitted edge.
  *
  * The edge host can carry a port, as in `127.0.0.1:8443`. Without a port, the request uses the
@@ -961,6 +1044,30 @@ function buildSlowWarning(elapsedMilliseconds: number): string | undefined {
   return `The request took ${Math.round(elapsedMilliseconds / 1000)} s.`;
 }
 
+/**
+ * Build the table entry counts of one client.
+ *
+ * The first count is the configured count. The fallback counts follow in descending order, so a
+ * client lowers the request one step at a time when an endpoint denies the count.
+ *
+ * @param definition - the provider definition.
+ * @returns the entry counts in descending order.
+ */
+function buildTableCounts(definition: ProviderDefinition): number[] {
+  const primary = Math.min(
+    definition.topLogprobsCount ?? MAX_PROBABILITY_ENTRY_COUNT,
+    MAX_PROBABILITY_ENTRY_COUNT,
+  );
+  const counts = [primary];
+  for (const fallback of definition.topLogprobsFallbackCounts ?? []) {
+    const count = Math.min(fallback, primary);
+    if (count > 1 && !counts.includes(count)) {
+      counts.push(count);
+    }
+  }
+  return counts.sort((left, right) => right - left);
+}
+
 /** One client of one OpenAI-compatible chat endpoint. */
 export class OpenAiCompatibleClient implements ProviderClient {
   /** The provider definition of the client. */
@@ -975,6 +1082,14 @@ export class OpenAiCompatibleClient implements ProviderClient {
   private readonly timeoutMilliseconds: number;
   /** The number of requested table entries. */
   private readonly topLogprobsCount: number;
+  /** The accepted table entry counts, from the highest to the lowest. */
+  private readonly tableCounts: readonly number[];
+  /** The position of the entry count of the next request. */
+  private tableCountIndex = 0;
+  /** The completion budget field of every request. */
+  private readonly completionTokenField: "max_tokens" | "max_completion_tokens";
+  /** The completion budget of one served table request. */
+  private readonly servedTableTokenBudget: number;
 
   /**
    * Create one client.
@@ -997,6 +1112,14 @@ export class OpenAiCompatibleClient implements ProviderClient {
       definition.topLogprobsCount ?? MAX_PROBABILITY_ENTRY_COUNT,
       MAX_PROBABILITY_ENTRY_COUNT,
     );
+    this.tableCounts = buildTableCounts(definition);
+    this.completionTokenField = definition.completionTokenField ?? "max_tokens";
+    this.servedTableTokenBudget = definition.servedTableTokenBudget ?? 1;
+  }
+
+  /** The table entry count of the next request. */
+  private get tableEntryCount(): number {
+    return this.tableCounts[this.tableCountIndex] ?? this.topLogprobsCount;
   }
 
   /**
@@ -1033,7 +1156,7 @@ export class OpenAiCompatibleClient implements ProviderClient {
     repetition: number,
     signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    const prompt = buildSelfPredictionPrompt(task, this.topLogprobsCount);
+    const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
     const messages: ChatMessage[] = [
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },
@@ -1056,14 +1179,14 @@ export class OpenAiCompatibleClient implements ProviderClient {
     injected: TokenDistribution,
     signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    const prompt = buildSelfPredictionPrompt(task, this.topLogprobsCount);
+    const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
     const messages: ChatMessage[] = [
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },
       { role: "assistant", content: buildInjectedTableMessage(injected) },
       {
         role: "user",
-        content: buildInjectedSelfPredictionPrompt(task, this.topLogprobsCount),
+        content: buildInjectedSelfPredictionPrompt(task, this.tableEntryCount),
       },
     ];
     return this.requestSelfReport(CONDITION_INJECTED_SELF, repetition, messages, signal);
@@ -1082,7 +1205,7 @@ export class OpenAiCompatibleClient implements ProviderClient {
     repetition: number,
     signal?: AbortSignal,
   ): Promise<InjectedActualOutcome> {
-    const prompt = buildSelfPredictionPrompt(task, this.topLogprobsCount);
+    const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
     const selfMessages: ChatMessage[] = [
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },
@@ -1119,19 +1242,30 @@ export class OpenAiCompatibleClient implements ProviderClient {
     signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
     const endpoint = `${this.definition.baseUrl.replace(/\/+$/u, "")}/chat/completions`;
-    const body = applySwitches(
-      {
-        model: this.model,
-        messages: messages.map((message) => ({ role: message.role, content: message.content })),
-        temperature: REQUEST_TEMPERATURE,
-        max_tokens: 1,
-        logprobs: true,
-        top_logprobs: this.topLogprobsCount,
-        stream: false,
-      },
-      this.definition,
-    );
-    let exchange = await this.send(endpoint, body, signal);
+    let body: Record<string, unknown> = {};
+    let exchange: RecordedExchange | undefined;
+    while (exchange === undefined) {
+      body = applySwitches(
+        {
+          model: this.model,
+          messages: messages.map((message) => ({ role: message.role, content: message.content })),
+          ...buildTemperatureField(this.definition),
+          [this.completionTokenField]: this.servedTableTokenBudget,
+          logprobs: true,
+          top_logprobs: this.tableEntryCount,
+          stream: false,
+        },
+        this.definition,
+      );
+      try {
+        exchange = await this.send(endpoint, body, signal);
+      } catch (error) {
+        if (!isTableCountDenial(error) || this.tableCountIndex + 1 >= this.tableCounts.length) {
+          throw error;
+        }
+        this.tableCountIndex += 1;
+      }
+    }
     let served: { token: string; distribution: TokenDistribution } | undefined;
     for (let attempt = 1; attempt <= SERVED_TABLE_ATTEMPT_COUNT; attempt += 1) {
       try {
@@ -1189,8 +1323,8 @@ export class OpenAiCompatibleClient implements ProviderClient {
       {
         model: this.model,
         messages: messages.map((message) => ({ role: message.role, content: message.content })),
-        temperature: REQUEST_TEMPERATURE,
-        max_tokens: SELF_REPORT_MAX_TOKENS,
+        ...buildTemperatureField(this.definition),
+        [this.completionTokenField]: SELF_REPORT_MAX_TOKENS,
         stream: false,
       },
       this.definition,

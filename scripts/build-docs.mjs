@@ -389,7 +389,10 @@ const protocolBody = [
         "The plugin sends one system message and one user message, with <code>temperature: 0</code>, " +
           "<code>max_tokens: 1</code>, <code>logprobs: true</code>, and " +
           "<code>top_logprobs: 20</code>. The provider returns the top 20 entries of the first " +
-          "generated token.",
+          "generated token. An endpoint that denies a field changes the body. The OpenAI provider " +
+          "omits the temperature, names the budget with <code>max_completion_tokens</code>, raises " +
+          "the budget to 16 tokens, and lowers <code>top_logprobs</code> to 5 when the endpoint " +
+          "denies 20.",
       ),
       code(
         [
