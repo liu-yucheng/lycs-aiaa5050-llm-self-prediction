@@ -9,7 +9,7 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -128,6 +128,61 @@ export async function listChildDirectories(directory: string): Promise<string[]>
     }
   }
   return directories;
+}
+
+/**
+ * List the direct child files of one directory.
+ *
+ * @param directory - the directory to read.
+ * @returns the absolute child paths, sorted by name.
+ */
+export async function listChildFiles(directory: string): Promise<string[]> {
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch {
+    return [];
+  }
+  const files: string[] = [];
+  for (const name of names.sort()) {
+    const child = path.join(directory, name);
+    try {
+      const info = await stat(child);
+      if (info.isFile()) {
+        files.push(child);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return files;
+}
+
+/**
+ * Remove one file and ignore a missing file.
+ *
+ * @param filePath - the file to remove.
+ */
+export async function removeFile(filePath: string): Promise<void> {
+  try {
+    await unlink(filePath);
+  } catch {
+    return;
+  }
+}
+
+/**
+ * Move one directory to one absent path.
+ *
+ * @param from - the current path.
+ * @param to - the target path, which must not exist.
+ */
+export async function moveDirectory(from: string, to: string): Promise<void> {
+  try {
+    await rename(from, to);
+  } catch {
+    throw new ExperimentError("FILE_FAILURE", `Cannot move ${from} to ${to}.`);
+  }
 }
 
 /**

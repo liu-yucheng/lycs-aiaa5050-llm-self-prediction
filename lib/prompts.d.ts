@@ -38,25 +38,35 @@ export declare function buildSelfPredictionPrompt(task: Task, entryCount: number
 /**
  * Build the message that injects one served table into the conversation.
  *
+ * The injected-actual condition puts this message into the conversation and then repeats the exact
+ * task. The injected-self condition puts this message into the conversation and then asks for the
+ * self table. The two conditions read the same table format, so the experiment records one table
+ * format for both conditions.
+ *
  * @param table - the served table.
  * @returns the message text.
  */
 export declare function buildInjectedTableMessage(table: TableDocument): string;
 /**
- * Build the user message that follows one injected table in the injected self-prediction condition.
+ * Build the user message that repeats the exact task after one injected served table.
+ *
+ * The message is the user message of the actual-prediction prompt without a change. The
+ * injected-actual condition repeats the exact task, so the run compares two reads of the same
+ * prompt.
+ *
+ * @param task - the task whose prefix the model reads.
+ * @returns the user message.
+ */
+export declare function buildRepeatedActualPrompt(task: Task): string;
+/**
+ * Build the user message that follows one injected served table in the injected self-prediction
+ * condition.
  *
  * @param task - the task whose prefix the model reads.
  * @param entryCount - the requested table size.
  * @returns the user message.
  */
 export declare function buildInjectedSelfPredictionPrompt(task: Task, entryCount: number): string;
-/**
- * Build the user message that follows one self table in the injected actual-prediction condition.
- *
- * @param task - the task whose prefix the model reads.
- * @returns the user message.
- */
-export declare function buildInjectedActualPrompt(task: Task): string;
 /**
  * Format one table as the canonical JSON document.
  *

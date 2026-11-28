@@ -218,6 +218,39 @@
   }
 
   /**
+   * Format one p-value for the explorer.
+   *
+   * @param value - the p-value.
+   *
+   * @returns the text of the p-value.
+   */
+  function formatProbability(value) {
+    if (value === null || value === undefined || !isFinite(value)) { return "n/a"; }
+    return Number(value) < 0.001 ? Number(value).toExponential(1) : Number(value).toFixed(4);
+  }
+
+  /**
+   * Find the test of the selected model and the selected comparison.
+   *
+   * @returns the comparison summary, or null when the index holds no such summary.
+   */
+  function selectedTest() {
+    if (!state.index || !state.index.metrics) { return null; }
+    var entry = currentEntry();
+    var providerKey = entry ? entry.providerKey : "";
+    var providers = state.index.metrics.providers || [];
+    var comparison = comparisonSelect.value;
+    for (var outer = 0; outer < providers.length; outer += 1) {
+      if (providers[outer].providerKey !== providerKey) { continue; }
+      var list = providers[outer].comparisons || [];
+      for (var inner = 0; inner < list.length; inner += 1) {
+        if (list[inner].comparison === comparison) { return list[inner]; }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Render one bar span for a value on a scale.
    *
    * @param value - the value.
@@ -282,8 +315,10 @@
       '<span>📋 <b>' + escapeHtml(task.id) + '</b></span>' +
       '<span>🏷️ ' + escapeHtml(task.category) + '</span>' +
       '<span>' + badge + '</span>' +
-      '<span>KL(A‖P) <b>' + formatNumber(summary.klActualPredicted, 3) + '</b></span>' +
-      '<span>KL(P‖A) <b>' + formatNumber(summary.klPredictedActual, 3) + '</b></span>' +
+      '<span class="formula">KL(A‖P) <b>' + formatNumber(summary.klActualPredicted, 3) +
+      '</b></span>' +
+      '<span class="formula">KL(P‖A) <b>' + formatNumber(summary.klPredictedActual, 3) +
+      '</b></span>' +
       '<span>JS <b>' + formatNumber(summary.jensenShannon, 3) + '</b></span>' +
       '<span>TV <b>' + formatNumber(summary.totalVariation, 3) + '</b></span>' +
       '<span>📉 <b>' + formatNumber(summary.coveragePredictedByActual, 3) + '</b></span>' +
@@ -348,9 +383,11 @@
    * @returns the served condition and the predicted condition.
    */
   function whichKeys(comparisonName) {
-    if (comparisonName === "plain_self") { return { actual: "plain_actual", predicted: "plain_self" }; }
-    if (comparisonName === "injected_self") { return { actual: "plain_actual", predicted: "injected_self" }; }
-    return { actual: "plain_actual", predicted: "injected_actual" };
+    if (comparisonName === "self") { return { actual: "actual", predicted: "self" }; }
+    if (comparisonName === "actual_injected_self") {
+      return { actual: "actual", predicted: "actual_injected_self" };
+    }
+    return { actual: "actual", predicted: "actual_injected_actual" };
   }
 
   /**
@@ -505,13 +542,33 @@
       if (!task) { return; }
       var keepActual = Number(actualSelect.value) || 1;
       var keepPredicted = Number(predictedSelect.value) || 1;
-      var actualReps = (task.runs.plain_actual || []).map(function (item) { return item.rep; });
+      var actualReps = (task.runs.actual || []).map(function (item) { return item.rep; });
       fillSelect(actualSelect, actualReps);
       if (actualReps.indexOf(keepActual) >= 0) { actualSelect.value = String(keepActual); }
       var keys = whichKeys(comparisonSelect.value);
       var predictedReps = (task.runs[keys.predicted] || []).map(function (item) { return item.rep; });
       fillSelect(predictedSelect, predictedReps);
       if (predictedReps.indexOf(keepPredicted) >= 0) { predictedSelect.value = String(keepPredicted); }
+    }
+
+    /**
+     * Build the card of the session-level test of the selected comparison.
+     *
+     * @returns the markup of the card.
+     */
+    function summaryCard() {
+      var summary = selectedTest();
+      if (!summary || !summary.hypothesis) {
+        return statCard("🧮", "n/a", text("p-value", "p 值"));
+      }
+      var test = summary.hypothesis;
+      var label = text(
+        "p-value · null rejected: " + (test.rejectsNull ? "yes" : "no") + " · median " +
+          formatNumber(summary.medianSymmetricKl, 3) + " nats",
+        "p 值 · 拒绝原假设：" + (test.rejectsNull ? "是" : "否") + " · 中位 " +
+          formatNumber(summary.medianSymmetricKl, 3) + " nat"
+      );
+      return statCard("🧮", formatProbability(test.pValue), label);
     }
 
     /**
@@ -530,7 +587,8 @@
         statCard("Σ", formatNumber(value.jensenShannon, 3), text("Jensen-Shannon", "JS 散度"), "actual") +
         statCard("📏", formatNumber(value.totalVariation, 3), text("total variation", "全变差")) +
         statCard("📉", formatNumber(value.coveragePredictedByActual, 3),
-          text("coverage of served mass", "接口质量覆盖率"));
+          text("coverage of served mass", "接口质量覆盖率")) +
+        summaryCard();
     }
 
     /**
@@ -626,7 +684,7 @@
     if (resetButton) {
       resetButton.addEventListener("click", function () {
         modelSelect.value = "0";
-        if (state.index) { comparisonSelect.value = state.index.defaultComparison || "plain_self"; }
+        if (state.index) { comparisonSelect.value = state.index.defaultComparison || "self"; }
         compareToggle.checked = false;
         state.model = null;
         state.entry = null;
@@ -641,7 +699,7 @@
       fillSelect(modelSelect, entries.map(function (entry, position) { return position; }), function (position) {
         return entries[position].model + " · " + entries[position].providerKey;
       });
-      comparisonSelect.value = index.defaultComparison || "plain_self";
+      comparisonSelect.value = index.defaultComparison || "self";
       state.model = null;
       applySelection();
     }).catch(function (error) {

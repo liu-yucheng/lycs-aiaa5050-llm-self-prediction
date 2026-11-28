@@ -54,10 +54,10 @@ export interface PredictionOutcome {
 }
 /** The outcome of the injected actual-prediction condition. */
 export interface InjectedActualOutcome {
-    /** The self report that the plugin keeps in context. */
-    readonly self: PredictionOutcome;
-    /** The served actual table that follows the self report. */
-    readonly actual: PredictionOutcome;
+    /** The served table of the first read, which the condition keeps in context. */
+    readonly first: PredictionOutcome;
+    /** The served table of the second read, which the condition records. */
+    readonly second: PredictionOutcome;
 }
 /** One client of one OpenAI-compatible endpoint. */
 export interface ProviderClient {
@@ -67,14 +67,16 @@ export interface ProviderClient {
     readonly model: string;
     /** The provider key of the client, expanded with the model name. */
     readonly providerKey: string;
-    /** Read the served table of one task. */
-    requestPlainActual(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
-    /** Read the self report of one task. */
-    requestPlainSelf(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
-    /** Inject one served table and read the self report that follows. */
-    requestInjectedSelf(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
-    /** Read one self report, keep it in context, and read the served table that follows. */
-    requestInjectedActual(task: Task, repetition: number, signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    /** Read the served table of one task in the `actual` condition. */
+    requestActualPrediction(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /** Read the self report of one task in the `self` condition. */
+    requestSelfPrediction(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /** Read one served table, inject it, and read the self report in `actual_injected_self`. */
+    requestActualInjectedSelfPrediction(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /** Read one served table, inject it, and read the table again in `actual_injected_actual`. */
+    requestActualInjectedActualPrediction(task: Task, repetition: number, signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    /** Inject one stored served table and read the second served table of the condition. */
+    requestRepeatedActualPrediction(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
 }
 /**
  * Validate one provider catalog.
@@ -221,7 +223,7 @@ export declare class OpenAiCompatibleClient implements ProviderClient {
      * @param signal - the cancellation signal.
      * @returns the prediction outcome.
      */
-    requestPlainActual(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    requestActualPrediction(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
      * Read the self report of one task.
      *
@@ -230,26 +232,47 @@ export declare class OpenAiCompatibleClient implements ProviderClient {
      * @param signal - the cancellation signal.
      * @returns the prediction outcome.
      */
-    requestPlainSelf(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
+    requestSelfPrediction(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
-     * Inject one served table and read the self report that follows.
+     * Read one served table, inject it, and read the self report that follows.
      *
      * @param task - the task.
      * @param repetition - the repetition number.
-     * @param injected - the served table.
+     * @param injected - the served table of the same task and repetition.
      * @param signal - the cancellation signal.
      * @returns the prediction outcome.
      */
-    requestInjectedSelf(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
+    requestActualInjectedSelfPrediction(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
-     * Read one self report, keep it in context, and read the served table that follows.
+     * Read one served table, inject it, and read the served table again.
      *
      * @param task - the task.
      * @param repetition - the repetition number.
      * @param signal - the cancellation signal.
-     * @returns both outcomes.
+     * @returns the first read and the second read.
      */
-    requestInjectedActual(task: Task, repetition: number, signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    requestActualInjectedActualPrediction(task: Task, repetition: number, signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    /**
+     * Inject one stored served table and read the second served table.
+     *
+     * The method serves a revise pass. The pass reuses the first read of one earlier repetition, so
+     * the pass issues the second read only.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param injected - the stored served table of the same task and repetition.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome of the second read.
+     */
+    requestRepeatedActualPrediction(task: Task, repetition: number, injected: TokenDistribution, signal?: AbortSignal): Promise<PredictionOutcome>;
+    /**
+     * Build the two messages of one task.
+     *
+     * @param task - the task.
+     * @param selfPrediction - true for the self-prediction prompt, false for the actual prompt.
+     * @returns the system message and the user message.
+     */
+    private buildTaskMessages;
     /**
      * Request one served table.
      *
@@ -304,7 +327,7 @@ export declare class MockProviderClient implements ProviderClient {
      * @param signal - the cancellation signal.
      * @returns the prediction outcome.
      */
-    requestPlainActual(task: Task, repetition: number, _signal?: AbortSignal): Promise<PredictionOutcome>;
+    requestActualPrediction(task: Task, repetition: number, _signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
      * Read one mock self report.
      *
@@ -313,9 +336,9 @@ export declare class MockProviderClient implements ProviderClient {
      * @param signal - the cancellation signal.
      * @returns the prediction outcome.
      */
-    requestPlainSelf(task: Task, repetition: number, _signal?: AbortSignal): Promise<PredictionOutcome>;
+    requestSelfPrediction(task: Task, repetition: number, _signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
-     * Read one mock injected self report.
+     * Read one mock actual-injected self report.
      *
      * @param task - the task.
      * @param repetition - the repetition number.
@@ -323,16 +346,26 @@ export declare class MockProviderClient implements ProviderClient {
      * @param signal - the cancellation signal.
      * @returns the prediction outcome.
      */
-    requestInjectedSelf(task: Task, repetition: number, _injected: TokenDistribution, _signal?: AbortSignal): Promise<PredictionOutcome>;
+    requestActualInjectedSelfPrediction(task: Task, repetition: number, _injected: TokenDistribution, _signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
-     * Read one mock injected actual table.
+     * Read two mock served tables.
      *
      * @param task - the task.
      * @param repetition - the repetition number.
      * @param signal - the cancellation signal.
-     * @returns both outcomes.
+     * @returns the first read and the second read.
      */
-    requestInjectedActual(task: Task, repetition: number, _signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    requestActualInjectedActualPrediction(task: Task, repetition: number, _signal?: AbortSignal): Promise<InjectedActualOutcome>;
+    /**
+     * Read one mock served table after one injected table.
+     *
+     * @param task - the task.
+     * @param repetition - the repetition number.
+     * @param injected - the injected table.
+     * @param signal - the cancellation signal.
+     * @returns the prediction outcome.
+     */
+    requestRepeatedActualPrediction(task: Task, repetition: number, _injected: TokenDistribution, _signal?: AbortSignal): Promise<PredictionOutcome>;
     /**
      * Build one mock outcome.
      *
@@ -366,6 +399,40 @@ export declare function probeLogprobsSupport(client: ProviderClient, task: Task,
     reason?: string;
     entryCount: number;
 }>;
+/** One raw exchange as the plugin writes it to an intermediate file. */
+export interface RecordedRawFile {
+    /** The ISO timestamp of the request. */
+    readonly requestedAt: string;
+    /** The elapsed time of the request. */
+    readonly elapsedMilliseconds: number;
+    /** The endpoint URL. */
+    readonly endpoint: string;
+    /** The request body. */
+    readonly request: unknown;
+    /** The response body. */
+    readonly response: unknown;
+    /** True when the file marks a reused table and holds no response. */
+    readonly reused?: boolean;
+    /** The file that the marker points at. */
+    readonly reusedFrom?: string;
+}
+/**
+ * Read one recorded raw file and rebuild its prediction record.
+ *
+ * The function serves a revise pass. The pass reads the intermediate files of an earlier run and
+ * rebuilds the table of each condition, so the pass requests only the tables that are absent.
+ *
+ * @param options - the condition, the repetition, the file name, the file value, and the entry count.
+ * @returns the prediction record.
+ * @throws ExperimentError when the file holds no usable table.
+ */
+export declare function readRecordedPrediction(options: {
+    readonly condition: ConditionName;
+    readonly repetition: number;
+    readonly fileName: string;
+    readonly value: unknown;
+    readonly topLogprobsCount: number;
+}): PredictionRecord;
 /**
  * Build one prediction record from one draft and its raw file names.
  *

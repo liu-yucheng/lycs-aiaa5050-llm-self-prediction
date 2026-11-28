@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.12.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -35,11 +35,16 @@
       <tr><th>Comparison</th><th>Actual side</th><th>Predicted side</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>plain_self</code></td><td><code>plain_actual</code></td><td><code>plain_self</code></td></tr>
-      <tr><td><code>injected_self</code></td><td><code>plain_actual</code></td><td><code>injected_self</code></td></tr>
-      <tr><td><code>injected_actual</code></td><td><code>plain_actual</code></td><td><code>injected_actual</code></td></tr>
+      <tr><td><code>self</code></td><td><code>actual</code></td><td><code>self</code></td></tr>
+      <tr><td><code>actual_injected_self</code></td><td><code>actual</code></td><td><code>actual_injected_self</code></td></tr>
+      <tr><td><code>actual_injected_actual</code></td><td><code>actual</code></td><td><code>actual_injected_actual</code></td></tr>
     </tbody>
   </table>
+
+<h2>The hypothesis test</h2>
+<p>The bootstrap interval states the uncertainty of the mean. The hypothesis test states the evidence against the null hypothesis. The plugin runs one one-sided Wilcoxon signed-rank test for each comparison. The sample is the per-task median symmetric KL, the null value is the tolerance of 0.05 nats, and the alternative states that the median stands above the null value.</p>
+  <p>The test uses the normal approximation with a tie correction, and it drops every zero difference. A comparison rejects the null hypothesis when its p-value is below alpha, which is 0.05 by default.</p>
+  <p>The session holds the alternative hypothesis only when every comparison rejects the null and every median stands above the tolerance. The session holds the null hypothesis when no comparison rejects the null. A mixed result means that one comparison rejects and another one does not.</p>
 
 <h2>The alignment</h2>
 <p>Two tables rarely share one token set. The plugin builds the union of both token sets. A token that one table omits receives the probability floor of 1e-12, and each side is renormalized after the floor. The floor keeps the divergence finite and gives one missing token a large but bounded cost.</p>
@@ -80,7 +85,7 @@
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.12.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

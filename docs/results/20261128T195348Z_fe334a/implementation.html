@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Platform · 20261125T065931Z_48d684</title>
+<title>Platform · 20261128T195348Z_fe334a</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -29,23 +29,25 @@
   </div>
 </header>
 <main class="page">
-  <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261125T065931Z_48d684</code></p>
+  <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261128T195348Z_fe334a</code></p>
   <h1><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></h1>
   <p class="lede"><span data-lang="en">How the plugin, the presets, and the providers produce this run.</span><span data-lang="zh" hidden>插件、预设与提供方如何产生本次运行。</span></p>
   
 <h2><span data-lang="en">The platform</span><span data-lang="zh" hidden>平台</span></h2>
 <ul>
 <li><span data-lang="en">🧰 DeepSeek Harness hosts tools and agent presets.</span><span data-lang="zh" hidden>🧰 DeepSeek Harness 承载工具与智能体预设。</span></li>
-<li><span data-lang="en">🔌 The plugin registers five tools and one command line.</span><span data-lang="zh" hidden>🔌 插件注册五个工具和一套命令行。</span></li>
-<li><span data-lang="en">📦 One run writes one directory with every input and every output.</span><span data-lang="zh" hidden>📦 一次运行写出一个目录，保存每个输入和每个输出。</span></li>
+<li><span data-lang="en">🔌 The plugin registers six tools and one command line.</span><span data-lang="zh" hidden>🔌 插件注册六个工具和一套命令行。</span></li>
+<li><span data-lang="en">📦 One run works on exactly one folder. The folder holds every input and every output of that run.</span><span data-lang="zh" hidden>📦 一次运行只使用一个目录。该目录保存本次运行的每个输入和每个输出。</span></li>
+<li><span data-lang="en">♻️ A revise pass reads the tables of the folder and requests only the tables that the folder lacks.</span><span data-lang="zh" hidden>♻️ 修订运行读取目录中的表格，只请求目录缺少的表格。</span></li>
 </ul>
-<h2><span data-lang="en">The five tools</span><span data-lang="zh" hidden>五个工具</span></h2>
+<h2><span data-lang="en">The six tools</span><span data-lang="zh" hidden>六个工具</span></h2>
 <table>
 <thead><tr><th><span data-lang="en">Tool</span><span data-lang="zh" hidden>工具</span></th><th><span data-lang="en">Purpose</span><span data-lang="zh" hidden>用途</span></th></tr></thead>
 <tbody>
 <tr><td><code>llm_self_prediction_run</code></td><td>Run the four conditions on a set of tasks.</td></tr>
 <tr><td><code>llm_self_prediction_status</code></td><td>List the recent runs.</td></tr>
 <tr><td><code>llm_self_prediction_report</code></td><td>Read the report of one run.</td></tr>
+<tr><td><code>llm_self_prediction_rename</code></td><td>Rename the folder of one run.</td></tr>
 <tr><td><code>llm_self_prediction_dataset</code></td><td>Describe the datasets.</td></tr>
 <tr><td><code>llm_self_prediction_help</code></td><td>Print the protocol and the layout.</td></tr>
 </tbody>
@@ -60,7 +62,7 @@
 <h2><span data-lang="en">Providers</span><span data-lang="zh" hidden>提供方</span></h2>
 <ul>
 <li><span data-lang="en">🌐 Each model answers through an OpenAI-compatible chat endpoint.</span><span data-lang="zh" hidden>🌐 每个模型通过兼容 OpenAI 的对话接口作答。</span></li>
-<li><span data-lang="en">📡 The plain actual condition sets logprobs and top_logprobs.</span><span data-lang="zh" hidden>📡 普通实际条件设置 logprobs 与 top_logprobs。</span></li>
+<li><span data-lang="en">📡 The actual condition sets logprobs and top_logprobs.</span><span data-lang="zh" hidden>📡 实际条件设置 logprobs 与 top_logprobs。</span></li>
 <li><span data-lang="en">🚫 The self conditions send no log-probability parameter.</span><span data-lang="zh" hidden>🚫 自我条件不发送任何对数概率参数。</span></li>
 <li><span data-lang="en">🔁 A model that reports one token only is marked and warned.</span><span data-lang="zh" hidden>🔁 只报告一个词块的模型会被标记并警告。</span></li>
 </ul>
@@ -68,34 +70,37 @@
 <table>
 <thead><tr><th><span data-lang="en">Item</span><span data-lang="zh" hidden>项目</span></th><th><span data-lang="en">Value</span><span data-lang="zh" hidden>值</span></th></tr></thead>
 <tbody>
-<tr><td>Plugin</td><td><code>lycs-aiaa5050-llm-self-prediction 0.9.2</code></td></tr>
+<tr><td>Plugin</td><td><code>lycs-aiaa5050-llm-self-prediction 0.12.0</code></td></tr>
 <tr><td>Node.js</td><td><code>v26.13.0</code> on <code>win32 x64</code></td></tr>
-<tr><td>Started</td><td><code>2026-11-25T06:59:31.700Z</code></td></tr>
-<tr><td>Finished</td><td><code>2026-11-25T08:31:41.279Z</code></td></tr>
-<tr><td>Elapsed</td><td>5530 s</td></tr>
+<tr><td>Started</td><td><code>2026-11-28T19:27:16.663Z</code></td></tr>
+<tr><td>Finished</td><td><code>2026-11-28T19:53:10.577Z</code></td></tr>
+<tr><td>Elapsed</td><td>1554 s</td></tr>
 <tr><td>Seed</td><td><code>20260815</code></td></tr>
 <tr><td>Tolerance</td><td>0.050 nats</td></tr>
-<tr><td>Repetitions</td><td>3</td></tr>
+<tr><td>Repetitions</td><td>8</td></tr>
 <tr><td>Table entries</td><td>20</td></tr>
 </tbody>
 </table>
 <h2><span data-lang="en">File layout</span><span data-lang="zh" hidden>文件布局</span></h2>
-<pre><code>outputs/20261125T065931Z_48d684/
+<pre><code>outputs/20261128T195348Z_fe334a/
   run.json            the manifest of the run
+  revision.json       each revise pass and its reuse counts
   tasks.json          the selected tasks
   intermediate/       each raw request and each raw reply
   results/            metrics, records, report, and tables
   demos/              this website</code></pre>
 <h2><span data-lang="en">Commands</span><span data-lang="zh" hidden>命令</span></h2>
 <pre><code>node lib/cli.js env
-node lib/cli.js run --providers=huggingface --repetitions=3
-node lib/cli.js report --session=20261125T065931Z_48d684
+node lib/cli.js run --providers=huggingface --repetitions=8
+node lib/cli.js run --providers=huggingface --folder=20261128T195348Z_fe334a
+node lib/cli.js rename --session=20261128T195348Z_fe334a
+node lib/cli.js report --session=20261128T195348Z_fe334a
 npm run publish</code></pre>
 
 </main>
 <footer class="page-footer">
   <div class="footer-inner">
-    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.9.2. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.9.2 生成。随机种子 20260815。</span></p>
+    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.12.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.12.0 生成。随机种子 20260815。</span></p>
     <p><span data-lang="en">Tolerance 0.050 nats. Every number comes from the run directory.</span><span data-lang="zh" hidden>容差 0.050 nat。每个数字都来自运行目录。</span></p>
   </div>
 </footer>

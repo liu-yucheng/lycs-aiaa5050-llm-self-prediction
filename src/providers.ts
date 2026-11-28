@@ -12,10 +12,10 @@
 import https from "node:https";
 
 import {
-  CONDITION_INJECTED_ACTUAL,
-  CONDITION_INJECTED_SELF,
-  CONDITION_PLAIN_ACTUAL,
-  CONDITION_PLAIN_SELF,
+  CONDITION_ACTUAL,
+  CONDITION_ACTUAL_INJECTED_ACTUAL,
+  CONDITION_ACTUAL_INJECTED_SELF,
+  CONDITION_SELF,
   CONFIG_FILE_NAME,
   DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
   MAX_PROBABILITY_ENTRY_COUNT,
@@ -30,9 +30,9 @@ import { sleep } from "./files.js";
 import { buildDistribution } from "./probability.js";
 import {
   buildActualPredictionPrompt,
-  buildInjectedActualPrompt,
   buildInjectedSelfPredictionPrompt,
   buildInjectedTableMessage,
+  buildRepeatedActualPrompt,
   buildSelfPredictionPrompt,
   formatTableJson,
   parseSelfReport,
@@ -104,10 +104,10 @@ export interface PredictionOutcome {
 
 /** The outcome of the injected actual-prediction condition. */
 export interface InjectedActualOutcome {
-  /** The self report that the plugin keeps in context. */
-  readonly self: PredictionOutcome;
-  /** The served actual table that follows the self report. */
-  readonly actual: PredictionOutcome;
+  /** The served table of the first read, which the condition keeps in context. */
+  readonly first: PredictionOutcome;
+  /** The served table of the second read, which the condition records. */
+  readonly second: PredictionOutcome;
 }
 
 /** One client of one OpenAI-compatible endpoint. */
@@ -118,23 +118,38 @@ export interface ProviderClient {
   readonly model: string;
   /** The provider key of the client, expanded with the model name. */
   readonly providerKey: string;
-  /** Read the served table of one task. */
-  requestPlainActual(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
-  /** Read the self report of one task. */
-  requestPlainSelf(task: Task, repetition: number, signal?: AbortSignal): Promise<PredictionOutcome>;
-  /** Inject one served table and read the self report that follows. */
-  requestInjectedSelf(
+  /** Read the served table of one task in the `actual` condition. */
+  requestActualPrediction(
+    task: Task,
+    repetition: number,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome>;
+  /** Read the self report of one task in the `self` condition. */
+  requestSelfPrediction(
+    task: Task,
+    repetition: number,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome>;
+  /** Read one served table, inject it, and read the self report in `actual_injected_self`. */
+  requestActualInjectedSelfPrediction(
     task: Task,
     repetition: number,
     injected: TokenDistribution,
     signal?: AbortSignal,
   ): Promise<PredictionOutcome>;
-  /** Read one self report, keep it in context, and read the served table that follows. */
-  requestInjectedActual(
+  /** Read one served table, inject it, and read the table again in `actual_injected_actual`. */
+  requestActualInjectedActualPrediction(
     task: Task,
     repetition: number,
     signal?: AbortSignal,
   ): Promise<InjectedActualOutcome>;
+  /** Inject one stored served table and read the second served table of the condition. */
+  requestRepeatedActualPrediction(
+    task: Task,
+    repetition: number,
+    injected: TokenDistribution,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome>;
 }
 
 /**
@@ -1130,17 +1145,17 @@ export class OpenAiCompatibleClient implements ProviderClient {
    * @param signal - the cancellation signal.
    * @returns the prediction outcome.
    */
-  public async requestPlainActual(
+  public async requestActualPrediction(
     task: Task,
     repetition: number,
     signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    const prompt = buildActualPredictionPrompt(task);
-    const messages: ChatMessage[] = [
-      { role: "system", content: prompt.system },
-      { role: "user", content: prompt.user },
-    ];
-    return this.requestServedTable(CONDITION_PLAIN_ACTUAL, repetition, messages, signal);
+    return this.requestServedTable(
+      CONDITION_ACTUAL,
+      repetition,
+      this.buildTaskMessages(task),
+      signal,
+    );
   }
 
   /**
@@ -1151,79 +1166,121 @@ export class OpenAiCompatibleClient implements ProviderClient {
    * @param signal - the cancellation signal.
    * @returns the prediction outcome.
    */
-  public async requestPlainSelf(
+  public async requestSelfPrediction(
     task: Task,
     repetition: number,
     signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
-    const messages: ChatMessage[] = [
-      { role: "system", content: prompt.system },
-      { role: "user", content: prompt.user },
-    ];
-    return this.requestSelfReport(CONDITION_PLAIN_SELF, repetition, messages, signal);
+    return this.requestSelfReport(
+      CONDITION_SELF,
+      repetition,
+      this.buildTaskMessages(task, true),
+      signal,
+    );
   }
 
   /**
-   * Inject one served table and read the self report that follows.
+   * Read one served table, inject it, and read the self report that follows.
    *
    * @param task - the task.
    * @param repetition - the repetition number.
-   * @param injected - the served table.
+   * @param injected - the served table of the same task and repetition.
    * @param signal - the cancellation signal.
    * @returns the prediction outcome.
    */
-  public async requestInjectedSelf(
+  public async requestActualInjectedSelfPrediction(
     task: Task,
     repetition: number,
     injected: TokenDistribution,
     signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
     const messages: ChatMessage[] = [
-      { role: "system", content: prompt.system },
-      { role: "user", content: prompt.user },
+      ...this.buildTaskMessages(task, true),
       { role: "assistant", content: buildInjectedTableMessage(injected) },
-      {
-        role: "user",
-        content: buildInjectedSelfPredictionPrompt(task, this.tableEntryCount),
-      },
+      { role: "user", content: buildInjectedSelfPredictionPrompt(task, this.tableEntryCount) },
     ];
-    return this.requestSelfReport(CONDITION_INJECTED_SELF, repetition, messages, signal);
+    return this.requestSelfReport(CONDITION_ACTUAL_INJECTED_SELF, repetition, messages, signal);
   }
 
   /**
-   * Read one self report, keep it in context, and read the served table that follows.
+   * Read one served table, inject it, and read the served table again.
    *
    * @param task - the task.
    * @param repetition - the repetition number.
    * @param signal - the cancellation signal.
-   * @returns both outcomes.
+   * @returns the first read and the second read.
    */
-  public async requestInjectedActual(
+  public async requestActualInjectedActualPrediction(
     task: Task,
     repetition: number,
     signal?: AbortSignal,
   ): Promise<InjectedActualOutcome> {
-    const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
-    const selfMessages: ChatMessage[] = [
-      { role: "system", content: prompt.system },
-      { role: "user", content: prompt.user },
-    ];
-    const self = await this.requestSelfReport(CONDITION_INJECTED_ACTUAL, repetition, selfMessages, signal);
-    const tableText = formatTableJson({ entries: self.draft.distribution.entries });
+    const first = await this.requestServedTable(
+      CONDITION_ACTUAL_INJECTED_ACTUAL,
+      repetition,
+      this.buildTaskMessages(task),
+      signal,
+    );
+    const second = await this.requestRepeatedActualPrediction(
+      task,
+      repetition,
+      first.draft.distribution,
+      signal,
+    );
+    return { first, second };
+  }
+
+  /**
+   * Inject one stored served table and read the second served table.
+   *
+   * The method serves a revise pass. The pass reuses the first read of one earlier repetition, so
+   * the pass issues the second read only.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param injected - the stored served table of the same task and repetition.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome of the second read.
+   */
+  public async requestRepeatedActualPrediction(
+    task: Task,
+    repetition: number,
+    injected: TokenDistribution,
+    signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
     const messages: ChatMessage[] = [
-      ...selfMessages,
-      { role: "assistant", content: tableText },
-      { role: "user", content: buildInjectedActualPrompt(task) },
+      ...this.buildTaskMessages(task),
+      { role: "assistant", content: buildInjectedTableMessage(injected) },
+      { role: "user", content: buildRepeatedActualPrompt(task) },
     ];
-    const actual = await this.requestServedTable(
-      CONDITION_INJECTED_ACTUAL,
+    return this.requestServedTable(
+      CONDITION_ACTUAL_INJECTED_ACTUAL,
       repetition,
       messages,
       signal,
     );
-    return { self, actual };
+  }
+
+  /**
+   * Build the two messages of one task.
+   *
+   * @param task - the task.
+   * @param selfPrediction - true for the self-prediction prompt, false for the actual prompt.
+   * @returns the system message and the user message.
+   */
+  private buildTaskMessages(task: Task, selfPrediction = false): ChatMessage[] {
+    if (selfPrediction) {
+      const prompt = buildSelfPredictionPrompt(task, this.tableEntryCount);
+      return [
+        { role: "system", content: prompt.system },
+        { role: "user", content: prompt.user },
+      ];
+    }
+    const prompt = buildActualPredictionPrompt(task);
+    return [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ];
   }
 
   /**
@@ -1388,10 +1445,10 @@ export class OpenAiCompatibleClient implements ProviderClient {
 /** The token alphabet of the mock client. */
 /** The weight of the served table in each mock condition. */
 const MOCK_CONDITION_WEIGHTS: Readonly<Record<ConditionName, number>> = {
-  plain_actual: 1,
-  plain_self: 0,
-  injected_self: 0.55,
-  injected_actual: 0.85,
+  actual: 1,
+  self: 0,
+  actual_injected_self: 0.55,
+  actual_injected_actual: 1,
 };
 
 const MOCK_TOKENS = [
@@ -1487,6 +1544,82 @@ function mockWeights(count: number, rotation: number): number[] {
   return weights.map((value) => value / total);
 }
 
+/**
+ * Build one recorded served-table reply in the shape of the compatible API.
+ *
+ * The reply shows the table that the mock client reads, so a later revise pass can reuse the
+ * recorded file in the same way it reuses a recorded network reply.
+ *
+ * @param model - the model name.
+ * @param condition - the condition name.
+ * @param distribution - the served table.
+ * @returns the response body.
+ */
+function buildMockServedTableReply(
+  model: string,
+  condition: ConditionName,
+  distribution: TokenDistribution,
+): Record<string, unknown> {
+  const content = distribution.entries.map((entry) => ({
+    token: entry.token,
+    logprob: entry.logProbability,
+  }));
+  return {
+    id: `mock-${condition}`,
+    object: "chat.completion",
+    model,
+    choices: [
+      {
+        index: 0,
+        finish_reason: "stop",
+        message: { role: "assistant", content: distribution.topToken },
+        logprobs: {
+          content: [
+            {
+              token: distribution.topToken,
+              logprob: distribution.entries[0]?.logProbability ?? 0,
+              top_logprobs: content,
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Build one recorded self-report reply in the shape of the compatible API.
+ *
+ * @param model - the model name.
+ * @param condition - the condition name.
+ * @param distribution - the reported table.
+ * @returns the response body.
+ */
+function buildMockSelfReportReply(
+  model: string,
+  condition: ConditionName,
+  distribution: TokenDistribution,
+): Record<string, unknown> {
+  const content = {
+    entries: distribution.entries.map((entry) => ({
+      token: entry.token,
+      logProbability: entry.logProbability,
+    })),
+  };
+  return {
+    id: `mock-${condition}`,
+    object: "chat.completion",
+    model,
+    choices: [
+      {
+        index: 0,
+        finish_reason: "stop",
+        message: { role: "assistant", content: JSON.stringify(content) },
+      },
+    ],
+  };
+}
+
 /** One deterministic client that needs no network. */
 export class MockProviderClient implements ProviderClient {
   /** The provider definition of the client. */
@@ -1518,12 +1651,12 @@ export class MockProviderClient implements ProviderClient {
    * @param signal - the cancellation signal.
    * @returns the prediction outcome.
    */
-  public async requestPlainActual(
+  public async requestActualPrediction(
     task: Task,
     repetition: number,
     _signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    return this.buildOutcome(CONDITION_PLAIN_ACTUAL, task, repetition, "provider_logprobs");
+    return this.buildOutcome(CONDITION_ACTUAL, task, repetition, "provider_logprobs");
   }
 
   /**
@@ -1534,16 +1667,16 @@ export class MockProviderClient implements ProviderClient {
    * @param signal - the cancellation signal.
    * @returns the prediction outcome.
    */
-  public async requestPlainSelf(
+  public async requestSelfPrediction(
     task: Task,
     repetition: number,
     _signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    return this.buildOutcome(CONDITION_PLAIN_SELF, task, repetition, "self_report");
+    return this.buildOutcome(CONDITION_SELF, task, repetition, "self_report");
   }
 
   /**
-   * Read one mock injected self report.
+   * Read one mock actual-injected self report.
    *
    * @param task - the task.
    * @param repetition - the repetition number.
@@ -1551,32 +1684,64 @@ export class MockProviderClient implements ProviderClient {
    * @param signal - the cancellation signal.
    * @returns the prediction outcome.
    */
-  public async requestInjectedSelf(
+  public async requestActualInjectedSelfPrediction(
     task: Task,
     repetition: number,
     _injected: TokenDistribution,
     _signal?: AbortSignal,
   ): Promise<PredictionOutcome> {
-    return this.buildOutcome(CONDITION_INJECTED_SELF, task, repetition, "self_report");
+    return this.buildOutcome(CONDITION_ACTUAL_INJECTED_SELF, task, repetition, "self_report");
   }
 
   /**
-   * Read one mock injected actual table.
+   * Read two mock served tables.
    *
    * @param task - the task.
    * @param repetition - the repetition number.
    * @param signal - the cancellation signal.
-   * @returns both outcomes.
+   * @returns the first read and the second read.
    */
-  public async requestInjectedActual(
+  public async requestActualInjectedActualPrediction(
     task: Task,
     repetition: number,
     _signal?: AbortSignal,
   ): Promise<InjectedActualOutcome> {
-    return {
-      self: this.buildOutcome(CONDITION_INJECTED_ACTUAL, task, repetition, "self_report"),
-      actual: this.buildOutcome(CONDITION_INJECTED_ACTUAL, task, repetition, "provider_logprobs"),
-    };
+    const first = this.buildOutcome(
+      CONDITION_ACTUAL_INJECTED_ACTUAL,
+      task,
+      repetition,
+      "provider_logprobs",
+    );
+    const second = this.buildOutcome(
+      CONDITION_ACTUAL_INJECTED_ACTUAL,
+      task,
+      repetition,
+      "provider_logprobs",
+    );
+    return { first, second };
+  }
+
+  /**
+   * Read one mock served table after one injected table.
+   *
+   * @param task - the task.
+   * @param repetition - the repetition number.
+   * @param injected - the injected table.
+   * @param signal - the cancellation signal.
+   * @returns the prediction outcome.
+   */
+  public async requestRepeatedActualPrediction(
+    task: Task,
+    repetition: number,
+    _injected: TokenDistribution,
+    _signal?: AbortSignal,
+  ): Promise<PredictionOutcome> {
+    return this.buildOutcome(
+      CONDITION_ACTUAL_INJECTED_ACTUAL,
+      task,
+      repetition,
+      "provider_logprobs",
+    );
   }
 
   /**
@@ -1625,12 +1790,10 @@ export class MockProviderClient implements ProviderClient {
             mock: true,
             condition,
           },
-          responseBody: {
-            mock: true,
-            model: this.model,
-            condition,
-            entries: distribution.entries,
-          },
+          responseBody:
+            source === "provider_logprobs"
+              ? buildMockServedTableReply(this.model, condition, distribution)
+              : buildMockSelfReportReply(this.model, condition, distribution),
         },
       ],
     };
@@ -1670,7 +1833,7 @@ export async function probeLogprobsSupport(
   signal?: AbortSignal,
 ): Promise<{ supported: boolean; reason?: string; entryCount: number }> {
   try {
-    const outcome = await client.requestPlainActual(task, 1, signal);
+    const outcome = await client.requestActualPrediction(task, 1, signal);
     const entryCount = outcome.draft.distribution.supportSize;
     return { supported: entryCount > 1, entryCount };
   } catch (error) {
@@ -1680,6 +1843,82 @@ export async function probeLogprobsSupport(
       entryCount: 0,
     };
   }
+}
+
+/** One raw exchange as the plugin writes it to an intermediate file. */
+export interface RecordedRawFile {
+  /** The ISO timestamp of the request. */
+  readonly requestedAt: string;
+  /** The elapsed time of the request. */
+  readonly elapsedMilliseconds: number;
+  /** The endpoint URL. */
+  readonly endpoint: string;
+  /** The request body. */
+  readonly request: unknown;
+  /** The response body. */
+  readonly response: unknown;
+  /** True when the file marks a reused table and holds no response. */
+  readonly reused?: boolean;
+  /** The file that the marker points at. */
+  readonly reusedFrom?: string;
+}
+
+/**
+ * Read one recorded raw file and rebuild its prediction record.
+ *
+ * The function serves a revise pass. The pass reads the intermediate files of an earlier run and
+ * rebuilds the table of each condition, so the pass requests only the tables that are absent.
+ *
+ * @param options - the condition, the repetition, the file name, the file value, and the entry count.
+ * @returns the prediction record.
+ * @throws ExperimentError when the file holds no usable table.
+ */
+export function readRecordedPrediction(options: {
+  readonly condition: ConditionName;
+  readonly repetition: number;
+  readonly fileName: string;
+  readonly value: unknown;
+  readonly topLogprobsCount: number;
+}): PredictionRecord {
+  if (!isRecord(options.value)) {
+    throw new ExperimentError("INVALID_RESPONSE", "The recorded file is not a JSON object.");
+  }
+  if (options.value["reused"] === true) {
+    throw new ExperimentError("INVALID_RESPONSE", "The recorded file is a reuse marker.");
+  }
+  const requestedAt =
+    typeof options.value["requestedAt"] === "string" ? options.value["requestedAt"] : "";
+  const elapsedMilliseconds =
+    typeof options.value["elapsedMilliseconds"] === "number"
+      ? options.value["elapsedMilliseconds"]
+      : 0;
+  const endpoint = typeof options.value["endpoint"] === "string" ? options.value["endpoint"] : "";
+  const response = options.value["response"];
+  const requestBody = options.value["request"];
+  const isSelfReport =
+    options.condition === CONDITION_SELF || options.condition === CONDITION_ACTUAL_INJECTED_SELF;
+  let token: string | undefined;
+  let distribution: TokenDistribution;
+  if (isSelfReport) {
+    const choice = readFirstChoice(response);
+    distribution = buildSelfDistribution(readMessageContent(choice), readToolArguments(choice));
+  } else {
+    const served = readServedTable(response, options.topLogprobsCount);
+    token = served.token;
+    distribution = served.distribution;
+  }
+  return {
+    condition: options.condition,
+    repetition: options.repetition,
+    requestedAt,
+    elapsedMilliseconds,
+    token,
+    distribution,
+    source: isSelfReport ? "self_report" : "provider_logprobs",
+    rawFileNames: [options.fileName],
+    endpoint,
+    requestBody,
+  };
 }
 
 /**

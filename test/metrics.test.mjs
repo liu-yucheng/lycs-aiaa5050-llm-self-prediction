@@ -10,6 +10,7 @@ import {
   computeComparisonMetrics,
   computeSessionMetrics,
   createRandomGenerator,
+  decideSessionHypothesis,
   decideVerdict,
 } from "../lib/metrics.js";
 import { buildDistribution } from "../lib/probability.js";
@@ -30,7 +31,9 @@ function prediction(condition, repetition, pairs) {
     elapsedMilliseconds: 120,
     token: pairs[0][0],
     distribution: table(pairs),
-    source: condition === "plain_actual" ? "provider_logprobs" : "self_report",
+    source: condition === "actual" || condition === "actual_injected_actual"
+      ? "provider_logprobs"
+      : "self_report",
     rawFileNames: [`${condition}-r${repetition}-call1.json`],
     endpoint: "mock://local",
     requestBody: {},
@@ -79,18 +82,18 @@ test("a task record pairs each actual repetition with each predicted repetition"
     "Mock",
     "mock-model",
     {
-      plain_actual: [prediction("plain_actual", 1, identical), prediction("plain_actual", 2, identical)],
-      plain_self: [prediction("plain_self", 1, shifted), prediction("plain_self", 2, identical)],
-      injected_self: [prediction("injected_self", 1, identical)],
-      injected_actual: [],
+      actual: [prediction("actual", 1, identical), prediction("actual", 2, identical)],
+      self: [prediction("self", 1, shifted), prediction("self", 2, identical)],
+      actual_injected_self: [prediction("actual_injected_self", 1, identical)],
+      actual_injected_actual: [],
     },
     [],
   );
-  assert.equal(record.comparisons.plain_self.length, 4);
-  assert.equal(record.comparisons.injected_self.length, 2);
-  assert.equal(record.comparisons.injected_actual.length, 0);
-  assert.equal(record.comparisons.plain_self[0].actualRepetition, 1);
-  assert.equal(record.comparisons.plain_self[1].predictedRepetition, 2);
+  assert.equal(record.comparisons.self.length, 4);
+  assert.equal(record.comparisons.actual_injected_self.length, 2);
+  assert.equal(record.comparisons.actual_injected_actual.length, 0);
+  assert.equal(record.comparisons.self[0].actualRepetition, 1);
+  assert.equal(record.comparisons.self[1].predictedRepetition, 2);
 });
 
 test("the random generator repeats a sequence for one seed", () => {
@@ -138,10 +141,10 @@ test("the session metrics hold one result for each provider and comparison", () 
       "Mock",
       "mock-model",
       {
-        plain_actual: [prediction("plain_actual", 1, identical)],
-        plain_self: [prediction("plain_self", 1, identical)],
-        injected_self: [prediction("injected_self", 1, shifted)],
-        injected_actual: [prediction("injected_actual", 1, identical)],
+        actual: [prediction("actual", 1, identical)],
+        self: [prediction("self", 1, identical)],
+        actual_injected_self: [prediction("actual_injected_self", 1, shifted)],
+        actual_injected_actual: [prediction("actual_injected_actual", 1, identical)],
       },
       [],
     ),
@@ -151,16 +154,17 @@ test("the session metrics hold one result for each provider and comparison", () 
       "Mock",
       "mock-model",
       {
-        plain_actual: [prediction("plain_actual", 1, identical)],
-        plain_self: [prediction("plain_self", 1, shifted)],
-        injected_self: [prediction("injected_self", 1, shifted)],
-        injected_actual: [prediction("injected_actual", 1, shifted)],
+        actual: [prediction("actual", 1, identical)],
+        self: [prediction("self", 1, shifted)],
+        actual_injected_self: [prediction("actual_injected_self", 1, shifted)],
+        actual_injected_actual: [prediction("actual_injected_actual", 1, shifted)],
       },
       [],
     ),
   ];
   const metrics = computeSessionMetrics({
     xid: "20261125T090000Z_abc123",
+    protocolVersion: "2.0.0",
     datasetIds: ["test"],
     languages: ["zh-Hans"],
     records,
@@ -178,6 +182,60 @@ test("the session metrics hold one result for each provider and comparison", () 
   assert.equal(provider.comparisons[0].pairCount, 2);
   assert.equal(provider.verdicts.length, 3);
   assert.equal(metrics.verdicts.length, 1);
+  assert.equal(provider.comparisons[0].hypothesis.testName, "wilcoxon_signed_rank");
+  assert.equal(metrics.hypothesis.alpha, 0.05);
+  assert.equal(["alternative", "null", "mixed"].includes(metrics.hypothesis.verdict), true);
   assert.equal(provider.categories.length, 1);
   assert.equal(provider.languages.length, 1);
+});
+
+test("the control comparison gates the session verdict", () => {
+  const makeTest = (comparison, median, rejected) => ({
+    testName: "wilcoxon_signed_rank",
+    comparison,
+    sampleCount: 8,
+    nullValue: 0,
+    median,
+    statistic: 30,
+    zScore: 2.5,
+    pValue: rejected ? 0.001 : 0.5,
+    alpha: 0.05,
+    rejectsNull: rejected,
+  });
+  const alternative = decideSessionHypothesis(
+    [
+      makeTest("self", 3.5, true),
+      makeTest("actual_injected_self", 1.5, true),
+      makeTest("actual_injected_actual", 0.001, true),
+    ],
+    0.05,
+  );
+  assert.equal(alternative.verdict, "alternative");
+  assert.equal(alternative.alternativeHolds, true);
+  assert.equal(alternative.testCount, 2);
+  assert.equal(alternative.controlTestCount, 1);
+  assert.equal(alternative.controlViolationCount, 0);
+
+  const mixed = decideSessionHypothesis(
+    [
+      makeTest("self", 3.5, true),
+      makeTest("actual_injected_self", 1.5, true),
+      makeTest("actual_injected_actual", 4.5, true),
+    ],
+    0.05,
+  );
+  assert.equal(mixed.verdict, "mixed");
+  assert.equal(mixed.controlViolationCount, 1);
+  assert.equal(mixed.controlMedianMaximum, 4.5);
+
+  const nullResult = decideSessionHypothesis(
+    [
+      makeTest("self", 0.01, false),
+      makeTest("actual_injected_self", 0.02, false),
+      makeTest("actual_injected_actual", 0.001, false),
+    ],
+    0.05,
+  );
+  assert.equal(nullResult.verdict, "null");
+  assert.equal(nullResult.rejectedCount, 0);
 });

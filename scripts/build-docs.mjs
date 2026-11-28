@@ -216,17 +216,19 @@ const overviewBody = [
       "Providers",
       "Hugging Face router models, OpenAI chat models, and a deterministic mock provider",
     ],
-    ["Conditions", "plain actual, plain self, injected self, injected actual; 3 repetitions each"],
-    ["Comparisons", "3: plain self, injected self, and injected actual against the plain actual table"],
+    ["Conditions", "actual, self, actual then actual, and actual then self; 8 repetitions each"],
+    ["Comparisons", "3: self, actual then self, and actual then actual against the actual table"],
     ["Verdict", "Bootstrap interval of the mean symmetric KL against a tolerance of 0.05 nats"],
+    ["Hypothesis test", "One-sided Wilcoxon signed-rank test of the median divergence, alpha 0.05"],
   ]),
   section(
     "Why four conditions",
     list([
-      "The plain actual table is the ground truth, because the provider computes it and the model does not write it.",
-      "The plain self table shows what the model says when it must state its own prediction.",
-      "The injected self table shows whether the true table moves the self report toward the truth.",
-      "The injected actual table shows whether the self report distorts the served table that follows it.",
+      "The actual table is the ground truth, because the provider computes it and the model does not write it.",
+      "The self table shows what the model says when it must state its own prediction.",
+      "The actual-then-self table shows whether the true table moves the self report toward the truth.",
+      "The actual-then-actual table is the control. The model reads the table, reads the table again, " +
+        "and any divergence is the noise of the reading, not a self report.",
     ]),
   ),
   section(
@@ -235,7 +237,19 @@ const overviewBody = [
       "<code>outputs/&lt;xid&gt;/intermediate/</code> holds every raw exchange, one file for each call.",
       "<code>outputs/&lt;xid&gt;/results/</code> holds the metrics, the records, the report, and the tables.",
       "<code>outputs/&lt;xid&gt;/demos/</code> holds the static bilingual demonstration website.",
+      "<code>outputs/&lt;xid&gt;/revision.json</code> holds one entry for each revise pass of the folder.",
       "<code>node lib/cli.js demos [&lt;xid&gt;]</code> writes that website again from the current templates.",
+    ]),
+  ),
+  section(
+    "One folder for one run",
+    list([
+      "A run reads one output folder and writes only that folder.",
+      "A run that names an existing folder revises it. The pass keeps every raw table that the " +
+        "current protocol reads, requests the absent tables, and removes each raw file that the " +
+        "current protocol does not read.",
+      "<code>node lib/cli.js rename --session=&lt;xid&gt;</code> moves the folder to a fresh " +
+        "identifier, and the manifest keeps the old identifier.",
     ]),
   ),
   section(
@@ -250,18 +264,23 @@ const overviewBody = [
         "",
         "# a real run reads the key from .env",
         "node lib/cli.js env",
-        "node lib/cli.js run",
+        "node lib/cli.js run --folder=<name> --repetitions=8",
+        "",
+        "# a revise pass of the same folder, then a new identifier",
+        "node lib/cli.js run --folder=<name> --repetitions=8",
+        "node lib/cli.js rename --session=<name>",
       ].join("\n"),
     ),
   ),
   section(
-    "The five tools",
+    "The six tools",
     table(
       ["Tool", "Purpose"],
       [
-        ["<code>llm_self_prediction_run</code>", "Run one session and write the session directory."],
+        ["<code>llm_self_prediction_run</code>", "Run or revise one folder and write the session files."],
         ["<code>llm_self_prediction_status</code>", "List the recent sessions with their verdicts."],
         ["<code>llm_self_prediction_report</code>", "Read the Markdown report of one session."],
+        ["<code>llm_self_prediction_rename</code>", "Move one folder to a fresh identifier."],
         ["<code>llm_self_prediction_dataset</code>", "Summarize the two dataset files."],
         ["<code>llm_self_prediction_help</code>", "Explain the protocol and the provider setup."],
       ],
@@ -306,17 +325,18 @@ const designBody = [
     table(
       ["Condition", "Context", "Table origin"],
       [
-        ["<code>plain_actual</code>", "The task prompt.", "The provider logprobs of one served token."],
-        ["<code>plain_self</code>", "The task prompt.", "The JSON table in the reply body."],
+        ["<code>actual</code>", "The task prompt.", "The provider logprobs of one served token."],
+        ["<code>self</code>", "The task prompt.", "The JSON table in the reply body."],
         [
-          "<code>injected_self</code>",
-          "The task prompt, then one assistant message with a served table.",
-          "The JSON table in the second reply body.",
+          "<code>actual_injected_actual</code>",
+          "The task prompt, then one assistant message with the served table, then the task prompt again.",
+          "The provider logprobs of the second read. This condition is the control.",
         ],
         [
-          "<code>injected_actual</code>",
-          "The task prompt, then one assistant message with a self report.",
-          "The provider logprobs of the following served token.",
+          "<code>actual_injected_self</code>",
+          "The task prompt, then one assistant message with the served table, then one request for " +
+            "the own table.",
+          "The JSON table in the second reply body.",
         ],
       ],
     ),
@@ -325,13 +345,13 @@ const designBody = [
     "The repetitions",
     [
       paragraph(
-        "Each condition runs three times for each task. The temperature is zero, so the served " +
+        "Each condition runs eight times for each task. The temperature is zero, so the served " +
           "table of one model changes little across repetitions, while a self report can change a " +
           "lot. Both kinds of repetition appear in the comparison.",
       ),
       paragraph(
-        "One comparison pairs each actual repetition with each predicted repetition. Three " +
-          "repetitions give nine pairs for each task and each comparison.",
+        "One comparison pairs each actual repetition with each predicted repetition. Eight " +
+          "repetitions give sixty-four pairs for each task and each comparison.",
       ),
     ].join("\n  "),
   ),
@@ -432,21 +452,27 @@ const protocolBody = [
     ].join("\n  "),
   ),
   section(
-    "The two injections",
+    "The two injected conditions",
     [
       paragraph(
-        "<strong>Injected self.</strong> The plugin sends the task prompt, then one assistant " +
-          "message that holds a served table, then one user message that asks for the self report " +
-          "again. The second report is the measurement.",
+        "<strong>Actual then self.</strong> The plugin sends the task prompt, then one assistant " +
+          "message that holds the served table of the same repetition, then one user message that " +
+          "asks for the own table. The second table is the measurement.",
       ),
       paragraph(
-        "<strong>Injected actual.</strong> The plugin reads one self report, keeps that report as " +
-          "one assistant message, and then asks for the served table of the same prefix. The served " +
-          "table that follows is the measurement.",
+        "<strong>Actual then actual.</strong> The plugin sends the task prompt, then one assistant " +
+          "message that holds the served table of the same repetition, then the task prompt again. " +
+          "The served table of the second read is the measurement. The first read of the pair is " +
+          "the <code>actual</code> table of the same repetition, so the folder needs no extra call.",
       ),
       paragraph(
-        "The plugin records both calls of the second injection, so a reader can see whether the " +
-          "model repeated its own table or changed it.",
+        "The condition that reads the table twice is the control. It shows how far one reading " +
+          "stands from another reading of the same model and the same prefix. A divergence that " +
+          "stays near that level is not evidence of a self report.",
+      ),
+      paragraph(
+        "The plugin writes a marker file for the reused first read, so a reader can tell a reused " +
+          "table from a fresh call. The marker holds no table.",
       ),
     ].join("\n  "),
   ),
@@ -485,11 +511,38 @@ const measuresBody = [
     table(
       ["Comparison", "Actual side", "Predicted side"],
       [
-        ["<code>plain_self</code>", "<code>plain_actual</code>", "<code>plain_self</code>"],
-        ["<code>injected_self</code>", "<code>plain_actual</code>", "<code>injected_self</code>"],
-        ["<code>injected_actual</code>", "<code>plain_actual</code>", "<code>injected_actual</code>"],
+        ["<code>self</code>", "<code>actual</code>", "<code>self</code>"],
+        ["<code>actual_injected_self</code>", "<code>actual</code>", "<code>actual_injected_self</code>"],
+        [
+          "<code>actual_injected_actual</code>",
+          "<code>actual</code>",
+          "<code>actual_injected_actual</code>",
+        ],
       ],
     ),
+  ),
+  section(
+    "The hypothesis test",
+    [
+      paragraph(
+        "The bootstrap interval states the uncertainty of the mean. The hypothesis test states " +
+          "the evidence against the null hypothesis. The plugin runs one one-sided Wilcoxon " +
+          "signed-rank test for each comparison. The sample is the per-task median symmetric KL, " +
+          "the null value is the tolerance of 0.05 nats, and the alternative states that the " +
+          "median stands above the null value.",
+      ),
+      paragraph(
+        "The test uses the normal approximation with a tie correction, and it drops every zero " +
+          "difference. A comparison rejects the null hypothesis when its p-value is below alpha, " +
+          "which is 0.05 by default.",
+      ),
+      paragraph(
+        "The session holds the alternative hypothesis only when every comparison rejects the null " +
+          "and every median stands above the tolerance. The session holds the null hypothesis when " +
+          "no comparison rejects the null. A mixed result means that one comparison rejects and " +
+          "another one does not.",
+      ),
+    ].join("\n  "),
   ),
   section(
     "The alignment",
@@ -566,9 +619,12 @@ const referenceBody = [
       [
         ["<code>providers</code>", "string array", "Provider keys or model keys. Empty selects every enabled model."],
         ["<code>tasks</code>", "string array", "Task identifiers in the selected order. Empty selects every task."],
-        ["<code>repetitions</code>", "integer 1 to 10", "The repetition count of each condition. Default 3."],
+        ["<code>repetitions</code>", "integer 1 to 16", "The repetition count of each condition. Default 8."],
         ["<code>toleranceNats</code>", "number", "The verdict tolerance in nats. Default 0.05."],
+        ["<code>alpha</code>", "number 1e-6 to 0.5", "The alpha level of the hypothesis test. Default 0.05."],
         ["<code>outputDirectory</code>", "string", "The output root. Empty uses the plugin setting."],
+        ["<code>folder</code>", "string", "The one output folder. An existing folder is revised."],
+        ["<code>renameFolder</code>", "boolean", "Move the folder to a fresh identifier at the end."],
         ["<code>seed</code>", "integer", "The bootstrap seed. Default 20260815."],
         ["<code>maxConcurrency</code>", "integer 1 to 16", "The number of tasks that run at the same time."],
         ["<code>topLogprobsCount</code>", "integer 2 to 64", "The requested table size. Default 20."],
@@ -583,13 +639,16 @@ const referenceBody = [
         "node lib/cli.js run [options]",
         "node lib/cli.js status [--limit=5]",
         "node lib/cli.js report [--session=<xid>]",
+        "node lib/cli.js demos [--session=<xid>]",
+        "node lib/cli.js rename --session=<xid>",
         "node lib/cli.js dataset [--sample=8]",
         "node lib/cli.js env",
         "node lib/cli.js help",
         "",
         "# run options",
-        "--providers=<keys> --tasks=<ids> --repetitions=<n> --tolerance=<nats>",
-        "--output=<directory> --seed=<n> --concurrency=<n> --entries=<n> --dry-run",
+        "--providers=<keys> --tasks=<ids> --repetitions=<n> --tolerance=<nats> --alpha=<level>",
+        "--folder=<name> --rename-folder --output=<directory> --seed=<n> --concurrency=<n>",
+        "--entries=<n> --dry-run",
       ].join("\n"),
     ),
   ),
@@ -645,9 +704,10 @@ const referenceBody = [
       [
         "outputs/<xid>/",
         "  run.json                     the manifest: status, options, providers, versions",
+        "  revision.json                one record for each revise pass of the folder",
         "  tasks.json                   the selected tasks",
         "  intermediate/<providerKey>/<taskId>/<condition>-r<n>-call<k>.json",
-        "  results/metrics.json         the three comparisons, the summaries, the verdicts",
+        "  results/metrics.json         the three comparisons, the summaries, the tests, the verdicts",
         "  results/records.json         one task record for each task and model",
         "  results/records/<providerKey>/<taskId>.json",
         "  results/report.md            the Markdown report",
@@ -800,6 +860,7 @@ const detailMarkdown = [
   "A DeepSeek Harness plugin for the experiment \"Can LLMs predict their own next token",
   "predictions?\". The plugin asks one model for one next-token table, asks the same model to",
   "report that table, and measures the distance between the two tables under two injections.",
+  "One run works on one output folder, and a second run on the same folder revises it.",
   "",
   "## Research question",
   "",
@@ -818,25 +879,26 @@ const detailMarkdown = [
   "",
   "| Condition | Context | Table origin |",
   "| --- | --- | --- |",
-  "| `plain_actual` | The task prompt. | The provider logprobs of one served token. |",
-  "| `plain_self` | The task prompt. | The JSON table in the reply body. |",
-  "| `injected_self` | Task prompt, then an assistant message with a served table." +
-    " | The JSON table in the second reply. |",
-  "| `injected_actual` | Task prompt, then an assistant message with a self report." +
-    " | The served table that follows. |",
+  "| `actual` | The task prompt. | The provider logprobs of one served token. |",
+  "| `self` | The task prompt. | The JSON table in the reply body. |",
+  "| `actual_injected_actual` | Task prompt, then an assistant message with the served table," +
+    " then the task prompt again. | The provider logprobs of the second read. This condition is" +
+    " the control. |",
+  "| `actual_injected_self` | Task prompt, then an assistant message with the served table," +
+    " then one request for the own table. | The JSON table in the second reply. |",
   "",
-  "Each condition runs three times for each task at `temperature: 0`.",
+  "Each condition runs eight times for each task at `temperature: 0`.",
   "",
   "## Comparisons",
   "",
   "| Comparison | Actual side | Predicted side |",
   "| --- | --- | --- |",
-  "| `plain_self` | `plain_actual` | `plain_self` |",
-  "| `injected_self` | `plain_actual` | `injected_self` |",
-  "| `injected_actual` | `plain_actual` | `injected_actual` |",
+  "| `self` | `actual` | `self` |",
+  "| `actual_injected_self` | `actual` | `actual_injected_self` |",
+  "| `actual_injected_actual` | `actual` | `actual_injected_actual` |",
   "",
-  "One comparison pairs each actual repetition with each predicted repetition, so three",
-  "repetitions give nine pairs for each task and comparison.",
+  "One comparison pairs each actual repetition with each predicted repetition, so eight",
+  "repetitions give sixty-four pairs for each task and comparison.",
   "",
   "## Measures",
   "",
@@ -861,6 +923,29 @@ const detailMarkdown = [
   "- `separated`: the lower bound of the interval is above the tolerance.",
   "- `inconclusive`: the interval covers the tolerance, or the comparison holds no pair.",
   "",
+  "## Hypothesis test",
+  "",
+  "The plugin runs one one-sided Wilcoxon signed-rank test for each comparison. The sample is the",
+  "per-task median symmetric KL. The null value is the tolerance. The test uses the normal",
+  "approximation with a tie correction, drops every zero difference, and reports a one-sided",
+  "p-value. A comparison rejects the null hypothesis when the p-value is below alpha.",
+  "",
+  "The session holds the alternative hypothesis only when every comparison rejects the null and",
+  "every median stands above the tolerance. The session holds the null hypothesis when no",
+  "comparison rejects the null. A mixed result means that one comparison rejects and another one",
+  "does not.",
+  "",
+  "## One folder for one run",
+  "",
+  "A run reads one output folder and writes only that folder. A run that names an existing folder",
+  "revises it: the pass keeps every raw table that the current protocol reads, requests the absent",
+  "tables, and removes each raw file that the current protocol does not read. The folder keeps one",
+  "`revision.json` with one entry for each revise pass.",
+  "",
+  "A rename moves the folder to a fresh identifier of the form `<timestamp>_<short identifier>`.",
+  "The manifest keeps the old identifier in `previousXid`.",
+  "",
+  "",
   "## Dataset",
   "",
   "`inputs/testing-dataset/` holds `dataset-zh-32.json` and `dataset-en-32.json`. Each file holds 32",
@@ -873,6 +958,7 @@ const detailMarkdown = [
   "```text",
   "outputs/<xid>/",
   "  run.json",
+  "  revision.json",
   "  tasks.json",
   "  intermediate/<providerKey>/<taskId>/<condition>-r<n>-call<k>.json",
   "  results/metrics.json",
@@ -895,9 +981,10 @@ const detailMarkdown = [
   "",
   "## Tools",
   "",
-  "- `llm_self_prediction_run`: run one session.",
+  "- `llm_self_prediction_run`: run or revise one folder.",
   "- `llm_self_prediction_status`: list the recent sessions.",
   "- `llm_self_prediction_report`: read one Markdown report.",
+  "- `llm_self_prediction_rename`: move one folder to a fresh identifier.",
   "- `llm_self_prediction_dataset`: summarize the dataset files.",
   "- `llm_self_prediction_help`: explain the protocol and the provider setup.",
   "",
