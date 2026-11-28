@@ -12,7 +12,7 @@
 export const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 
 /** The semantic version of the plugin. */
-export const PLUGIN_VERSION = "0.9.2";
+export const PLUGIN_VERSION = "0.10.0";
 
 /** The name of the tool that runs the experiment. */
 export const TOOL_RUN = "llm_self_prediction_run";
@@ -98,14 +98,20 @@ export const RESULTS_DIRECTORY_NAME = "results";
 /** The directory name of the static webpages below one run directory. */
 export const DEMOS_DIRECTORY_NAME = "demos";
 
-/** The file name of the public models file. */
-export const MODELS_FILE_NAME = "models-to-use.env";
+/** The file name of the public configuration file that holds the non-secret provider settings. */
+export const CONFIG_FILE_NAME = "configs.env";
+
+/** The file name of the configuration file that an earlier plugin version used. */
+export const LEGACY_CONFIG_FILE_NAME = "models-to-use.env";
 
 /** The file name of the private environment file. */
 export const ENV_FILE_NAME = ".env";
 
 /** The file name of the public example environment file. */
 export const ENV_EXAMPLE_FILE_NAME = ".env.example";
+
+/** The environment property that names the code repository of one provider. The property is optional. */
+export const ENV_REPO_URL_PROPERTY = "repo_url";
 
 /** The environment property that overrides the base URL of one provider. */
 export const ENV_BASE_URL_PROPERTY = "base_url";
@@ -130,6 +136,18 @@ export const ENV_THINKING_PROPERTY = "thinking";
 
 /** The environment property that sets the `reasoning` switch of one provider. */
 export const ENV_REASONING_PROPERTY = "reasoning";
+
+/**
+ * The properties that the private environment file accepts.
+ *
+ * The private file holds the optional repository URL, the endpoint, and the API key. Every other
+ * property belongs to the public configuration file.
+ */
+export const PRIVATE_ENVIRONMENT_PROPERTIES = [
+  ENV_REPO_URL_PROPERTY,
+  ENV_BASE_URL_PROPERTY,
+  ENV_API_KEY_PROPERTY,
+] as const;
 
 /** The attempt count of one served table request. */
 export const SERVED_TABLE_ATTEMPT_COUNT = 3;

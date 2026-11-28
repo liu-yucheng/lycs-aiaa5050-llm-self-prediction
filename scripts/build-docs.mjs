@@ -600,17 +600,27 @@ const referenceBody = [
   section(
     "The environment keys",
     paragraph(
-      "The private file <code>.env</code> holds the endpoint and the key of each provider. The " +
-        "public file <code>.env.example</code> lists every key. The public file " +
-        "<code>models-to-use.env</code> holds the model list, so a workspace changes the tested " +
-        "models without a change of the private file. A placeholder in angle brackets counts as an " +
-        "absent key.",
+      "The private file <code>.env</code> holds only <code>repo_url</code>, <code>base_url</code>, " +
+        "and <code>api_key</code>. The public file <code>.env.example</code> lists the same keys. " +
+        "The public file <code>configs.env</code> holds every other setting, such as the model " +
+        "list and the switches. A placeholder in angle brackets counts as an absent key. The " +
+        "reader reports a key outside the private set in <code>.env</code> and applies only the " +
+        "<code>configs.env</code> value.",
     ),
     table(
-      ["Key", "Meaning"],
+      ["Private key", "Meaning"],
       [
+        [
+          "<code>&lt;section&gt;.repo_url</code>",
+          "The optional code repository of the section. The plugin accepts the key and calls no repository.",
+        ],
         ["<code>&lt;section&gt;.base_url</code>", "The endpoint that serves the OpenAI-compatible chat route."],
         ["<code>&lt;section&gt;.api_key</code>", "The API key of the section."],
+      ],
+    ),
+    table(
+      ["Configuration key", "Meaning"],
+      [
         ["<code>&lt;section&gt;.model_to_use</code>", "One model name."],
         ["<code>&lt;section&gt;.models_to_use</code>", "A comma-separated model list that replaces the catalog list."],
         ["<code>&lt;section&gt;.top_logprobs</code>", "The requested table size."],
