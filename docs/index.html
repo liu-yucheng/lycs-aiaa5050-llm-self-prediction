@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.10.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html" aria-current="page">Overview</a>
       <a href="design.html">Design</a>
@@ -35,7 +35,7 @@
 
   <dl class="facts">
     <dt>Dataset</dt><dd>32 Simplified Chinese and 32 US English tasks in 8 categories in <code>inputs/testing-dataset/</code></dd>
-    <dt>Providers</dt><dd>Hugging Face router models, plus a deterministic mock provider</dd>
+    <dt>Providers</dt><dd>Hugging Face router models, OpenAI chat models, and a deterministic mock provider</dd>
     <dt>Conditions</dt><dd>plain actual, plain self, injected self, injected actual; 3 repetitions each</dd>
     <dt>Comparisons</dt><dd>3: plain self, injected self, and injected actual against the plain actual table</dd>
     <dt>Verdict</dt><dd>Bootstrap interval of the mean symmetric KL against a tolerance of 0.05 nats</dd>
@@ -112,7 +112,7 @@ node lib/cli.js run</code></pre>
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.10.0. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

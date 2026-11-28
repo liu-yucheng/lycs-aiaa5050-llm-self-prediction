@@ -116,6 +116,18 @@ A model that fails the probe is left out of the run with a warning that names th
 reasons are common: the endpoint makes the reasoning mode mandatory, or the endpoint serves no
 table of candidates.
 
+## OpenAI models
+
+The `openai` section of `configs.env` holds the models of the OpenAI API. The probe on 2026-11-29
+sent `logprobs=true` with `top_logprobs=20` at `temperature=0` to every chat model that the
+`GET /models` call lists. Four models pass and the list holds them: `gpt-4.1`, `gpt-4.1-mini`,
+`gpt-4o`, and `gpt-4o-mini`. The dated snapshots of the same models pass too.
+
+The other chat models fail one requirement each. The `gpt-5` and `o3` families answer the
+`logprobs` request with a `403` denial. `gpt-5.1` through `gpt-5.4` cap `top_logprobs` at five.
+`gpt-5.5` and every later model reject `temperature=0` and accept only the default value of one.
+`gpt-5-search-api` serves no `logprobs` field, and the `pro` endpoints are not chat models.
+
 DeepSeek serves the chosen token only. The endpoint fills every other candidate with a
 placeholder value, so the reader keeps the chosen token and the record carries a warning. Use the
 DeepSeek provider for a pre-test of the pipeline, not for a published measurement.
@@ -166,11 +178,12 @@ An edge host carries the request through a host that the network permits. The TL
 carries the edge name, and the `Host` header keeps the base URL host, so the edge still selects
 the right distribution. The edge certificate replaces the certificate of the base URL host.
 
-The plugin holds the catalog in code. It serves two providers, Hugging Face for the test and
-DeepSeek for the pre-test, and one local test provider that a dry run selects. The private
-`.env` file holds the base URL and the API key. The public `configs.env` file holds the model
-list, so a workspace changes the tested models without a change of the private file. A provider
-with no model stops the run with a message that names the missing line.
+The plugin holds the catalog in code. It serves three providers: Hugging Face for the tested
+models, OpenAI for the strict table of twenty candidates, and DeepSeek for the pre-test. A dry
+run selects the local test provider instead. The private `.env` file holds the base URL and the
+API key. The public `configs.env` file holds the model list, so a workspace changes the tested
+models without a change of the private file. A provider with no model stops the run with a
+message that names the missing line.
 
 ## Run
 

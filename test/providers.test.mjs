@@ -5,6 +5,7 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
+import { createProviderCatalog } from "../lib/catalog.js";
 import {
   applyProviderEnvironments,
   buildEdgeRequestOptions,
@@ -406,4 +407,16 @@ test("the served table reader drops a placeholder entry", () => {
   assert.equal(served.token, "霜");
   assert.equal(served.distribution.supportSize, 1);
   assert.equal(served.distribution.topToken, "霜");
+});
+
+test("the catalog holds an OpenAI provider that requests a table of twenty", () => {
+  const catalog = createProviderCatalog();
+  const provider = catalog.providers.find((entry) => entry.key === "openai");
+  assert.ok(provider !== undefined);
+  assert.equal(provider.baseUrl, "https://api.openai.com/v1");
+  assert.equal(provider.environmentPrefix, "openai");
+  assert.equal(provider.topLogprobsCount, 20);
+  assert.equal(provider.model, "");
+  assert.deepEqual(provider.models, []);
+  assert.equal(provider.enabled, true);
 });
