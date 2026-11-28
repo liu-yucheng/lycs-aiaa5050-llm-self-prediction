@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summary · 20261128T195348Z_fe334a</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../../results.html" title="Home" aria-label="Home">&#8962;</a>
+    <div class="brand">
+      <span class="brand-mark">AIAA5050</span>
+      <span class="brand-text"><span data-lang="en">Next-token self-prediction</span><span data-lang="zh" hidden>下一个词块自我预测</span></span>
+    </div>
+    <nav class="nav" aria-label="Chapters">
+      <a href="index.html"><span data-lang="en">Overview</span><span data-lang="zh" hidden>总览</span></a>
+      <a href="method.html"><span data-lang="en">Method</span><span data-lang="zh" hidden>方法</span></a>
+      <a href="summary.html" aria-current="page"><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></a>
+      <a href="explorer.html"><span data-lang="en">Result Explorer</span><span data-lang="zh" hidden>结果浏览器</span></a>
+      <a href="context.html"><span data-lang="en">Course and Debates</span><span data-lang="zh" hidden>课程与辩论</span></a>
+      <a href="implementation.html"><span data-lang="en">Platform</span><span data-lang="zh" hidden>平台实现</span></a>
+      <a href="meaning.html"><span data-lang="en">Meaning and Limits</span><span data-lang="zh" hidden>意义与局限</span></a>
+    </nav>
+    <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
+      <span data-lang="en">中文</span><span data-lang="zh" hidden>English</span>
+    </button>
+  </div>
+</header>
+<main class="page">
+  <p class="eyebrow"><span data-lang="en">Run</span><span data-lang="zh" hidden>运行</span> <code>20261128T195348Z_fe334a</code></p>
+  <h1><span data-lang="en">Summary</span><span data-lang="zh" hidden>结果</span></h1>
+  <p class="lede"><span data-lang="en">The numbers of this run and the verdict of each comparison.</span><span data-lang="zh" hidden>本次运行的数值与每个比较的判定。</span></p>
+  
+<div class="stat-strip"><div class="stat-card actual"><span class="stat-icon">🏆</span><span class="stat-value">0.141</span><span class="stat-label"><span data-lang="en">smallest mean</span><span data-lang="zh" hidden>最小均值</span></span></div><div class="stat-card symmetric"><span class="stat-icon">🔺</span><span class="stat-value">17.306</span><span class="stat-label"><span data-lang="en">largest mean</span><span data-lang="zh" hidden>最大均值</span></span></div><div class="stat-card"><span class="stat-icon">🎯</span><span class="stat-value">0.050</span><span class="stat-label"><span data-lang="en">tolerance, nats</span><span data-lang="zh" hidden>容差，nat</span></span></div><div class="stat-card"><span class="stat-icon">🧪</span><span class="stat-value">10</span><span class="stat-label"><span data-lang="en">models</span><span data-lang="zh" hidden>模型</span></span></div><div class="stat-card predicted"><span class="stat-icon">⚖️</span><span class="stat-value">29/30</span><span class="stat-label"><span data-lang="en">separated</span><span data-lang="zh" hidden>判为有差异</span></span></div></div>
+<aside class="callout"><span data-lang="en">⚖️ Some comparisons stay near the tolerance. Read the badges below before you state a conclusion.</span><span data-lang="zh" hidden>⚖️ 部分比较接近容差。给出结论前请先看下方徽章。</span></aside>
+<h2><span data-lang="en">Every model on one scale</span><span data-lang="zh" hidden>所有模型同一标尺</span></h2>
+<p><span data-lang="en">A bar is one mean symmetric divergence. The dashed line is the tolerance. A short bar stays near no difference.</span><span data-lang="zh" hidden>每根条是一个平均对称散度。虚线是容差。条越短，越接近无差异。</span></p>
+<div class="bars">
+<h3><code>deepseek-ai/DeepSeek-V4.1-Flash-1017</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:42.68%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">7.387</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:16.66%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">2.883</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:2.13%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.368</span></div>
+<h3><code>Qwen/Qwen3-Coder-Next</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:67.84%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">11.740</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:15.38%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">2.661</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:2.25%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.389</span></div>
+<h3><code>moonshotai/Kimi-K3.1-Pro</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:56.70%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">9.812</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:49.26%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">8.525</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:45.66%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">7.902</span></div>
+<h3><code>zai-org/GLM-5.2</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:24.23%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">4.193</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:6.31%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">1.092</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:1.87%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.324</span></div>
+<h3><code>XiaomiMiMo/MiMo-V2.6-Pro-RL</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:31.99%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">5.535</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:3.95%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.683</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:2.01%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.348</span></div>
+<h3><code>tencent/Hy4</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:45.29%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">7.838</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:23.96%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">4.146</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:0.81%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.141</span></div>
+<h3><code>ByteDance-Seed/UI-TARS-1.5-7B</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:100.00%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">17.306</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:11.81%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">2.044</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:23.47%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">4.062</span></div>
+<h3><code>MiniMaxAI/MiniMax-M3</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:30.65%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">5.303</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:7.66%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">1.325</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:12.56%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">2.174</span></div>
+<h3><code>meta-llama/Llama-4-Maverick-17B-128E-Instruct</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:51.90%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">8.982</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:19.75%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">3.417</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:2.15%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.372</span></div>
+<h3><code>google/gemma-4-31B-it</code></h3>
+<div class="bar-row"><span class="bar-label">self</span><span class="bar-track"><span class="bar-fill symmetric" style="width:14.55%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">2.518</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_self</span><span class="bar-track"><span class="bar-fill predicted" style="width:6.02%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">1.043</span></div>
+<div class="bar-row"><span class="bar-label">actual_injected_actual</span><span class="bar-track"><span class="bar-fill actual" style="width:2.74%"></span><span class="tolerance-line" style="left:0.28892169672294526%"></span></span><span class="bar-value">0.475</span></div>
+</div>
+<h2><span data-lang="en">Verdict tally</span><span data-lang="zh" hidden>判定统计</span></h2>
+<table>
+<thead><tr><th><span data-lang="en">Comparison</span><span data-lang="zh" hidden>比较</span></th><th><span data-lang="en">Separated</span><span data-lang="zh" hidden>有差异</span></th><th><span data-lang="en">Indistinguishable</span><span data-lang="zh" hidden>无差异</span></th><th><span data-lang="en">Inconclusive</span><span data-lang="zh" hidden>不确定</span></th></tr></thead>
+<tbody>
+<tr><td><code>self</code></td><td class="number">10</td><td class="number">0</td><td class="number">0</td></tr>
+<tr><td><code>actual_injected_self</code></td><td class="number">10</td><td class="number">0</td><td class="number">0</td></tr>
+<tr><td><code>actual_injected_actual</code></td><td class="number">9</td><td class="number">0</td><td class="number">1</td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">Each model</span><span data-lang="zh" hidden>每个模型</span></h2>
+<table>
+<thead><tr><th><span data-lang="en">Model</span><span data-lang="zh" hidden>模型</span></th><th><span data-lang="en">Comparison</span><span data-lang="zh" hidden>比较</span></th><th><span data-lang="en">Mean symmetric KL</span><span data-lang="zh" hidden>平均对称 KL</span></th><th><span data-lang="en">Median symmetric KL</span><span data-lang="zh" hidden>中位对称 KL</span></th><th><span data-lang="en">95 % interval</span><span data-lang="zh" hidden>95% 区间</span></th><th><span data-lang="en">p-value</span><span data-lang="zh" hidden>p 值</span></th><th><span data-lang="en">Top-1 agreement</span><span data-lang="zh" hidden>首位一致率</span></th><th><span data-lang="en">Verdict</span><span data-lang="zh" hidden>判定</span></th></tr></thead>
+<tbody>
+<tr><td><code>deepseek-ai/DeepSeek-V4.1-Flash-1017</code></td><td><code>self</code></td><td class="number">7.387</td><td class="number">4.743</td><td class="number">5.868 – 9.104</td><td class="number">1.8e-12</td><td class="number">0.677</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>deepseek-ai/DeepSeek-V4.1-Flash-1017</code></td><td><code>actual_injected_self</code></td><td class="number">2.883</td><td class="number">0.831</td><td class="number">1.845 – 4.109</td><td class="number">1.8e-12</td><td class="number">0.834</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>deepseek-ai/DeepSeek-V4.1-Flash-1017</code></td><td><code>actual_injected_actual</code></td><td class="number">0.368</td><td class="number">0.005</td><td class="number">0.143 – 0.609</td><td class="number">5.6e-11</td><td class="number">0.946</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>Qwen/Qwen3-Coder-Next</code></td><td><code>self</code></td><td class="number">11.740</td><td class="number">10.712</td><td class="number">10.380 – 13.178</td><td class="number">1.8e-12</td><td class="number">0.539</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>Qwen/Qwen3-Coder-Next</code></td><td><code>actual_injected_self</code></td><td class="number">2.661</td><td class="number">0.891</td><td class="number">1.732 – 3.834</td><td class="number">1.8e-12</td><td class="number">0.811</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>Qwen/Qwen3-Coder-Next</code></td><td><code>actual_injected_actual</code></td><td class="number">0.389</td><td class="number">0.118</td><td class="number">0.246 – 0.561</td><td class="number">1.8e-12</td><td class="number">0.934</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>moonshotai/Kimi-K3.1-Pro</code></td><td><code>self</code></td><td class="number">9.812</td><td class="number">3.714</td><td class="number">8.541 – 11.095</td><td class="number">1.8e-12</td><td class="number">0.588</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>moonshotai/Kimi-K3.1-Pro</code></td><td><code>actual_injected_self</code></td><td class="number">8.525</td><td class="number">1.541</td><td class="number">7.406 – 9.628</td><td class="number">1.8e-12</td><td class="number">0.611</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>moonshotai/Kimi-K3.1-Pro</code></td><td><code>actual_injected_actual</code></td><td class="number">7.902</td><td class="number">0.693</td><td class="number">6.737 – 9.152</td><td class="number">2.6e-12</td><td class="number">0.705</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>zai-org/GLM-5.2</code></td><td><code>self</code></td><td class="number">4.193</td><td class="number">1.807</td><td class="number">2.928 – 5.680</td><td class="number">1.8e-12</td><td class="number">0.756</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>zai-org/GLM-5.2</code></td><td><code>actual_injected_self</code></td><td class="number">1.092</td><td class="number">0.093</td><td class="number">0.518 – 1.838</td><td class="number">1.8e-12</td><td class="number">0.886</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>zai-org/GLM-5.2</code></td><td><code>actual_injected_actual</code></td><td class="number">0.324</td><td class="number">0.113</td><td class="number">0.222 – 0.444</td><td class="number">2.6e-12</td><td class="number">0.952</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>XiaomiMiMo/MiMo-V2.6-Pro-RL</code></td><td><code>self</code></td><td class="number">5.535</td><td class="number">3.907</td><td class="number">4.412 – 6.807</td><td class="number">1.8e-12</td><td class="number">0.757</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>XiaomiMiMo/MiMo-V2.6-Pro-RL</code></td><td><code>actual_injected_self</code></td><td class="number">0.683</td><td class="number">0.057</td><td class="number">0.334 – 1.220</td><td class="number">1.8e-12</td><td class="number">0.946</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>XiaomiMiMo/MiMo-V2.6-Pro-RL</code></td><td><code>actual_injected_actual</code></td><td class="number">0.348</td><td class="number">0.162</td><td class="number">0.269 – 0.552</td><td class="number">5.6e-10</td><td class="number">0.988</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>tencent/Hy4</code></td><td><code>self</code></td><td class="number">7.838</td><td class="number">5.094</td><td class="number">6.160 – 9.789</td><td class="number">1.8e-12</td><td class="number">0.699</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>tencent/Hy4</code></td><td><code>actual_injected_self</code></td><td class="number">4.146</td><td class="number">1.940</td><td class="number">2.951 – 5.536</td><td class="number">1.8e-12</td><td class="number">0.783</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>tencent/Hy4</code></td><td><code>actual_injected_actual</code></td><td class="number">0.141</td><td class="number">0.000</td><td class="number">0.049 – 0.253</td><td class="number">1.8e-12</td><td class="number">0.993</td><td><span class="badge warn">⚖️ inconclusive · </span></td></tr>
+<tr><td><code>ByteDance-Seed/UI-TARS-1.5-7B</code></td><td><code>self</code></td><td class="number">17.306</td><td class="number">16.933</td><td class="number">15.276 – 19.162</td><td class="number">2.6e-12</td><td class="number">0.198</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>ByteDance-Seed/UI-TARS-1.5-7B</code></td><td><code>actual_injected_self</code></td><td class="number">2.044</td><td class="number">0.000</td><td class="number">0.939 – 3.919</td><td class="number">1.8e-12</td><td class="number">0.868</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>ByteDance-Seed/UI-TARS-1.5-7B</code></td><td><code>actual_injected_actual</code></td><td class="number">4.062</td><td class="number">3.909</td><td class="number">3.584 – 4.580</td><td class="number">1.8e-12</td><td class="number">0.755</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>MiniMaxAI/MiniMax-M3</code></td><td><code>self</code></td><td class="number">5.303</td><td class="number">3.486</td><td class="number">4.110 – 6.722</td><td class="number">1.8e-12</td><td class="number">0.736</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>MiniMaxAI/MiniMax-M3</code></td><td><code>actual_injected_self</code></td><td class="number">1.325</td><td class="number">0.008</td><td class="number">0.570 – 2.179</td><td class="number">1.8e-12</td><td class="number">0.881</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>MiniMaxAI/MiniMax-M3</code></td><td><code>actual_injected_actual</code></td><td class="number">2.174</td><td class="number">1.847</td><td class="number">1.862 – 2.508</td><td class="number">1.8e-12</td><td class="number">0.953</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>meta-llama/Llama-4-Maverick-17B-128E-Instruct</code></td><td><code>self</code></td><td class="number">8.982</td><td class="number">7.085</td><td class="number">7.443 – 10.623</td><td class="number">2.6e-12</td><td class="number">0.708</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>meta-llama/Llama-4-Maverick-17B-128E-Instruct</code></td><td><code>actual_injected_self</code></td><td class="number">3.417</td><td class="number">1.443</td><td class="number">2.281 – 4.623</td><td class="number">2.6e-12</td><td class="number">0.814</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>meta-llama/Llama-4-Maverick-17B-128E-Instruct</code></td><td><code>actual_injected_actual</code></td><td class="number">0.372</td><td class="number">0.000</td><td class="number">0.160 – 0.629</td><td class="number">2.6e-12</td><td class="number">0.989</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>google/gemma-4-31B-it</code></td><td><code>self</code></td><td class="number">2.518</td><td class="number">1.780</td><td class="number">1.857 – 3.400</td><td class="number">1.8e-12</td><td class="number">0.865</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>google/gemma-4-31B-it</code></td><td><code>actual_injected_self</code></td><td class="number">1.043</td><td class="number">0.391</td><td class="number">0.537 – 1.832</td><td class="number">1.8e-12</td><td class="number">0.936</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+<tr><td><code>google/gemma-4-31B-it</code></td><td><code>actual_injected_actual</code></td><td class="number">0.475</td><td class="number">0.001</td><td class="number">0.187 – 0.802</td><td class="number">1.2e-8</td><td class="number">0.964</td><td><span class="badge bad">🔺 separated · </span></td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">Failures and warnings</span><span data-lang="zh" hidden>失败与警告</span></h2>
+<ul>
+<li><span data-lang="en">❌ 637 calls recorded an error and no table.</span><span data-lang="zh" hidden>❌ 637 次调用记录错误，且没有表格。</span></li>
+<li><span data-lang="en">📉 A failed call removes one pair. It does not change the protocol.</span><span data-lang="zh" hidden>📉 失败调用少一对数据。协议不变。</span></li>
+<li><span data-lang="en">📄 Each error stays in the task record of the run directory.</span><span data-lang="zh" hidden>📄 每个错误都保留在运行目录的任务记录中。</span></li>
+</ul>
+<table>
+<thead><tr><th><span data-lang="en">Model</span><span data-lang="zh" hidden>模型</span></th><th><span data-lang="en">Records</span><span data-lang="zh" hidden>记录</span></th><th><span data-lang="en">Errors</span><span data-lang="zh" hidden>错误</span></th><th><span data-lang="en">Warnings</span><span data-lang="zh" hidden>警告</span></th></tr></thead>
+<tbody>
+<tr><td><code>deepseek-ai/DeepSeek-V4.1-Flash-1017</code></td><td class="number">64</td><td class="number">83</td><td class="number">0</td></tr>
+<tr><td><code>Qwen/Qwen3-Coder-Next</code></td><td class="number">64</td><td class="number">0</td><td class="number">0</td></tr>
+<tr><td><code>moonshotai/Kimi-K3.1-Pro</code></td><td class="number">64</td><td class="number">8</td><td class="number">0</td></tr>
+<tr><td><code>zai-org/GLM-5.2</code></td><td class="number">64</td><td class="number">8</td><td class="number">0</td></tr>
+<tr><td><code>XiaomiMiMo/MiMo-V2.6-Pro-RL</code></td><td class="number">64</td><td class="number">281</td><td class="number">44</td></tr>
+<tr><td><code>tencent/Hy4</code></td><td class="number">64</td><td class="number">6</td><td class="number">0</td></tr>
+<tr><td><code>ByteDance-Seed/UI-TARS-1.5-7B</code></td><td class="number">64</td><td class="number">30</td><td class="number">3</td></tr>
+<tr><td><code>MiniMaxAI/MiniMax-M3</code></td><td class="number">64</td><td class="number">3</td><td class="number">0</td></tr>
+<tr><td><code>meta-llama/Llama-4-Maverick-17B-128E-Instruct</code></td><td class="number">64</td><td class="number">24</td><td class="number">0</td></tr>
+<tr><td><code>google/gemma-4-31B-it</code></td><td class="number">64</td><td class="number">194</td><td class="number">3</td></tr>
+</tbody>
+</table>
+<h2><span data-lang="en">Read next</span><span data-lang="zh" hidden>继续阅读</span></h2>
+<ul>
+<li><span data-lang="en">🔬 Result Explorer: one task and the share of every token.</span><span data-lang="zh" hidden>🔬 结果浏览器：一个任务与每个词块的贡献。</span></li>
+<li><span data-lang="en">🧠 Meaning and Limits: what these numbers do not say.</span><span data-lang="zh" hidden>🧠 意义与局限：这些数字不说明什么。</span></li>
+</ul>
+
+</main>
+<footer class="page-footer">
+  <div class="footer-inner">
+    <p><span data-lang="en">Generated by lycs-aiaa5050-llm-self-prediction version 0.12.0. Random seed 20260815.</span><span data-lang="zh" hidden>由 lycs-aiaa5050-llm-self-prediction 版本 0.12.0 生成。随机种子 20260815。</span></p>
+    <p><span data-lang="en">Tolerance 0.050 nats. Every number comes from the run directory.</span><span data-lang="zh" hidden>容差 0.050 nat。每个数字都来自运行目录。</span></p>
+  </div>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -243,7 +243,7 @@ test("the actual request sends a temperature zero body with logprobs", async () 
   requests.length = 0;
   failureMode = false;
   const client = createProviderClient(definition(), "secret", 5000);
-  const outcome = await client.requestPlainActual(task, 2);
+  const outcome = await client.requestActualPrediction(task, 2);
   assert.equal(requests.length, 1);
   const request = requests[0];
   assert.equal(request.headers["authorization"], "Bearer secret");
@@ -253,7 +253,7 @@ test("the actual request sends a temperature zero body with logprobs", async () 
   assert.equal(request.body.top_logprobs, 4);
   assert.equal(request.body.stream, false);
   assert.equal(request.body.model, "local-model");
-  assert.equal(outcome.draft.condition, "plain_actual");
+  assert.equal(outcome.draft.condition, "actual");
   assert.equal(outcome.draft.repetition, 2);
   assert.equal(outcome.draft.source, "provider_logprobs");
   assert.equal(outcome.draft.distribution.supportSize, 4);
@@ -264,7 +264,7 @@ test("the actual request sends a temperature zero body with logprobs", async () 
 test("the self request sends no logprobs and reads the report body", async () => {
   requests.length = 0;
   const client = createProviderClient(definition(), "secret", 5000);
-  const outcome = await client.requestPlainSelf(task, 1);
+  const outcome = await client.requestSelfPrediction(task, 1);
   assert.equal(requests[0].body.logprobs, undefined);
   assert.ok(requests[0].body.max_tokens >= 512);
   assert.equal(outcome.draft.source, "self_report");
@@ -276,36 +276,55 @@ test("the injected self request puts one assistant table in the context", async 
   requests.length = 0;
   const client = createProviderClient(definition(), "secret", 5000);
   const injected = readServedTable(servedTableReply(), 4).distribution;
-  const outcome = await client.requestInjectedSelf(task, 1, injected);
+  const outcome = await client.requestActualInjectedSelfPrediction(task, 1, injected);
   const messages = requests[0].body.messages;
   assert.equal(messages.length, 4);
+  assert.equal(messages[0].role, "system");
   assert.equal(messages[2].role, "assistant");
   assert.ok(messages[2].content.includes("\"floor\""));
   assert.equal(messages[3].role, "user");
-  assert.equal(outcome.draft.condition, "injected_self");
+  assert.equal(requests[0].body.logprobs, undefined);
+  assert.equal(outcome.draft.condition, "actual_injected_self");
 });
 
-test("the injected actual request reads one self report and then one table", async () => {
+test("the injected actual request reads the table twice", async () => {
   requests.length = 0;
   const client = createProviderClient(definition(), "secret", 5000);
-  const outcome = await client.requestInjectedActual(task, 1);
+  const outcome = await client.requestActualInjectedActualPrediction(task, 1);
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].body.logprobs, undefined);
+  assert.equal(requests[0].body.logprobs, true);
   assert.equal(requests[1].body.logprobs, true);
   const messages = requests[1].body.messages;
   assert.equal(messages.length, 4);
   assert.equal(messages[2].role, "assistant");
   assert.ok(messages[2].content.includes("\"mat\""));
-  assert.equal(outcome.self.draft.source, "self_report");
-  assert.equal(outcome.actual.draft.source, "provider_logprobs");
-  assert.equal(outcome.actual.draft.distribution.topToken, "mat");
+  assert.equal(messages[3].role, "user");
+  assert.equal(outcome.first.draft.source, "provider_logprobs");
+  assert.equal(outcome.second.draft.source, "provider_logprobs");
+  assert.equal(outcome.second.draft.condition, "actual_injected_actual");
+  assert.equal(outcome.second.draft.distribution.topToken, "mat");
+});
+
+test("the repeated actual request injects a stored table and reads once", async () => {
+  requests.length = 0;
+  const client = createProviderClient(definition(), "secret", 5000);
+  const injected = readServedTable(servedTableReply(), 4).distribution;
+  const outcome = await client.requestRepeatedActualPrediction(task, 2, injected);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].body.logprobs, true);
+  const messages = requests[0].body.messages;
+  assert.equal(messages.length, 4);
+  assert.equal(messages[2].role, "assistant");
+  assert.equal(messages[3].role, "user");
+  assert.equal(outcome.draft.repetition, 2);
+  assert.equal(outcome.draft.condition, "actual_injected_actual");
 });
 
 test("a provider failure reports the status text", async () => {
   requests.length = 0;
   failureMode = true;
   const client = createProviderClient(definition(), "secret", 5000);
-  await assert.rejects(() => client.requestPlainActual(task, 1), /HTTP 400/u);
+  await assert.rejects(() => client.requestActualPrediction(task, 1), /HTTP 400/u);
   failureMode = false;
 });
 
@@ -333,16 +352,16 @@ test("the request switches follow the provider definition", async () => {
     "secret",
     5000,
   );
-  await client.requestPlainActual(task, 1);
+  await client.requestActualPrediction(task, 1);
   assert.deepEqual(requests[0].body.thinking, { type: "disabled" });
   assert.deepEqual(requests[0].body.reasoning, { enabled: false });
 });
 
 test("the mock client repeats a table for one repetition and varies it across repetitions", async () => {
   const client = new MockProviderClient(definition({ key: "mock", baseUrl: "mock://local" }));
-  const first = await client.requestPlainActual(task, 1);
-  const again = await client.requestPlainActual(task, 1);
-  const other = await client.requestPlainActual(task, 2);
+  const first = await client.requestActualPrediction(task, 1);
+  const again = await client.requestActualPrediction(task, 1);
+  const other = await client.requestActualPrediction(task, 2);
   assert.deepEqual(
     first.draft.distribution.entries.map((entry) => entry.token),
     again.draft.distribution.entries.map((entry) => entry.token),
@@ -392,7 +411,7 @@ test("the environment override carries the edge host into the catalog", () => {
 test("a reset connection repeats and then succeeds", async () => {
   resetCount = 1;
   const client = createProviderClient(definition(), "secret", 20000);
-  const outcome = await client.requestPlainActual(task, 1);
+  const outcome = await client.requestActualPrediction(task, 1);
   assert.equal(outcome.draft.distribution.entries.length, 4);
   assert.equal(resetCount, 0);
 });
@@ -400,7 +419,7 @@ test("a reset connection repeats and then succeeds", async () => {
 test("a rate-limited request repeats and then succeeds", async () => {
   rateLimitCount = 1;
   const client = createProviderClient(definition(), "secret", 20000);
-  const outcome = await client.requestPlainActual(task, 1);
+  const outcome = await client.requestActualPrediction(task, 1);
   assert.equal(outcome.draft.distribution.entries.length, 4);
   assert.equal(rateLimitCount, 0);
   assert.equal(requests.length > 0, true);
@@ -449,13 +468,13 @@ test("the client omits the temperature and lowers the table count on a denial", 
       }),
       "key",
     );
-    const outcome = await client.requestPlainActual(task, 1);
+    const outcome = await client.requestActualPrediction(task, 1);
     assert.equal(outcome.draft.distribution.supportSize, 4);
     assert.equal(requests[0].body.top_logprobs, 20);
     assert.equal(requests[1].body.top_logprobs, 5);
     assert.equal("temperature" in requests[0].body, false);
     assert.equal(requests[1].body.max_completion_tokens, 16);
-    await client.requestPlainActual(task, 2);
+    await client.requestActualPrediction(task, 2);
     assert.equal(requests[requests.length - 1].body.top_logprobs, 5);
   } finally {
     tableCap = null;
@@ -467,7 +486,7 @@ test("the client omits the temperature and lowers the table count on a denial", 
 test("a provider without the exceptions sends temperature zero and the classic field", async () => {
   requests.length = 0;
   const client = createProviderClient(definition(), "key");
-  await client.requestPlainActual(task, 1);
+  await client.requestActualPrediction(task, 1);
   assert.equal(requests[0].body.temperature, 0);
   assert.equal(requests[0].body.max_tokens, 1);
 });

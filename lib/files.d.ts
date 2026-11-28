@@ -51,6 +51,26 @@ export declare function readTextFile(filePath: string): Promise<string>;
  */
 export declare function listChildDirectories(directory: string): Promise<string[]>;
 /**
+ * List the direct child files of one directory.
+ *
+ * @param directory - the directory to read.
+ * @returns the absolute child paths, sorted by name.
+ */
+export declare function listChildFiles(directory: string): Promise<string[]>;
+/**
+ * Remove one file and ignore a missing file.
+ *
+ * @param filePath - the file to remove.
+ */
+export declare function removeFile(filePath: string): Promise<void>;
+/**
+ * Move one directory to one absent path.
+ *
+ * @param from - the current path.
+ * @param to - the target path, which must not exist.
+ */
+export declare function moveDirectory(from: string, to: string): Promise<void>;
+/**
  * Compute the SHA-256 digest of one text.
  *
  * @param text - the text to hash.

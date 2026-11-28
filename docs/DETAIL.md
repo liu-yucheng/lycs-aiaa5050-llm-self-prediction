@@ -1,8 +1,9 @@
-# lycs-aiaa5050-llm-self-prediction 0.11.1
+# lycs-aiaa5050-llm-self-prediction 0.12.0
 
 A DeepSeek Harness plugin for the experiment "Can LLMs predict their own next token
 predictions?". The plugin asks one model for one next-token table, asks the same model to
 report that table, and measures the distance between the two tables under two injections.
+One run works on one output folder, and a second run on the same folder revises it.
 
 ## Research question
 
@@ -21,23 +22,23 @@ a person asks the model in words?
 
 | Condition | Context | Table origin |
 | --- | --- | --- |
-| `plain_actual` | The task prompt. | The provider logprobs of one served token. |
-| `plain_self` | The task prompt. | The JSON table in the reply body. |
-| `injected_self` | Task prompt, then an assistant message with a served table. | The JSON table in the second reply. |
-| `injected_actual` | Task prompt, then an assistant message with a self report. | The served table that follows. |
+| `actual` | The task prompt. | The provider logprobs of one served token. |
+| `self` | The task prompt. | The JSON table in the reply body. |
+| `actual_injected_actual` | Task prompt, then an assistant message with the served table, then the task prompt again. | The provider logprobs of the second read. This condition is the control. |
+| `actual_injected_self` | Task prompt, then an assistant message with the served table, then one request for the own table. | The JSON table in the second reply. |
 
-Each condition runs three times for each task at `temperature: 0`.
+Each condition runs eight times for each task at `temperature: 0`.
 
 ## Comparisons
 
 | Comparison | Actual side | Predicted side |
 | --- | --- | --- |
-| `plain_self` | `plain_actual` | `plain_self` |
-| `injected_self` | `plain_actual` | `injected_self` |
-| `injected_actual` | `plain_actual` | `injected_actual` |
+| `self` | `actual` | `self` |
+| `actual_injected_self` | `actual` | `actual_injected_self` |
+| `actual_injected_actual` | `actual` | `actual_injected_actual` |
 
-One comparison pairs each actual repetition with each predicted repetition, so three
-repetitions give nine pairs for each task and comparison.
+One comparison pairs each actual repetition with each predicted repetition, so eight
+repetitions give sixty-four pairs for each task and comparison.
 
 ## Measures
 
@@ -62,6 +63,29 @@ that mean with 2000 resamples and a fixed seed. The default tolerance is 0.05 na
 - `separated`: the lower bound of the interval is above the tolerance.
 - `inconclusive`: the interval covers the tolerance, or the comparison holds no pair.
 
+## Hypothesis test
+
+The plugin runs one one-sided Wilcoxon signed-rank test for each comparison. The sample is the
+per-task median symmetric KL. The null value is the tolerance. The test uses the normal
+approximation with a tie correction, drops every zero difference, and reports a one-sided
+p-value. A comparison rejects the null hypothesis when the p-value is below alpha.
+
+The session holds the alternative hypothesis only when every comparison rejects the null and
+every median stands above the tolerance. The session holds the null hypothesis when no
+comparison rejects the null. A mixed result means that one comparison rejects and another one
+does not.
+
+## One folder for one run
+
+A run reads one output folder and writes only that folder. A run that names an existing folder
+revises it: the pass keeps every raw table that the current protocol reads, requests the absent
+tables, and removes each raw file that the current protocol does not read. The folder keeps one
+`revision.json` with one entry for each revise pass.
+
+A rename moves the folder to a fresh identifier of the form `<timestamp>_<short identifier>`.
+The manifest keeps the old identifier in `previousXid`.
+
+
 ## Dataset
 
 `inputs/testing-dataset/` holds `dataset-zh-32.json` and `dataset-en-32.json`. Each file holds 32
@@ -74,6 +98,7 @@ token. No metric reads the reference token.
 ```text
 outputs/<xid>/
   run.json
+  revision.json
   tasks.json
   intermediate/<providerKey>/<taskId>/<condition>-r<n>-call<k>.json
   results/metrics.json
@@ -96,9 +121,10 @@ one task pair at a time and recomputes the divergence in the browser from the re
 
 ## Tools
 
-- `llm_self_prediction_run`: run one session.
+- `llm_self_prediction_run`: run or revise one folder.
 - `llm_self_prediction_status`: list the recent sessions.
 - `llm_self_prediction_report`: read one Markdown report.
+- `llm_self_prediction_rename`: move one folder to a fresh identifier.
 - `llm_self_prediction_dataset`: summarize the dataset files.
 - `llm_self_prediction_help`: explain the protocol and the provider setup.
 

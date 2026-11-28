@@ -75,7 +75,7 @@ function createStubContext(options) {
   return { context, disposeAll: () => disposals.forEach((dispose) => dispose?.()) };
 }
 
-test("the entry point registers the five tools and reads the configuration", async () => {
+test("the entry point registers the six tools and reads the configuration", async () => {
   const workspace = await createScratchDirectory();
   const outputRoot = path.join(workspace, "custom-output");
   const registry = new Map();
@@ -90,6 +90,7 @@ test("the entry point registers the five tools and reads the configuration", asy
     [
       "llm_self_prediction_dataset",
       "llm_self_prediction_help",
+      "llm_self_prediction_rename",
       "llm_self_prediction_report",
       "llm_self_prediction_run",
       "llm_self_prediction_status",
@@ -125,5 +126,5 @@ test("the entry point loads without a configuration value", async () => {
 
   apply(context, undefined);
 
-  assert.equal(registry.size, 5);
+  assert.equal(registry.size, 6);
 });

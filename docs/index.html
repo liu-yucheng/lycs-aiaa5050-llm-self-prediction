@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.12.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html" aria-current="page">Overview</a>
       <a href="design.html">Design</a>
@@ -36,17 +36,18 @@
   <dl class="facts">
     <dt>Dataset</dt><dd>32 Simplified Chinese and 32 US English tasks in 8 categories in <code>inputs/testing-dataset/</code></dd>
     <dt>Providers</dt><dd>Hugging Face router models, OpenAI chat models, and a deterministic mock provider</dd>
-    <dt>Conditions</dt><dd>plain actual, plain self, injected self, injected actual; 3 repetitions each</dd>
-    <dt>Comparisons</dt><dd>3: plain self, injected self, and injected actual against the plain actual table</dd>
+    <dt>Conditions</dt><dd>actual, self, actual then actual, and actual then self; 8 repetitions each</dd>
+    <dt>Comparisons</dt><dd>3: self, actual then self, and actual then actual against the actual table</dd>
     <dt>Verdict</dt><dd>Bootstrap interval of the mean symmetric KL against a tolerance of 0.05 nats</dd>
+    <dt>Hypothesis test</dt><dd>One-sided Wilcoxon signed-rank test of the median divergence, alpha 0.05</dd>
   </dl>
 
 <h2>Why four conditions</h2>
 <ul>
-    <li>The plain actual table is the ground truth, because the provider computes it and the model does not write it.</li>
-    <li>The plain self table shows what the model says when it must state its own prediction.</li>
-    <li>The injected self table shows whether the true table moves the self report toward the truth.</li>
-    <li>The injected actual table shows whether the self report distorts the served table that follows it.</li>
+    <li>The actual table is the ground truth, because the provider computes it and the model does not write it.</li>
+    <li>The self table shows what the model says when it must state its own prediction.</li>
+    <li>The actual-then-self table shows whether the true table moves the self report toward the truth.</li>
+    <li>The actual-then-actual table is the control. The model reads the table, reads the table again, and any divergence is the noise of the reading, not a self report.</li>
   </ul>
 
 <h2>What one run writes</h2>
@@ -54,7 +55,15 @@
     <li><code>outputs/&lt;xid&gt;/intermediate/</code> holds every raw exchange, one file for each call.</li>
     <li><code>outputs/&lt;xid&gt;/results/</code> holds the metrics, the records, the report, and the tables.</li>
     <li><code>outputs/&lt;xid&gt;/demos/</code> holds the static bilingual demonstration website.</li>
+    <li><code>outputs/&lt;xid&gt;/revision.json</code> holds one entry for each revise pass of the folder.</li>
     <li><code>node lib/cli.js demos [&lt;xid&gt;]</code> writes that website again from the current templates.</li>
+  </ul>
+
+<h2>One folder for one run</h2>
+<ul>
+    <li>A run reads one output folder and writes only that folder.</li>
+    <li>A run that names an existing folder revises it. The pass keeps every raw table that the current protocol reads, requests the absent tables, and removes each raw file that the current protocol does not read.</li>
+    <li><code>node lib/cli.js rename --session=&lt;xid&gt;</code> moves the folder to a fresh identifier, and the manifest keeps the old identifier.</li>
   </ul>
 
 <h2>Install and first run</h2>
@@ -66,17 +75,22 @@ node lib/cli.js run --dry-run --tasks=Z001,E001 --repetitions=1
 
 # a real run reads the key from .env
 node lib/cli.js env
-node lib/cli.js run</code></pre>
+node lib/cli.js run --folder=&lt;name&gt; --repetitions=8
 
-<h2>The five tools</h2>
+# a revise pass of the same folder, then a new identifier
+node lib/cli.js run --folder=&lt;name&gt; --repetitions=8
+node lib/cli.js rename --session=&lt;name&gt;</code></pre>
+
+<h2>The six tools</h2>
   <table>
     <thead>
       <tr><th>Tool</th><th>Purpose</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>llm_self_prediction_run</code></td><td>Run one session and write the session directory.</td></tr>
+      <tr><td><code>llm_self_prediction_run</code></td><td>Run or revise one folder and write the session files.</td></tr>
       <tr><td><code>llm_self_prediction_status</code></td><td>List the recent sessions with their verdicts.</td></tr>
       <tr><td><code>llm_self_prediction_report</code></td><td>Read the Markdown report of one session.</td></tr>
+      <tr><td><code>llm_self_prediction_rename</code></td><td>Move one folder to a fresh identifier.</td></tr>
       <tr><td><code>llm_self_prediction_dataset</code></td><td>Summarize the two dataset files.</td></tr>
       <tr><td><code>llm_self_prediction_help</code></td><td>Explain the protocol and the provider setup.</td></tr>
     </tbody>
@@ -112,7 +126,7 @@ node lib/cli.js run</code></pre>
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.12.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

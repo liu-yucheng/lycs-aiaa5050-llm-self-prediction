@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.12.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html" aria-current="page">Design</a>
@@ -40,16 +40,16 @@
       <tr><th>Condition</th><th>Context</th><th>Table origin</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>plain_actual</code></td><td>The task prompt.</td><td>The provider logprobs of one served token.</td></tr>
-      <tr><td><code>plain_self</code></td><td>The task prompt.</td><td>The JSON table in the reply body.</td></tr>
-      <tr><td><code>injected_self</code></td><td>The task prompt, then one assistant message with a served table.</td><td>The JSON table in the second reply body.</td></tr>
-      <tr><td><code>injected_actual</code></td><td>The task prompt, then one assistant message with a self report.</td><td>The provider logprobs of the following served token.</td></tr>
+      <tr><td><code>actual</code></td><td>The task prompt.</td><td>The provider logprobs of one served token.</td></tr>
+      <tr><td><code>self</code></td><td>The task prompt.</td><td>The JSON table in the reply body.</td></tr>
+      <tr><td><code>actual_injected_actual</code></td><td>The task prompt, then one assistant message with the served table, then the task prompt again.</td><td>The provider logprobs of the second read. This condition is the control.</td></tr>
+      <tr><td><code>actual_injected_self</code></td><td>The task prompt, then one assistant message with the served table, then one request for the own table.</td><td>The JSON table in the second reply body.</td></tr>
     </tbody>
   </table>
 
 <h2>The repetitions</h2>
-<p>Each condition runs three times for each task. The temperature is zero, so the served table of one model changes little across repetitions, while a self report can change a lot. Both kinds of repetition appear in the comparison.</p>
-  <p>One comparison pairs each actual repetition with each predicted repetition. Three repetitions give nine pairs for each task and each comparison.</p>
+<p>Each condition runs eight times for each task. The temperature is zero, so the served table of one model changes little across repetitions, while a self report can change a lot. Both kinds of repetition appear in the comparison.</p>
+  <p>One comparison pairs each actual repetition with each predicted repetition. Eight repetitions give sixty-four pairs for each task and each comparison.</p>
 
 <h2>The dataset</h2>
 <p>The dataset holds two files in <code>inputs/testing-dataset/</code>. One file holds 32 Simplified Chinese tasks. The other file holds 32 US English tasks. Each file spreads its tasks over eight categories: poetry, idiom, daily, food, weather, technology, news, and story.</p>
@@ -78,7 +78,7 @@
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.12.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

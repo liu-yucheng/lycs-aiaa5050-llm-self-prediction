@@ -1,4 +1,4 @@
-import type { ComparisonMetrics, ComparisonName, ComparisonSummary, ConditionName, ConfidenceInterval, PredictionRecord, ProviderResult, SessionMetrics, Task, TaskRecord, TokenDistribution, Verdict } from "./types.js";
+import type { ComparisonMetrics, ComparisonName, ComparisonSummary, ConditionName, ConfidenceInterval, HypothesisTest, PredictionRecord, ProviderResult, SessionHypothesis, SessionMetrics, Task, TaskRecord, TokenDistribution, Verdict } from "./types.js";
 /**
  * Compute one comparison of two tables.
  *
@@ -10,13 +10,29 @@ import type { ComparisonMetrics, ComparisonName, ComparisonSummary, ConditionNam
  */
 export declare function computeComparisonMetrics(actual: TokenDistribution, predicted: TokenDistribution, actualRepetition: number, predictedRepetition: number): ComparisonMetrics;
 /**
+ * Test one list of task values against a null value with the one-sided Wilcoxon signed-rank test.
+ *
+ * The alternative hypothesis states that a task value is above the null value. The test uses the
+ * normal approximation with a tie correction, and the p-value counts the zero differences as
+ * evidence for neither side.
+ *
+ * @param values - the task values, one value for one task.
+ * @param nullValue - the value that the null hypothesis names.
+ * @param comparison - the comparison name of the values.
+ * @param alpha - the significance level.
+ * @returns the hypothesis test.
+ */
+export declare function wilcoxonSignedRankTest(values: readonly number[], nullValue: number, comparison: ComparisonName, alpha?: number): HypothesisTest;
+/**
  * Summarize one list of comparisons without a confidence interval.
  *
  * @param comparison - the comparison name.
  * @param values - the comparisons.
+ * @param taskMeans - the mean symmetric divergence of each task, which the hypothesis test reads.
+ * @param alpha - the significance level of the hypothesis test.
  * @returns the summary with a zero-width interval.
  */
-export declare function summarizeComparisons(comparison: ComparisonName, values: readonly ComparisonMetrics[]): ComparisonSummary;
+export declare function summarizeComparisons(comparison: ComparisonName, values: readonly ComparisonMetrics[], taskMeans?: readonly number[], alpha?: number): ComparisonSummary;
 /**
  * Build one task record.
  *
@@ -58,15 +74,40 @@ export declare function bootstrapConfidenceInterval(values: readonly number[], o
  */
 export declare function decideVerdict(interval: ConfidenceInterval, toleranceNats: number, pairCount: number): Verdict;
 /**
+ * Decide the hypothesis verdict from the hypothesis tests of one run.
+ *
+ * The alternative hypothesis holds when every self-prediction test rejects the null hypothesis,
+ * every self-prediction median exceeds the practical tolerance, and every control median stays at
+ * or below the tolerance. The null hypothesis holds when no self-prediction test rejects the null
+ * hypothesis, or when every self-prediction median stays at or below the tolerance and the
+ * control holds. Every other result is mixed.
+ *
+ * @param allTests - the hypothesis tests of the run.
+ * @param toleranceNats - the practical tolerance.
+ * @returns the session hypothesis.
+ */
+export declare function decideSessionHypothesis(allTests: readonly HypothesisTest[], toleranceNats: number): SessionHypothesis;
+/**
+ * Decide the hypothesis verdict of one run.
+ *
+ * The verdict comes from the hypothesis tests of every provider of the run.
+ *
+ * @param providers - the provider results.
+ * @param toleranceNats - the practical tolerance.
+ * @returns the session hypothesis.
+ */
+export declare function computeSessionHypothesis(providers: readonly ProviderResult[], toleranceNats: number): SessionHypothesis;
+/**
  * Compute the result of one model.
  *
  * @param records - the task records of the model.
  * @param toleranceNats - the tolerance.
  * @param randomSeed - the seed of the intervals.
  * @param sampleCount - the resample count of the intervals.
+ * @param alpha - the significance level of the hypothesis tests.
  * @returns the provider result.
  */
-export declare function computeProviderResult(records: readonly TaskRecord[], toleranceNats: number, randomSeed: number, sampleCount?: number): ProviderResult;
+export declare function computeProviderResult(records: readonly TaskRecord[], toleranceNats: number, randomSeed: number, sampleCount?: number, alpha?: number): ProviderResult;
 /**
  * Compute the metrics of one run.
  *
@@ -75,6 +116,7 @@ export declare function computeProviderResult(records: readonly TaskRecord[], to
  */
 export declare function computeSessionMetrics(options: {
     readonly xid: string;
+    readonly protocolVersion: string;
     readonly datasetIds: readonly string[];
     readonly languages: readonly string[];
     readonly records: readonly TaskRecord[];
@@ -85,4 +127,5 @@ export declare function computeSessionMetrics(options: {
     readonly generatedAt: string;
     readonly taskCount: number;
     readonly sampleCount?: number;
+    readonly alpha?: number;
 }): SessionMetrics;

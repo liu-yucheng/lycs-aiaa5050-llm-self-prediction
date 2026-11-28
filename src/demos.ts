@@ -20,9 +20,15 @@
 
 import path from "node:path";
 
-import { COMPARISON_NAMES, PLUGIN_NAME, PLUGIN_VERSION } from "./constants.js";
+import {
+  COMPARISON_NAMES,
+  PLUGIN_NAME,
+  PLUGIN_VERSION,
+  REVISION_RECORD_FILE_NAME,
+} from "./constants.js";
 import {
   ensureDirectory,
+  pathExists,
   readJsonFile,
   safeFileSegment,
   writeJsonFile,
@@ -35,6 +41,7 @@ import type {
   ComparisonSummary,
   PredictionRecord,
   ProviderResult,
+  ReuseSummary,
   SessionEnvironment,
   SessionMetrics,
   TaskRecord,
@@ -75,6 +82,8 @@ export interface DemoOptions {
   readonly environment: SessionEnvironment;
   /** The description of the datasets of the run. */
   readonly dataset: DemoDatasetDescription;
+  /** The count of the reused tables and of the requested tables. */
+  readonly reuse?: ReuseSummary;
 }
 
 /**
@@ -194,6 +203,22 @@ function table(
  */
 function codeBlock(text: string): string {
   return `<pre><code>${text}</code></pre>`;
+}
+
+/**
+ * Format one p-value for a page.
+ *
+ * @param value - the p-value.
+ * @returns the text of the p-value.
+ */
+function formatProbabilityValue(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) {
+    return "n/a";
+  }
+  if (value < 0.001) {
+    return value.toExponential(1);
+  }
+  return value.toFixed(4);
 }
 
 /**
@@ -433,8 +458,53 @@ function renderOverviewPage(options: DemoOptions): string {
       `<td class="number">${provider.taskCount}</td></tr>`
     );
   });
+  const testRows = metrics.providers.flatMap((provider) =>
+    provider.comparisons.map((entry) => {
+      const test = entry.hypothesis;
+      return (
+        `<tr><td><code>${provider.model}</code></td>` +
+        `<td><code>${entry.comparison}</code></td>` +
+        `<td class="number">${formatNumber(test.median, 3)}</td>` +
+        `<td class="number">${formatNumber(test.zScore, 3)}</td>` +
+        `<td class="number">${formatProbabilityValue(test.pValue)}</td>` +
+        `<td>${test.rejectsNull ? "yes" : "no"}</td></tr>`
+      );
+    }),
+  );
   const meanOf = (comparison: ComparisonName): number | undefined =>
     means.find((entry) => entry.comparison === comparison)?.mean;
+  const hypothesis = metrics.hypothesis;
+  const hypothesisIcon =
+    hypothesis.verdict === "alternative" ? "🔺" : hypothesis.verdict === "null" ? "0️⃣" : "⚖️";
+  const toleranceText = formatNumber(metrics.toleranceNats, 3);
+  const hypothesisEnglish =
+    hypothesis.verdict === "alternative"
+      ? `The run rejects the null hypothesis. A model does not report its own next-token ` +
+        `distribution: the divergence stays above the ${toleranceText}-nat tolerance, and the ` +
+        `one-sided Wilcoxon signed-rank test rejects the null in ${hypothesis.rejectedCount} of ` +
+        `${hypothesis.testCount} comparisons.`
+      : hypothesis.verdict === "null"
+        ? `The run keeps the null hypothesis. A model reports its own next-token distribution ` +
+          `within the ${toleranceText}-nat tolerance, and no test rejects the null.`
+        : `The run finds mixed evidence. ${hypothesis.rejectedCount} of ` +
+          `${hypothesis.testCount} self-prediction comparisons reject the null, and ` +
+          `${hypothesis.controlViolationCount} of ${hypothesis.controlTestCount} control ` +
+          `comparisons stand above the ${toleranceText}-nat tolerance. A control comparison ` +
+          `above the tolerance means that the model does not repeat its own table, so the ` +
+          `divergence of that model measures the protocol as well as the model.`;
+  const hypothesisChinese =
+    hypothesis.verdict === "alternative"
+      ? `本运行拒绝原假设。模型报不出自己的下一个词块分布：散度高于 ${toleranceText} nat 容差，` +
+        `单侧 Wilcoxon 符号秩检验在 ${hypothesis.testCount} 个比较中有 ` +
+        `${hypothesis.rejectedCount} 个拒绝原假设。`
+      : hypothesis.verdict === "null"
+        ? `本运行保留原假设。模型在自己的下一个词块分布上落在 ${toleranceText} nat 容差内，` +
+          "没有任何检验拒绝原假设。"
+        : `本运行得到混合证据。${hypothesis.testCount} 个自我预测比较中有 ` +
+          `${hypothesis.rejectedCount} 个拒绝原假设，另有 ` +
+          `${hypothesis.controlViolationCount} / ${hypothesis.controlTestCount} ` +
+          `个对照比较高于 ${toleranceText} nat 容差。对照比较高于容差说明该模型无法重复自己的表格，` +
+          "因此该模型的散度同时反映了协议与该模型。";
   const comparisonCount = metrics.providers.length * COMPARISON_NAMES.length;
   const body = `
 ${statStrip([
@@ -486,43 +556,42 @@ ${list([
   },
 ])}
 ${heading(2, "Core argument", "核心论点")}
-${paragraph(
-  "📐 This run proves one negative result about current open-source models. A model cannot " +
-    "predict its own next-token prediction. The result holds in the hardest condition, where " +
-    "the served table sits in the context as a cheat sheet.",
-  "📐 本运行证明关于当前开源模型的一个否定结果。模型不能预测自己的下一个词块预测。" +
-    "该结果在最强的条件下仍成立：接口表格作为小抄放在上下文中。",
-)}
+${paragraph(`${hypothesisIcon} ${hypothesisEnglish}`, `${hypothesisIcon} ${hypothesisChinese}`)}
 ${list([
   {
     english:
       `📏 ${separatedCount} of ${comparisonCount} model-comparison pairs stay above the ` +
-      `${formatNumber(metrics.toleranceNats, 3)}-nat tolerance.`,
+      `${toleranceText}-nat tolerance, and ${hypothesis.rejectedCount} of ` +
+      `${hypothesis.testCount} tests reject the null hypothesis.`,
     chinese:
-      `📏 ${comparisonCount} 个模型-比较对中有 ${separatedCount} 个高于 ` +
-      `${formatNumber(metrics.toleranceNats, 3)} nat 容差。`,
+      `${comparisonCount} 个模型-比较对中有 ${separatedCount} 个高于 ${toleranceText} nat 容差，` +
+      `${hypothesis.testCount} 个检验中有 ${hypothesis.rejectedCount} 个拒绝原假设。`,
   },
   {
     english:
-      `🗣️ Without a cheat sheet, the mean self-report gap is ${formatNumber(meanOf("plain_self"), 3)} ` +
-      "nats.",
-    chinese: `🗣️ 没有小抄时，自我报告的平均差距为 ${formatNumber(meanOf("plain_self"), 3)} nat。`,
+      `🗣️ In the \`self\` condition, the model writes the table with no help. The mean gap is ` +
+      `${formatNumber(meanOf("self"), 3)} nats.`,
+    chinese:
+      `🗣️ 在 \`self\` 条件下，模型在没有任何帮助时写出表格。平均差距为 ` +
+      `${formatNumber(meanOf("self"), 3)} nat。`,
   },
   {
     english:
-      `🔁 With the served table in the context, the mean gap falls to ` +
-      `${formatNumber(meanOf("injected_self"), 3)} nats. The gap stays far above 0.`,
+      `🔁 In the \`actual_injected_self\` condition, the model reads the served table first. ` +
+      `The mean gap is ${formatNumber(meanOf("actual_injected_self"), 3)} nats.`,
     chinese:
-      `🔁 接口表格放入上下文后，平均差距降到 ${formatNumber(meanOf("injected_self"), 3)} nat。` +
-      "差距仍远高于 0。",
+      `🔁 在 \`actual_injected_self\` 条件下，模型先读取接口表格。平均差距为 ` +
+      `${formatNumber(meanOf("actual_injected_self"), 3)} nat。`,
   },
   {
     english:
-      `🎯 With the own table in the context, the model reads the served table differently: mean ` +
-      `gap ${formatNumber(meanOf("injected_actual"), 3)} nats.`,
+      `🎯 In the \`actual_injected_actual\` control condition, the model reads the task twice. ` +
+      `The mean gap between the two reads is ` +
+      `${formatNumber(meanOf("actual_injected_actual"), 3)} nats, so this value measures the ` +
+      "noise floor of the protocol.",
     chinese:
-      `🎯 自身表格放入上下文后，模型读出的接口表格出现偏移：平均差距 ` +
-      `${formatNumber(meanOf("injected_actual"), 3)} nat。`,
+      `🎯 在 \`actual_injected_actual\` 对照条件下，模型把任务读两次。两次读取的平均差距为 ` +
+      `${formatNumber(meanOf("actual_injected_actual"), 3)} nat，该值度量协议的噪声下限。`,
   },
 ])}
 ${callout(
@@ -566,40 +635,61 @@ ${heading(2, "Four conditions", "四种条件")}
 ${cards([
   {
     icon: "1️⃣📡",
-    titleEnglish: "Plain actual",
-    titleChinese: "普通实际",
+    titleEnglish: "Actual",
+    titleChinese: "实际",
     textEnglish: "Read the served table. This table is the ground truth.",
     textChinese: "读取接口表格。该表格是基准。",
   },
   {
     icon: "2️⃣🗣️",
-    titleEnglish: "Plain self",
-    titleChinese: "普通自我",
+    titleEnglish: "Self",
+    titleChinese: "自我",
     textEnglish: "Ask the model to write its own table as text.",
     textChinese: "要求模型用文字写出自己的表格。",
   },
   {
-    icon: "3️⃣🔁",
-    titleEnglish: "Injected self",
-    titleChinese: "注入自我",
-    textEnglish: "Put the served table in context. Ask for the own table again.",
-    textChinese: "把接口表格放入上下文。再次索取自身表格。",
+    icon: "3️⃣🎯",
+    titleEnglish: "Actual, then actual",
+    titleChinese: "先实际后实际",
+    textEnglish:
+      "Read the task, read the served table, read the task again, and read the served table " +
+      "again. This condition is the control.",
+    textChinese: "读取任务，读取接口表格，再次读取任务，再次读取接口表格。该条件是对照。",
   },
   {
-    icon: "4️⃣🎯",
-    titleEnglish: "Injected actual",
-    titleChinese: "注入实际",
-    textEnglish: "Put the own table in context. Read the served table again.",
-    textChinese: "把自身表格放入上下文。再次读取接口表格。",
+    icon: "4️⃣🔁",
+    titleEnglish: "Actual, then self",
+    titleChinese: "先实际后自我",
+    textEnglish: "Read the task, read the served table, and then write the own table as text.",
+    textChinese: "读取任务，读取接口表格，然后用文字写出自己的表格。",
   },
 ])}
+${heading(2, "Statistical test", "统计检验")}
+${paragraph(
+  `🧮 Each comparison uses a one-sided Wilcoxon signed-rank test at the alpha level of ` +
+    `${metrics.hypothesis.alpha}. The sample is the median divergence of one task. The test ` +
+    "measures the evidence against the null hypothesis of a 0-nat divergence.",
+  `🧮 每个比较使用单侧 Wilcoxon 符号秩检验，显著性水平为 ${metrics.hypothesis.alpha}。` +
+    "样本是一个任务的中位散度。该检验度量反对 0 nat 散度原假设的证据。",
+)}
+${table(
+  [
+    { english: "Model", chinese: "模型" },
+    { english: "Comparison", chinese: "比较" },
+    { english: "Median, nats", chinese: "中位，nat" },
+    { english: "z", chinese: "z" },
+    { english: "p-value", chinese: "p 值" },
+    { english: "Null rejected", chinese: "拒绝原假设" },
+  ],
+  testRows,
+)}
 ${heading(2, "The verdict at a glance", "判定一览")}
 ${table(
   [
     { english: "Model", chinese: "模型" },
-    { english: "plain_self", chinese: "普通自我" },
-    { english: "injected_self", chinese: "注入自我" },
-    { english: "injected_actual", chinese: "注入实际" },
+    { english: "self", chinese: "自我" },
+    { english: "actual_injected_self", chinese: "先读实际后自我" },
+    { english: "actual_injected_actual", chinese: "先读实际后实际" },
     { english: "Tasks", chinese: "任务" },
   ],
   verdictRows,
@@ -622,9 +712,9 @@ ${means
   .map(
     (entry) =>
       `<li><span class="step">` +
-      (entry.comparison === "plain_self"
+      (entry.comparison === "self"
         ? "🗣️"
-        : entry.comparison === "injected_self"
+        : entry.comparison === "actual_injected_self"
           ? "🔁"
           : "🎯") +
       `</span>` +
@@ -913,8 +1003,10 @@ function renderSummaryPage(options: DemoOptions): string {
         `<tr><td><code>${provider.model}</code></td>` +
         `<td><code>${entry.comparison}</code></td>` +
         `<td class="number">${formatNumber(entry.meanSymmetricKl, 3)}</td>` +
+        `<td class="number">${formatNumber(entry.medianSymmetricKl, 3)}</td>` +
         `<td class="number">${formatNumber(entry.confidenceInterval.lower, 3)} – ` +
         `${formatNumber(entry.confidenceInterval.upper, 3)}</td>` +
+        `<td class="number">${formatProbabilityValue(entry.hypothesis.pValue)}</td>` +
         `<td class="number">${formatNumber(entry.topTokenAgreementRate, 3)}</td>` +
         `<td>${verdictBadge(verdict, "")}</td></tr>`
       );
@@ -949,7 +1041,7 @@ function renderSummaryPage(options: DemoOptions): string {
       COMPARISON_NAMES.map((comparison) => {
         const entry = provider.comparisons.find((item) => item.comparison === comparison);
         const kind =
-          comparison === "plain_self" ? "symmetric" : comparison === "injected_self" ? "predicted" : "actual";
+          comparison === "self" ? "symmetric" : comparison === "actual_injected_self" ? "predicted" : "actual";
         return barRow(comparison, entry?.meanSymmetricKl ?? 0, maximum, metrics.toleranceNats, kind);
       }).join("\n"),
   );
@@ -1021,7 +1113,9 @@ ${table(
     { english: "Model", chinese: "模型" },
     { english: "Comparison", chinese: "比较" },
     { english: "Mean symmetric KL", chinese: "平均对称 KL" },
+    { english: "Median symmetric KL", chinese: "中位对称 KL" },
     { english: "95 % interval", chinese: "95% 区间" },
+    { english: "p-value", chinese: "p 值" },
     { english: "Top-1 agreement", chinese: "首位一致率" },
     { english: "Verdict", chinese: "判定" },
   ],
@@ -1432,15 +1526,23 @@ ${list([
     chinese: "🧰 DeepSeek Harness 承载工具与智能体预设。",
   },
   {
-    english: "🔌 The plugin registers five tools and one command line.",
-    chinese: "🔌 插件注册五个工具和一套命令行。",
+    english: "🔌 The plugin registers six tools and one command line.",
+    chinese: "🔌 插件注册六个工具和一套命令行。",
   },
   {
-    english: "📦 One run writes one directory with every input and every output.",
-    chinese: "📦 一次运行写出一个目录，保存每个输入和每个输出。",
+    english:
+      "📦 One run works on exactly one folder. The folder holds every input and every output " +
+      "of that run.",
+    chinese: "📦 一次运行只使用一个目录。该目录保存本次运行的每个输入和每个输出。",
+  },
+  {
+    english:
+      "♻️ A revise pass reads the tables of the folder and requests only the tables that the " +
+      "folder lacks.",
+    chinese: "♻️ 修订运行读取目录中的表格，只请求目录缺少的表格。",
   },
 ])}
-${heading(2, "The five tools", "五个工具")}
+${heading(2, "The six tools", "六个工具")}
 ${table(
   [
     { english: "Tool", chinese: "工具" },
@@ -1450,6 +1552,7 @@ ${table(
     "<tr><td><code>llm_self_prediction_run</code></td><td>Run the four conditions on a set of tasks.</td></tr>",
     "<tr><td><code>llm_self_prediction_status</code></td><td>List the recent runs.</td></tr>",
     "<tr><td><code>llm_self_prediction_report</code></td><td>Read the report of one run.</td></tr>",
+    "<tr><td><code>llm_self_prediction_rename</code></td><td>Rename the folder of one run.</td></tr>",
     "<tr><td><code>llm_self_prediction_dataset</code></td><td>Describe the datasets.</td></tr>",
     "<tr><td><code>llm_self_prediction_help</code></td><td>Print the protocol and the layout.</td></tr>",
   ],
@@ -1490,8 +1593,8 @@ ${list([
     chinese: "🌐 每个模型通过兼容 OpenAI 的对话接口作答。",
   },
   {
-    english: "📡 The plain actual condition sets logprobs and top_logprobs.",
-    chinese: "📡 普通实际条件设置 logprobs 与 top_logprobs。",
+    english: "📡 The actual condition sets logprobs and top_logprobs.",
+    chinese: "📡 实际条件设置 logprobs 与 top_logprobs。",
   },
   {
     english: "🚫 The self conditions send no log-probability parameter.",
@@ -1513,13 +1616,16 @@ ${table(
 ${heading(2, "File layout", "文件布局")}
 ${codeBlock(`outputs/${metrics.xid}/
   run.json            the manifest of the run
+  revision.json       each revise pass and its reuse counts
   tasks.json          the selected tasks
   intermediate/       each raw request and each raw reply
   results/            metrics, records, report, and tables
   demos/              this website`)}
 ${heading(2, "Commands", "命令")}
 ${codeBlock(`node lib/cli.js env
-node lib/cli.js run --providers=huggingface --repetitions=3
+node lib/cli.js run --providers=huggingface --repetitions=8
+node lib/cli.js run --providers=huggingface --folder=${metrics.xid}
+node lib/cli.js rename --session=${metrics.xid}
 node lib/cli.js report --session=${metrics.xid}
 npm run publish`)}
 `;
@@ -1551,6 +1657,19 @@ function renderMeaningPage(options: DemoOptions): string {
     0,
   );
   const total = metrics.providers.length * COMPARISON_NAMES.length;
+  const hypothesis = metrics.hypothesis;
+  const hypothesisIcon =
+    hypothesis.verdict === "alternative" ? "🔺" : hypothesis.verdict === "null" ? "0️⃣" : "⚖️";
+  const meanOfComparison = (comparison: ComparisonName): number => {
+    const values = metrics.providers
+      .map((provider) => provider.comparisons.find((entry) => entry.comparison === comparison))
+      .filter((entry): entry is ComparisonSummary => entry !== undefined)
+      .map((entry) => entry.meanSymmetricKl);
+    if (values.length === 0) {
+      return Number.NaN;
+    }
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
   const body = `
 ${heading(2, "What the numbers mean", "数字说明什么")}
 ${cards([
@@ -1565,8 +1684,13 @@ ${cards([
     icon: "📉",
     titleEnglish: "A gap",
     titleChinese: "一道差距",
-    textEnglish: "Injection reduces the gap. It does not close the gap.",
-    textChinese: "注入会缩小差距。它不会消除差距。",
+    textEnglish:
+      `The served table in the context moves the self report from ` +
+      `${formatNumber(meanOfComparison("self"), 3)} nats to ` +
+      `${formatNumber(meanOfComparison("actual_injected_self"), 3)} nats.`,
+    textChinese:
+      `上下文中的接口表格把自我报告的差距从 ${formatNumber(meanOfComparison("self"), 3)} nat ` +
+      `移到 ${formatNumber(meanOfComparison("actual_injected_self"), 3)} nat。`,
   },
   {
     icon: "📐",
@@ -1582,10 +1706,12 @@ ${callout(
   `⚖️ ${total} 个比较中有 ${separated} 个高于容差。判为有差异只说明存在差异，不说明原因。`,
 )}
 ${callout(
-  "🧠 The argument has two parts. Part one is measured here: the self-report misses the served " +
-    "table, and a cheat sheet does not close the gap. Part two is a hypothesis for later work: a " +
-    "model that passes part one would gain a self dimension.",
-  "🧠 论点分两部分。第一部分在本运行中测量：自我报告偏离接口表格，小抄也不能消除差距。" +
+  `${hypothesisIcon} The argument has two parts. Part one is measured here: the run asks whether ` +
+    `the self-report matches the served table, and the session verdict is ` +
+    `\`${hypothesis.verdict}\` at alpha ${hypothesis.alpha}. Part two is a hypothesis for later ` +
+    "work: a model that passes part one would gain a self dimension.",
+  `${hypothesisIcon} 论点分两部分。第一部分在本运行中测量：运行检验自我报告是否与接口表格一致，` +
+    `会话判定为 \`${hypothesis.verdict}\`，显著性水平 ${hypothesis.alpha}。` +
     "第二部分是后续工作的假设：通过第一部分的模型会获得自我维度。",
 )}
 ${heading(2, "What the numbers do not mean", "数字不说明什么")}
@@ -1630,8 +1756,11 @@ ${list([
     chinese: "🎛️ 一次运行只有一个温度、一套提示词和一个容差。",
   },
   {
-    english: "🔁 Three repetitions limit the estimate of provider noise.",
-    chinese: "🔁 三次重复限制了提供方噪声的估计。",
+    english:
+      `🔁 ${metrics.repetitionCount} repetitions keep the estimate of provider noise inside ` +
+      "the control condition of the run.",
+    chinese:
+      `🔁 ${metrics.repetitionCount} 次重复把提供方噪声估计限制在本次运行的对照条件内。`,
   },
 ])}
 ${heading(2, "Future work", "后续工作")}
@@ -1707,6 +1836,7 @@ function buildStyleSheet(): string {
   --sans: Arial, SimHei, "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --serif: Cambria, NSimSun, "Songti SC", "Source Serif 4", Georgia, serif;
   --mono: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --math: "XITS Math", "STIX Two Math", "Cambria Math", Cambria, serif;
 }
 
 * { box-sizing: border-box; }
@@ -1971,6 +2101,7 @@ div.stat-card.predicted { border-top-color: var(--predicted); }
 div.stat-card.symmetric { border-top-color: var(--symmetric); }
 
 span.stat-icon { font-size: 1.05rem; line-height: 1.2; }
+span.formula { font-family: var(--math); font-size: 1rem; }
 span.stat-value { font-family: var(--sans); font-size: 1.45rem; font-weight: 700; }
 span.stat-label { font-family: var(--sans); color: var(--muted); font-size: 0.82rem; }
 
@@ -2459,6 +2590,39 @@ function buildBrowserScript(): string {
   }
 
   /**
+   * Format one p-value for the explorer.
+   *
+   * @param value - the p-value.
+   *
+   * @returns the text of the p-value.
+   */
+  function formatProbability(value) {
+    if (value === null || value === undefined || !isFinite(value)) { return "n/a"; }
+    return Number(value) < 0.001 ? Number(value).toExponential(1) : Number(value).toFixed(4);
+  }
+
+  /**
+   * Find the test of the selected model and the selected comparison.
+   *
+   * @returns the comparison summary, or null when the index holds no such summary.
+   */
+  function selectedTest() {
+    if (!state.index || !state.index.metrics) { return null; }
+    var entry = currentEntry();
+    var providerKey = entry ? entry.providerKey : "";
+    var providers = state.index.metrics.providers || [];
+    var comparison = comparisonSelect.value;
+    for (var outer = 0; outer < providers.length; outer += 1) {
+      if (providers[outer].providerKey !== providerKey) { continue; }
+      var list = providers[outer].comparisons || [];
+      for (var inner = 0; inner < list.length; inner += 1) {
+        if (list[inner].comparison === comparison) { return list[inner]; }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Render one bar span for a value on a scale.
    *
    * @param value - the value.
@@ -2523,8 +2687,10 @@ function buildBrowserScript(): string {
       '<span>📋 <b>' + escapeHtml(task.id) + '</b></span>' +
       '<span>🏷️ ' + escapeHtml(task.category) + '</span>' +
       '<span>' + badge + '</span>' +
-      '<span>KL(A‖P) <b>' + formatNumber(summary.klActualPredicted, 3) + '</b></span>' +
-      '<span>KL(P‖A) <b>' + formatNumber(summary.klPredictedActual, 3) + '</b></span>' +
+      '<span class="formula">KL(A‖P) <b>' + formatNumber(summary.klActualPredicted, 3) +
+      '</b></span>' +
+      '<span class="formula">KL(P‖A) <b>' + formatNumber(summary.klPredictedActual, 3) +
+      '</b></span>' +
       '<span>JS <b>' + formatNumber(summary.jensenShannon, 3) + '</b></span>' +
       '<span>TV <b>' + formatNumber(summary.totalVariation, 3) + '</b></span>' +
       '<span>📉 <b>' + formatNumber(summary.coveragePredictedByActual, 3) + '</b></span>' +
@@ -2589,9 +2755,11 @@ function buildBrowserScript(): string {
    * @returns the served condition and the predicted condition.
    */
   function whichKeys(comparisonName) {
-    if (comparisonName === "plain_self") { return { actual: "plain_actual", predicted: "plain_self" }; }
-    if (comparisonName === "injected_self") { return { actual: "plain_actual", predicted: "injected_self" }; }
-    return { actual: "plain_actual", predicted: "injected_actual" };
+    if (comparisonName === "self") { return { actual: "actual", predicted: "self" }; }
+    if (comparisonName === "actual_injected_self") {
+      return { actual: "actual", predicted: "actual_injected_self" };
+    }
+    return { actual: "actual", predicted: "actual_injected_actual" };
   }
 
   /**
@@ -2746,13 +2914,33 @@ function buildBrowserScript(): string {
       if (!task) { return; }
       var keepActual = Number(actualSelect.value) || 1;
       var keepPredicted = Number(predictedSelect.value) || 1;
-      var actualReps = (task.runs.plain_actual || []).map(function (item) { return item.rep; });
+      var actualReps = (task.runs.actual || []).map(function (item) { return item.rep; });
       fillSelect(actualSelect, actualReps);
       if (actualReps.indexOf(keepActual) >= 0) { actualSelect.value = String(keepActual); }
       var keys = whichKeys(comparisonSelect.value);
       var predictedReps = (task.runs[keys.predicted] || []).map(function (item) { return item.rep; });
       fillSelect(predictedSelect, predictedReps);
       if (predictedReps.indexOf(keepPredicted) >= 0) { predictedSelect.value = String(keepPredicted); }
+    }
+
+    /**
+     * Build the card of the session-level test of the selected comparison.
+     *
+     * @returns the markup of the card.
+     */
+    function summaryCard() {
+      var summary = selectedTest();
+      if (!summary || !summary.hypothesis) {
+        return statCard("🧮", "n/a", text("p-value", "p 值"));
+      }
+      var test = summary.hypothesis;
+      var label = text(
+        "p-value · null rejected: " + (test.rejectsNull ? "yes" : "no") + " · median " +
+          formatNumber(summary.medianSymmetricKl, 3) + " nats",
+        "p 值 · 拒绝原假设：" + (test.rejectsNull ? "是" : "否") + " · 中位 " +
+          formatNumber(summary.medianSymmetricKl, 3) + " nat"
+      );
+      return statCard("🧮", formatProbability(test.pValue), label);
     }
 
     /**
@@ -2771,7 +2959,8 @@ function buildBrowserScript(): string {
         statCard("Σ", formatNumber(value.jensenShannon, 3), text("Jensen-Shannon", "JS 散度"), "actual") +
         statCard("📏", formatNumber(value.totalVariation, 3), text("total variation", "全变差")) +
         statCard("📉", formatNumber(value.coveragePredictedByActual, 3),
-          text("coverage of served mass", "接口质量覆盖率"));
+          text("coverage of served mass", "接口质量覆盖率")) +
+        summaryCard();
     }
 
     /**
@@ -2867,7 +3056,7 @@ function buildBrowserScript(): string {
     if (resetButton) {
       resetButton.addEventListener("click", function () {
         modelSelect.value = "0";
-        if (state.index) { comparisonSelect.value = state.index.defaultComparison || "plain_self"; }
+        if (state.index) { comparisonSelect.value = state.index.defaultComparison || "self"; }
         compareToggle.checked = false;
         state.model = null;
         state.entry = null;
@@ -2882,7 +3071,7 @@ function buildBrowserScript(): string {
       fillSelect(modelSelect, entries.map(function (entry, position) { return position; }), function (position) {
         return entries[position].model + " · " + entries[position].providerKey;
       });
-      comparisonSelect.value = index.defaultComparison || "plain_self";
+      comparisonSelect.value = index.defaultComparison || "self";
       state.model = null;
       applySelection();
     }).catch(function (error) {
@@ -2911,7 +3100,7 @@ function buildIndexData(options: DemoOptions): string {
   const payload = {
     xid: options.metrics.xid,
     toleranceNats: options.metrics.toleranceNats,
-    defaultComparison: "plain_self",
+    defaultComparison: "self",
     models,
     metrics: {
       xid: options.metrics.xid,
@@ -2924,13 +3113,17 @@ function buildIndexData(options: DemoOptions): string {
           comparison: comparison.comparison,
           pairCount: comparison.pairCount,
           meanSymmetricKl: comparison.meanSymmetricKl,
+          medianSymmetricKl: comparison.medianSymmetricKl,
           meanJensenShannon: comparison.meanJensenShannon,
           meanTotalVariation: comparison.meanTotalVariation,
           topTokenAgreementRate: comparison.topTokenAgreementRate,
           confidenceInterval: comparison.confidenceInterval,
+          hypothesis: comparison.hypothesis,
         })),
       })),
+      hypothesis: options.metrics.hypothesis,
     },
+    reuse: options.reuse ?? null,
   };
   return `window.LLM_SP_INDEX = ${JSON.stringify(payload)};\n`;
 }
@@ -3053,7 +3246,22 @@ export async function readDemoOptions(runDirectory: string): Promise<DemoOptions
     taskCount: metrics.taskCount,
     categories: [...categories].map(([name, ids]) => ({ name, count: ids.size })),
   };
-  return { directory: path.join(runDirectory, "demos"), metrics, records, environment, dataset };
+  const revisionPath = path.join(runDirectory, REVISION_RECORD_FILE_NAME);
+  let reuse: ReuseSummary | undefined;
+  if (await pathExists(revisionPath)) {
+    const record = (await readJsonFile(revisionPath)) as {
+      readonly revisions?: readonly { readonly reuse?: ReuseSummary }[];
+    };
+    reuse = record.revisions?.at(-1)?.reuse;
+  }
+  return {
+    directory: path.join(runDirectory, "demos"),
+    metrics,
+    records,
+    environment,
+    dataset,
+    ...(reuse === undefined ? {} : { reuse }),
+  };
 }
 
 /**

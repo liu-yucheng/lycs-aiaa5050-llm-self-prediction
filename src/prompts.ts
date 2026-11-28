@@ -6,8 +6,12 @@
  *
  * The actual-prediction prompt asks for one next token, and the run reads the `logprobs` table of
  * the reply. The self-prediction prompt asks for one JSON table. Both prompts state the same task,
- * so the comparison measures the model and not the wording. The injected variants put one table
- * into the message list as an assistant turn, and then ask the same question again.
+ * so the comparison measures the model and not the wording.
+ *
+ * The injected-actual condition puts one served table into the message list as an assistant turn
+ * and then repeats the exact task. The second read is the recorded table of the condition. The
+ * injected-self condition puts one served table into the message list and then asks for the self
+ * table. One table format serves both conditions.
  */
 
 import { MAX_PROBABILITY_ENTRY_COUNT } from "./constants.js";
@@ -118,6 +122,11 @@ Report the ${count} most likely next tokens for this prefix, in the table that y
 /**
  * Build the message that injects one served table into the conversation.
  *
+ * The injected-actual condition puts this message into the conversation and then repeats the exact
+ * task. The injected-self condition puts this message into the conversation and then asks for the
+ * self table. The two conditions read the same table format, so the experiment records one table
+ * format for both conditions.
+ *
  * @param table - the served table.
  * @returns the message text.
  */
@@ -131,7 +140,22 @@ export function buildInjectedTableMessage(table: TableDocument): string {
 }
 
 /**
- * Build the user message that follows one injected table in the injected self-prediction condition.
+ * Build the user message that repeats the exact task after one injected served table.
+ *
+ * The message is the user message of the actual-prediction prompt without a change. The
+ * injected-actual condition repeats the exact task, so the run compares two reads of the same
+ * prompt.
+ *
+ * @param task - the task whose prefix the model reads.
+ * @returns the user message.
+ */
+export function buildRepeatedActualPrompt(task: Task): string {
+  return buildActualPredictionPrompt(task).user;
+}
+
+/**
+ * Build the user message that follows one injected served table in the injected self-prediction
+ * condition.
  *
  * @param task - the task whose prefix the model reads.
  * @param entryCount - the requested table size.
@@ -154,27 +178,6 @@ export function buildInjectedSelfPredictionPrompt(task: Task, entryCount: number
     "你已经看到服务端实际给出的概率表。现在请报告你自己预测的概率表：这个前缀之后最可能的 " +
     `${count} 个词，以及你认为在看到服务端概率表之前自己会给出的概率。不要照抄服务端的表。` +
     '只回复一个 JSON 对象，格式为：{"entries": [{"token": "词", "logProbability": -0.02}]}'
-  );
-}
-
-/**
- * Build the user message that follows one self table in the injected actual-prediction condition.
- *
- * @param task - the task whose prefix the model reads.
- * @returns the user message.
- */
-export function buildInjectedActualPrompt(task: Task): string {
-  if (isEnglishTask(task)) {
-    return (
-      `Sentence prefix: ${task.prefix}\n\n` +
-      "The table above is your own prediction for this prefix. Continue the sentence. Output " +
-      "only the one word that comes next. Do not explain and do not add punctuation."
-    );
-  }
-  return (
-    `句子前缀：${task.prefix}\n\n` +
-    "上面的表是你自己对这个前缀的预测。请继续这句话，只输出紧接着的一个词，" +
-    "不要解释，不要加标点。"
   );
 }
 

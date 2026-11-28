@@ -178,6 +178,29 @@ export interface ComparisonMetrics {
     /** The number of distinct tokens in the union of both supports. */
     readonly unionSupportSize: number;
 }
+/** The result of one one-sided hypothesis test over the tasks of one model. */
+export interface HypothesisTest {
+    /** The name of the test, as in `wilcoxon_signed_rank`. */
+    readonly testName: string;
+    /** The name of the comparison that the test reads. */
+    readonly comparison: ComparisonName;
+    /** The number of task values in the test. */
+    readonly sampleCount: number;
+    /** The value that the null hypothesis names, in nats. */
+    readonly nullValue: number;
+    /** The median of the task values, in nats. */
+    readonly median: number;
+    /** The sum of the ranks of the positive differences. */
+    readonly statistic: number;
+    /** The normal-approximation score of the statistic. */
+    readonly zScore: number;
+    /** The one-sided p-value of the score. */
+    readonly pValue: number;
+    /** The significance level of the test. */
+    readonly alpha: number;
+    /** True when the test rejects the null hypothesis at the significance level. */
+    readonly rejectsNull: boolean;
+}
 /** The summary of one comparison over every pair of one model. */
 export interface ComparisonSummary {
     /** The name of the comparison. */
@@ -206,6 +229,8 @@ export interface ComparisonSummary {
     readonly meanUnionSupportSize: number;
     /** The bootstrap interval of the mean symmetric divergence over tasks. */
     readonly confidenceInterval: ConfidenceInterval;
+    /** The one-sided hypothesis test of the task values against the tolerance. */
+    readonly hypothesis: HypothesisTest;
 }
 /** One bootstrap confidence interval. */
 export interface ConfidenceInterval {
@@ -282,10 +307,33 @@ export interface GroupResult {
     /** The summaries in canonical order. */
     readonly comparisons: readonly ComparisonSummary[];
 }
+/** The summary of one hypothesis test over every model of a run. */
+export interface SessionHypothesis {
+    /** True when the alternative hypothesis holds for the run. */
+    readonly alternativeHolds: boolean;
+    /** The number of tests that reject the null hypothesis at the significance level. */
+    readonly rejectedCount: number;
+    /** The number of tests in the run. */
+    readonly testCount: number;
+    /** The smallest p-value of the run. */
+    readonly smallestPValue: number;
+    /** The significance level of the run. */
+    readonly alpha: number;
+    /** The short statement of the verdict, as in `alternative`. */
+    readonly verdict: "alternative" | "null" | "mixed";
+    /** The largest control median of the run, in nats. */
+    readonly controlMedianMaximum: number;
+    /** The number of control tests that stand above the tolerance. */
+    readonly controlViolationCount: number;
+    /** The number of control tests in the run. */
+    readonly controlTestCount: number;
+}
 /** The metrics of one run. */
 export interface SessionMetrics {
     /** The run identifier. */
     readonly xid: string;
+    /** The protocol version of the run. */
+    readonly protocolVersion: string;
     /** The dataset identifiers. */
     readonly datasetIds: readonly string[];
     /** The language tags of the dataset. */
@@ -306,6 +354,8 @@ export interface SessionMetrics {
     readonly providers: readonly ProviderResult[];
     /** The verdicts of every provider and comparison. */
     readonly verdicts: readonly ProviderVerdict[];
+    /** The verdict of the hypothesis test of the run. */
+    readonly hypothesis: SessionHypothesis;
 }
 /** One verdict of one provider. */
 export interface ProviderVerdict {
@@ -328,6 +378,10 @@ export interface RunOptions {
     readonly toleranceNats: number;
     /** The output root. */
     readonly outputDirectory: string;
+    /** The one run folder of the run. */
+    readonly folder: string;
+    /** True when the run revises an existing folder. */
+    readonly revise: boolean;
     /** The random seed. */
     readonly randomSeed: number;
     /** The number of tasks that run at the same time. */
@@ -336,6 +390,32 @@ export interface RunOptions {
     readonly topLogprobsCount: number;
     /** True when the run uses the mock provider and no network. */
     readonly dryRun: boolean;
+}
+/** The reused and the requested record counts of one run. */
+export interface ReuseSummary {
+    /** The number of prediction records that the run read from the intermediate directory. */
+    readonly reusedRecordCount: number;
+    /** The number of prediction records that the run requested. */
+    readonly requestedRecordCount: number;
+    /** The number of raw files that a revise pass removed. */
+    readonly droppedFileCount: number;
+}
+/** One revision of one run folder. */
+export interface RevisionRecord {
+    /** The ISO timestamp of the revision. */
+    readonly revisedAt: string;
+    /** The plugin version of the revision. */
+    readonly pluginVersion: string;
+    /** The protocol version of the revision. */
+    readonly protocolVersion: string;
+    /** The repetition count of the revision. */
+    readonly repetitionCount: number;
+    /** The providers of the revision. */
+    readonly providers: readonly string[];
+    /** The reused and the requested record counts. */
+    readonly reuse: ReuseSummary;
+    /** The raw files that the revision removed, relative to the run folder. */
+    readonly droppedFileNames: readonly string[];
 }
 /** The environment record of one run. */
 export interface SessionEnvironment {
@@ -347,6 +427,8 @@ export interface SessionEnvironment {
     readonly pluginName: string;
     /** The plugin version. */
     readonly pluginVersion: string;
+    /** The protocol version. */
+    readonly protocolVersion: string;
     /** The random seed. */
     readonly randomSeed: number;
     /** The ISO timestamp of the start. */
@@ -366,6 +448,12 @@ export interface SessionEnvironment {
 export interface SessionManifest {
     /** The run identifier. */
     readonly xid: string;
+    /** The protocol version of the run. */
+    readonly protocolVersion: string;
+    /** The run identifier of the folder that this run revised. */
+    readonly previousXid?: string;
+    /** The revisions of the run folder, oldest first. */
+    readonly revisions?: readonly RevisionRecord[];
     /** The dataset identifiers. */
     readonly datasetIds: readonly string[];
     /** The digest of the task list. */
@@ -395,6 +483,8 @@ export interface RunResult {
     readonly reportPath: string;
     /** The path of the overview webpage. */
     readonly demosPath: string;
+    /** The reused and the requested record counts. */
+    readonly reuse: ReuseSummary;
     /** The warnings of the run. */
     readonly warnings: readonly string[];
 }

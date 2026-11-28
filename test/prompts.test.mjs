@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 
 import {
   buildActualPredictionPrompt,
-  buildInjectedActualPrompt,
   buildInjectedSelfPredictionPrompt,
+  buildRepeatedActualPrompt,
   buildInjectedTableMessage,
   buildSelfPredictionPrompt,
   formatTableJson,
@@ -71,10 +71,11 @@ test("the injected table message repeats each entry of the table", () => {
 
 test("the injected prompts refer to the table already in the context", () => {
   const self = buildInjectedSelfPredictionPrompt(englishTask, 20);
-  const actual = buildInjectedActualPrompt(englishTask);
+  const actual = buildRepeatedActualPrompt(englishTask);
   assert.ok(self.length > 0);
   assert.ok(actual.includes("The cat sat on the"));
-  assert.match(actual, /table|predict|log ?prob/iu);
+  assert.match(actual, /next/iu);
+  assert.equal(actual, buildActualPredictionPrompt(englishTask).user);
 });
 
 test("the table format rounds a log probability and stays valid JSON", () => {

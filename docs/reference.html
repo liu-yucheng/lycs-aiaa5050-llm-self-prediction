@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.12.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -37,9 +37,12 @@
     <tbody>
       <tr><td><code>providers</code></td><td>string array</td><td>Provider keys or model keys. Empty selects every enabled model.</td></tr>
       <tr><td><code>tasks</code></td><td>string array</td><td>Task identifiers in the selected order. Empty selects every task.</td></tr>
-      <tr><td><code>repetitions</code></td><td>integer 1 to 10</td><td>The repetition count of each condition. Default 3.</td></tr>
+      <tr><td><code>repetitions</code></td><td>integer 1 to 16</td><td>The repetition count of each condition. Default 8.</td></tr>
       <tr><td><code>toleranceNats</code></td><td>number</td><td>The verdict tolerance in nats. Default 0.05.</td></tr>
+      <tr><td><code>alpha</code></td><td>number 1e-6 to 0.5</td><td>The alpha level of the hypothesis test. Default 0.05.</td></tr>
       <tr><td><code>outputDirectory</code></td><td>string</td><td>The output root. Empty uses the plugin setting.</td></tr>
+      <tr><td><code>folder</code></td><td>string</td><td>The one output folder. An existing folder is revised.</td></tr>
+      <tr><td><code>renameFolder</code></td><td>boolean</td><td>Move the folder to a fresh identifier at the end.</td></tr>
       <tr><td><code>seed</code></td><td>integer</td><td>The bootstrap seed. Default 20260815.</td></tr>
       <tr><td><code>maxConcurrency</code></td><td>integer 1 to 16</td><td>The number of tasks that run at the same time.</td></tr>
       <tr><td><code>topLogprobsCount</code></td><td>integer 2 to 64</td><td>The requested table size. Default 20.</td></tr>
@@ -51,13 +54,16 @@
   <pre><code>node lib/cli.js run [options]
 node lib/cli.js status [--limit=5]
 node lib/cli.js report [--session=&lt;xid&gt;]
+node lib/cli.js demos [--session=&lt;xid&gt;]
+node lib/cli.js rename --session=&lt;xid&gt;
 node lib/cli.js dataset [--sample=8]
 node lib/cli.js env
 node lib/cli.js help
 
 # run options
---providers=&lt;keys&gt; --tasks=&lt;ids&gt; --repetitions=&lt;n&gt; --tolerance=&lt;nats&gt;
---output=&lt;directory&gt; --seed=&lt;n&gt; --concurrency=&lt;n&gt; --entries=&lt;n&gt; --dry-run</code></pre>
+--providers=&lt;keys&gt; --tasks=&lt;ids&gt; --repetitions=&lt;n&gt; --tolerance=&lt;nats&gt; --alpha=&lt;level&gt;
+--folder=&lt;name&gt; --rename-folder --output=&lt;directory&gt; --seed=&lt;n&gt; --concurrency=&lt;n&gt;
+--entries=&lt;n&gt; --dry-run</code></pre>
 
 <h2>The plugin settings</h2>
   <table>
@@ -76,9 +82,10 @@ node lib/cli.js help
 <h2>The output layout</h2>
   <pre><code>outputs/&lt;xid&gt;/
   run.json                     the manifest: status, options, providers, versions
+  revision.json                one record for each revise pass of the folder
   tasks.json                   the selected tasks
   intermediate/&lt;providerKey&gt;/&lt;taskId&gt;/&lt;condition&gt;-r&lt;n&gt;-call&lt;k&gt;.json
-  results/metrics.json         the three comparisons, the summaries, the verdicts
+  results/metrics.json         the three comparisons, the summaries, the tests, the verdicts
   results/records.json         one task record for each task and model
   results/records/&lt;providerKey&gt;/&lt;taskId&gt;.json
   results/report.md            the Markdown report
@@ -107,7 +114,7 @@ node lib/cli.js help
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.12.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

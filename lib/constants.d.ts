@@ -7,7 +7,9 @@
 /** The package name of the plugin. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The semantic version of the plugin. */
-export declare const PLUGIN_VERSION = "0.11.2";
+export declare const PLUGIN_VERSION = "0.12.0";
+/** The version of the experiment protocol that this plugin implements. */
+export declare const PROTOCOL_VERSION = "2.0.0";
 /** The name of the tool that runs the experiment. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 /** The name of the tool that lists the sessions. */
@@ -16,34 +18,57 @@ export declare const TOOL_STATUS = "llm_self_prediction_status";
 export declare const TOOL_REPORT = "llm_self_prediction_report";
 /** The name of the tool that describes the dataset. */
 export declare const TOOL_DATASET = "llm_self_prediction_dataset";
+/** The name of the tool that renames one run folder. */
+export declare const TOOL_RENAME = "llm_self_prediction_rename";
 /** The name of the tool that prints the help text. */
 export declare const TOOL_HELP = "llm_self_prediction_help";
 /** The condition that reads the served `logprobs` table without any prior table in context. */
-export declare const CONDITION_PLAIN_ACTUAL = "plain_actual";
+export declare const CONDITION_ACTUAL = "actual";
 /** The condition that asks the model to report its own table without any prior table in context. */
-export declare const CONDITION_PLAIN_SELF = "plain_self";
-/** The condition that injects the plain actual table and then asks for the self table. */
-export declare const CONDITION_INJECTED_SELF = "injected_self";
-/** The condition that keeps a self table in context and then reads the served actual table. */
-export declare const CONDITION_INJECTED_ACTUAL = "injected_actual";
+export declare const CONDITION_SELF = "self";
+/** The condition that injects the served table and then asks for the self table. */
+export declare const CONDITION_ACTUAL_INJECTED_SELF = "actual_injected_self";
+/** The condition that reads the served table, keeps it in context, and reads it again. */
+export declare const CONDITION_ACTUAL_INJECTED_ACTUAL = "actual_injected_actual";
 /** The four conditions of the protocol in their canonical order. */
-export declare const CONDITION_NAMES: readonly ["plain_actual", "plain_self", "injected_self", "injected_actual"];
-/** The comparison that pairs the plain self table with the plain actual table. */
-export declare const COMPARISON_PLAIN_SELF = "plain_self";
-/** The comparison that pairs the injected self table with the plain actual table. */
-export declare const COMPARISON_INJECTED_SELF = "injected_self";
-/** The comparison that pairs the injected actual table with the plain actual table. */
-export declare const COMPARISON_INJECTED_ACTUAL = "injected_actual";
+export declare const CONDITION_NAMES: readonly ["actual", "self", "actual_injected_self", "actual_injected_actual"];
+/** The comparison that pairs the self table with the actual table. */
+export declare const COMPARISON_SELF = "self";
+/** The comparison that pairs the injected self table with the actual table. */
+export declare const COMPARISON_ACTUAL_INJECTED_SELF = "actual_injected_self";
+/** The comparison that pairs the injected actual table with the actual table. */
+export declare const COMPARISON_ACTUAL_INJECTED_ACTUAL = "actual_injected_actual";
 /** The three comparisons of the protocol in their canonical order. */
-export declare const COMPARISON_NAMES: readonly ["plain_self", "injected_self", "injected_actual"];
+export declare const COMPARISON_NAMES: readonly ["self", "actual_injected_self", "actual_injected_actual"];
+/**
+ * The raw file name prefixes of an earlier protocol version.
+ *
+ * A revise pass reads one of these files when the file of the current protocol version is absent.
+ * The plan of the earlier protocol asked the same question in the same words for the two entries,
+ * so the recorded table is a valid sample of the new condition.
+ */
+export declare const LEGACY_CONDITION_NAMES: Readonly<Record<string, string>>;
+/** The prefixes of the raw files that the current protocol reads, in lookup order. */
+export declare const REUSABLE_CONDITION_PREFIXES: Readonly<Record<string, readonly string[]>>;
+/**
+ * The prefixes of the raw files that the current protocol does not read.
+ *
+ * The earlier protocol asked a different question in these two conditions. A revise pass removes
+ * the files, because no table of the current protocol can replace them.
+ */
+export declare const OBSOLETE_CONDITION_PREFIXES: readonly string[];
 /** The number of table entries that the protocol requests. */
 export declare const TOP_LOGPROBS_COUNT = 20;
 /** The number of repetitions of one condition on one task. */
-export declare const DEFAULT_REPETITION_COUNT = 3;
+export declare const DEFAULT_REPETITION_COUNT = 8;
+/** The largest repetition count that one run accepts. */
+export declare const MAX_REPETITION_COUNT = 16;
 /** The probability that one side receives for one token that the other side does not report. */
 export declare const PROBABILITY_FLOOR = 1e-12;
 /** The divergence in nats below which two distributions count as the same distribution. */
 export declare const DEFAULT_TOLERANCE_NATS = 0.05;
+/** The significance level of one hypothesis test. */
+export declare const DEFAULT_ALPHA = 0.05;
 /** The directory name of the input files. */
 export declare const INPUTS_DIRECTORY_NAME = "inputs";
 /** The directory name of the tested dataset below the inputs directory. */
@@ -58,6 +83,10 @@ export declare const INTERMEDIATE_DIRECTORY_NAME = "intermediate";
 export declare const RESULTS_DIRECTORY_NAME = "results";
 /** The directory name of the static webpages below one run directory. */
 export declare const DEMOS_DIRECTORY_NAME = "demos";
+/** The file name of the run manifest. */
+export declare const MANIFEST_FILE_NAME = "run.json";
+/** The file name of the revision record, which lists each file that a revise pass removed. */
+export declare const REVISION_RECORD_FILE_NAME = "revision.json";
 /** The file name of the public configuration file that holds the non-secret provider settings. */
 export declare const CONFIG_FILE_NAME = "configs.env";
 /** The file name of the configuration file that an earlier plugin version used. */
