@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.0</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.1</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -30,7 +30,7 @@
     parsing rules.</p>
 
 <h2>The actual request</h2>
-<p>The plugin sends one system message and one user message, with <code>temperature: 0</code>, <code>max_tokens: 1</code>, <code>logprobs: true</code>, and <code>top_logprobs: 20</code>. The provider returns the top 20 entries of the first generated token.</p>
+<p>The plugin sends one system message and one user message, with <code>temperature: 0</code>, <code>max_tokens: 1</code>, <code>logprobs: true</code>, and <code>top_logprobs: 20</code>. The provider returns the top 20 entries of the first generated token. An endpoint that denies a field changes the body. The OpenAI provider omits the temperature, names the budget with <code>max_completion_tokens</code>, raises the budget to 16 tokens, and lowers <code>top_logprobs</code> to 5 when the endpoint denies 20.</p>
     <pre><code>POST &lt;base_url&gt;/chat/completions
 {
   &quot;model&quot;: &quot;&lt;model&gt;&quot;,
@@ -77,7 +77,7 @@
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.0. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.1. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>
