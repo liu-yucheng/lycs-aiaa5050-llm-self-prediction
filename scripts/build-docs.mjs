@@ -212,7 +212,10 @@ const overviewBody = [
       "Dataset",
       "32 Simplified Chinese and 32 US English tasks in 8 categories in <code>inputs/testing-dataset/</code>",
     ],
-    ["Providers", "Hugging Face router models, plus a deterministic mock provider"],
+    [
+      "Providers",
+      "Hugging Face router models, OpenAI chat models, and a deterministic mock provider",
+    ],
     ["Conditions", "plain actual, plain self, injected self, injected actual; 3 repetitions each"],
     ["Comparisons", "3: plain self, injected self, and injected actual against the plain actual table"],
     ["Verdict", "Bootstrap interval of the mean symmetric KL against a tolerance of 0.05 nats"],
