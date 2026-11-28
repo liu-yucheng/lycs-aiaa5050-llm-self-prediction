@@ -195,6 +195,14 @@ export declare class OpenAiCompatibleClient implements ProviderClient {
     private readonly timeoutMilliseconds;
     /** The number of requested table entries. */
     private readonly topLogprobsCount;
+    /** The accepted table entry counts, from the highest to the lowest. */
+    private readonly tableCounts;
+    /** The position of the entry count of the next request. */
+    private tableCountIndex;
+    /** The completion budget field of every request. */
+    private readonly completionTokenField;
+    /** The completion budget of one served table request. */
+    private readonly servedTableTokenBudget;
     /**
      * Create one client.
      *
@@ -203,6 +211,8 @@ export declare class OpenAiCompatibleClient implements ProviderClient {
      * @param timeoutMilliseconds - the time limit of one request.
      */
     constructor(definition: ProviderDefinition, apiKey: string | undefined, timeoutMilliseconds?: number);
+    /** The table entry count of the next request. */
+    private get tableEntryCount();
     /**
      * Read the served table of one task.
      *

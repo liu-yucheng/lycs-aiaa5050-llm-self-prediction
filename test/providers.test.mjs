@@ -75,6 +75,9 @@ function selfReportReply() {
 
 const requests = [];
 let failureMode = false;
+let tableCap = null;
+let denyTemperature = false;
+let requireCompletionTokens = false;
 let rateLimitCount = 0;
 let resetCount = 0;
 let server;
@@ -102,6 +105,27 @@ before(async () => {
       if (failureMode) {
         response.writeHead(400, { "content-type": "application/json" });
         response.end(JSON.stringify({ error: { message: "bad request" } }));
+        return;
+      }
+      if (requireCompletionTokens && "max_tokens" in body) {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({ error: { message: "Unsupported parameter: 'max_tokens'." } }),
+        );
+        return;
+      }
+      if (denyTemperature && "temperature" in body) {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: { message: "Unsupported parameter: 'temperature'." } }));
+        return;
+      }
+      if (tableCap !== null && Number(body.top_logprobs ?? 0) > tableCap) {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            error: { message: `Invalid value for 'top_logprobs': must be less than or equal to ${tableCap}.` },
+          }),
+        );
         return;
       }
       const payload = body.logprobs === true ? servedTableReply() : selfReportReply();
@@ -409,6 +433,45 @@ test("the served table reader drops a placeholder entry", () => {
   assert.equal(served.distribution.topToken, "霜");
 });
 
+test("the client omits the temperature and lowers the table count on a denial", async () => {
+  tableCap = 5;
+  denyTemperature = true;
+  requireCompletionTokens = true;
+  requests.length = 0;
+  try {
+    const client = createProviderClient(
+      definition({
+        topLogprobsCount: 20,
+        topLogprobsFallbackCounts: [5],
+        completionTokenField: "max_completion_tokens",
+        servedTableTokenBudget: 16,
+        temperature: "default",
+      }),
+      "key",
+    );
+    const outcome = await client.requestPlainActual(task, 1);
+    assert.equal(outcome.draft.distribution.supportSize, 4);
+    assert.equal(requests[0].body.top_logprobs, 20);
+    assert.equal(requests[1].body.top_logprobs, 5);
+    assert.equal("temperature" in requests[0].body, false);
+    assert.equal(requests[1].body.max_completion_tokens, 16);
+    await client.requestPlainActual(task, 2);
+    assert.equal(requests[requests.length - 1].body.top_logprobs, 5);
+  } finally {
+    tableCap = null;
+    denyTemperature = false;
+    requireCompletionTokens = false;
+  }
+});
+
+test("a provider without the exceptions sends temperature zero and the classic field", async () => {
+  requests.length = 0;
+  const client = createProviderClient(definition(), "key");
+  await client.requestPlainActual(task, 1);
+  assert.equal(requests[0].body.temperature, 0);
+  assert.equal(requests[0].body.max_tokens, 1);
+});
+
 test("the catalog holds an OpenAI provider that requests a table of twenty", () => {
   const catalog = createProviderCatalog();
   const provider = catalog.providers.find((entry) => entry.key === "openai");
@@ -418,5 +481,9 @@ test("the catalog holds an OpenAI provider that requests a table of twenty", () 
   assert.equal(provider.topLogprobsCount, 20);
   assert.equal(provider.model, "");
   assert.deepEqual(provider.models, []);
+  assert.deepEqual(provider.topLogprobsFallbackCounts, [5]);
+  assert.equal(provider.completionTokenField, "max_completion_tokens");
+  assert.equal(provider.servedTableTokenBudget, 16);
+  assert.equal(provider.temperature, "default");
   assert.equal(provider.enabled, true);
 });
