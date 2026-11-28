@@ -7,7 +7,7 @@
 /** The package name of the plugin. */
 export declare const PLUGIN_NAME = "lycs-aiaa5050-llm-self-prediction";
 /** The semantic version of the plugin. */
-export declare const PLUGIN_VERSION = "0.9.2";
+export declare const PLUGIN_VERSION = "0.10.0";
 /** The name of the tool that runs the experiment. */
 export declare const TOOL_RUN = "llm_self_prediction_run";
 /** The name of the tool that lists the sessions. */
@@ -58,12 +58,16 @@ export declare const INTERMEDIATE_DIRECTORY_NAME = "intermediate";
 export declare const RESULTS_DIRECTORY_NAME = "results";
 /** The directory name of the static webpages below one run directory. */
 export declare const DEMOS_DIRECTORY_NAME = "demos";
-/** The file name of the public models file. */
-export declare const MODELS_FILE_NAME = "models-to-use.env";
+/** The file name of the public configuration file that holds the non-secret provider settings. */
+export declare const CONFIG_FILE_NAME = "configs.env";
+/** The file name of the configuration file that an earlier plugin version used. */
+export declare const LEGACY_CONFIG_FILE_NAME = "models-to-use.env";
 /** The file name of the private environment file. */
 export declare const ENV_FILE_NAME = ".env";
 /** The file name of the public example environment file. */
 export declare const ENV_EXAMPLE_FILE_NAME = ".env.example";
+/** The environment property that names the code repository of one provider. The property is optional. */
+export declare const ENV_REPO_URL_PROPERTY = "repo_url";
 /** The environment property that overrides the base URL of one provider. */
 export declare const ENV_BASE_URL_PROPERTY = "base_url";
 /** The environment property that overrides the model of one provider. */
@@ -80,6 +84,13 @@ export declare const ENV_TOP_LOGPROBS_PROPERTY = "top_logprobs";
 export declare const ENV_THINKING_PROPERTY = "thinking";
 /** The environment property that sets the `reasoning` switch of one provider. */
 export declare const ENV_REASONING_PROPERTY = "reasoning";
+/**
+ * The properties that the private environment file accepts.
+ *
+ * The private file holds the optional repository URL, the endpoint, and the API key. Every other
+ * property belongs to the public configuration file.
+ */
+export declare const PRIVATE_ENVIRONMENT_PROPERTIES: readonly ["repo_url", "base_url", "api_key"];
 /** The attempt count of one served table request. */
 export declare const SERVED_TABLE_ATTEMPT_COUNT = 3;
 /** The attempt count of one request that a rate limit or a server fault can repeat. */

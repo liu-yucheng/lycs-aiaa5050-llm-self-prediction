@@ -4,17 +4,20 @@
 /**
  * The configuration files of one workspace.
  *
- * The workspace root holds three files. `.env` is private and holds the base URL and the API key of
- * each provider. `.env.example` is public and holds the same keys with placeholder values.
- * `models-to-use.env` is public and holds the model list of each provider. The plugin copies an
- * example file when a configuration file is absent, and it never writes an API key to a session
- * file.
+ * The workspace root holds three files. `.env` is private and holds the optional repository URL,
+ * the base URL, and the API key of each provider. `.env.example` is public and holds the same keys
+ * with placeholder values. `configs.env` is public and holds every other provider setting, such as
+ * the model list and the switches. The reader enforces the split: a property outside the private
+ * set in `.env` is a problem, and the plugin applies only the configuration file value. The plugin
+ * copies an example file when a configuration file is absent, and it never writes an API key to a
+ * session file.
  */
 
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
 
 import {
+  CONFIG_FILE_NAME,
   ENV_API_KEY_PROPERTY,
   ENV_BASE_URL_PROPERTY,
   ENV_EDGE_HOST_PROPERTY,
@@ -25,7 +28,8 @@ import {
   ENV_REASONING_PROPERTY,
   ENV_THINKING_PROPERTY,
   ENV_TOP_LOGPROBS_PROPERTY,
-  MODELS_FILE_NAME,
+  LEGACY_CONFIG_FILE_NAME,
+  PRIVATE_ENVIRONMENT_PROPERTIES,
 } from "./constants.js";
 import { packagedPath, pathExists, readTextFile } from "./files.js";
 
@@ -137,12 +141,98 @@ export async function readEnvironmentFile(
   return parseEnvironmentText(await readTextFile(filePath));
 }
 
+/** One key of one environment file, split into its provider prefix and its property. */
+interface EnvironmentKey {
+  /** The provider section name. The name is lower case. */
+  readonly prefix: string;
+  /** The property name. The name is lower case. */
+  readonly property: string;
+}
+
 /**
- * Group the parsed values by provider section.
+ * Split one environment key into its provider prefix and its property.
  *
- * A key has the form `<prefix>.<property>`. The builder accepts the properties `base_url`,
- * `model_to_use`, `api_key`, `top_logprobs`, and `thinking`. It ignores any other property and any
- * key without a dot.
+ * A key has the form `<prefix>.<property>`. The function rejects a key without a dot and a key with
+ * an empty prefix.
+ *
+ * @param key - the key of one environment file line.
+ * @returns the two parts, or undefined when the key is invalid.
+ */
+function splitEnvironmentKey(key: string): EnvironmentKey | undefined {
+  const separator = key.indexOf(".");
+  if (separator <= 0) {
+    return undefined;
+  }
+  const prefix = key.slice(0, separator).trim().toLowerCase();
+  const property = key.slice(separator + 1).trim().toLowerCase();
+  if (prefix === "" || property === "") {
+    return undefined;
+  }
+  return { prefix, property };
+}
+
+/**
+ * Apply one provider property to one group of sections.
+ *
+ * The function accepts `base_url`, `model_to_use`, `models_to_use`, `api_key`, `top_logprobs`,
+ * `edge_host`, `thinking`, and `reasoning`. It ignores any other property, because the private
+ * environment file also holds an optional `repo_url` that the plugin does not use.
+ *
+ * @param environments - the sections to change.
+ * @param prefix - the provider section name.
+ * @param property - the property name in lower case.
+ * @param value - the property value.
+ */
+function applyProviderProperty(
+  environments: Map<string, ProviderEnvironment>,
+  prefix: string,
+  property: string,
+  value: string,
+): void {
+  const current = environments.get(prefix) ?? {};
+  if (property === ENV_BASE_URL_PROPERTY) {
+    environments.set(prefix, { ...current, baseUrl: value });
+  } else if (property === ENV_MODEL_PROPERTY) {
+    environments.set(prefix, { ...current, model: value });
+  } else if (property === ENV_MODELS_PROPERTY) {
+    const models = value
+      .split(",")
+      .map((model) => model.trim())
+      .filter((model) => model !== "");
+    if (models.length > 0) {
+      environments.set(prefix, { ...current, models });
+    }
+  } else if (property === ENV_API_KEY_PROPERTY) {
+    environments.set(prefix, { ...current, apiKey: value });
+  } else if (property === ENV_TOP_LOGPROBS_PROPERTY) {
+    const count = Number.parseInt(value.trim(), 10);
+    if (Number.isInteger(count) && count >= 1 && count <= 64) {
+      environments.set(prefix, { ...current, topLogprobsCount: count });
+    }
+  } else if (property === ENV_EDGE_HOST_PROPERTY) {
+    const edgeHost = value.trim().toLowerCase();
+    if (edgeHost !== "") {
+      environments.set(prefix, { ...current, edgeHost });
+    }
+  } else if (property === ENV_THINKING_PROPERTY) {
+    const thinking = value.trim().toLowerCase();
+    if (thinking !== "") {
+      environments.set(prefix, { ...current, thinking });
+    }
+  } else if (property === ENV_REASONING_PROPERTY) {
+    const reasoning = value.trim().toLowerCase();
+    if (reasoning !== "") {
+      environments.set(prefix, { ...current, reasoning });
+    }
+  }
+}
+
+/**
+ * Group the parsed values of one configuration file by provider section.
+ *
+ * A key has the form `<prefix>.<property>`. The builder accepts `base_url`, `model_to_use`,
+ * `models_to_use`, `api_key`, `top_logprobs`, `edge_host`, `thinking`, and `reasoning`. It ignores
+ * any other property and any key without a dot.
  *
  * @param values - the parsed values of one environment file.
  * @returns the section values in file order.
@@ -152,53 +242,64 @@ export function buildProviderEnvironments(
 ): Map<string, ProviderEnvironment> {
   const environments = new Map<string, ProviderEnvironment>();
   for (const [key, value] of Object.entries(values)) {
-    const separator = key.indexOf(".");
-    if (separator <= 0) {
+    const parsed = splitEnvironmentKey(key);
+    if (parsed === undefined) {
       continue;
     }
-    const prefix = key.slice(0, separator).trim().toLowerCase();
-    const property = key.slice(separator + 1).trim().toLowerCase();
-    if (prefix === "") {
-      continue;
-    }
-    const current = environments.get(prefix) ?? {};
-    if (property === ENV_BASE_URL_PROPERTY) {
-      environments.set(prefix, { ...current, baseUrl: value });
-    } else if (property === ENV_MODEL_PROPERTY) {
-      environments.set(prefix, { ...current, model: value });
-    } else if (property === ENV_MODELS_PROPERTY) {
-      const models = value
-        .split(",")
-        .map((model) => model.trim())
-        .filter((model) => model !== "");
-      if (models.length > 0) {
-        environments.set(prefix, { ...current, models });
-      }
-    } else if (property === ENV_API_KEY_PROPERTY) {
-      environments.set(prefix, { ...current, apiKey: value });
-    } else if (property === ENV_TOP_LOGPROBS_PROPERTY) {
-      const count = Number.parseInt(value.trim(), 10);
-      if (Number.isInteger(count) && count >= 1 && count <= 64) {
-        environments.set(prefix, { ...current, topLogprobsCount: count });
-      }
-    } else if (property === ENV_EDGE_HOST_PROPERTY) {
-      const edgeHost = value.trim().toLowerCase();
-      if (edgeHost !== "") {
-        environments.set(prefix, { ...current, edgeHost });
-      }
-    } else if (property === ENV_THINKING_PROPERTY) {
-      const thinking = value.trim().toLowerCase();
-      if (thinking !== "") {
-        environments.set(prefix, { ...current, thinking });
-      }
-    } else if (property === ENV_REASONING_PROPERTY) {
-      const reasoning = value.trim().toLowerCase();
-      if (reasoning !== "") {
-        environments.set(prefix, { ...current, reasoning });
-      }
-    }
+    applyProviderProperty(environments, parsed.prefix, parsed.property, value);
   }
   return environments;
+}
+
+/** The result of one read of the private environment file. */
+export interface PrivateEnvironmentResult {
+  /** The accepted section values in file order. */
+  readonly environments: Map<string, ProviderEnvironment>;
+  /** The keys that hold a property outside the private set, as in `huggingface.edge_host`. */
+  readonly rejectedKeys: readonly string[];
+}
+
+/**
+ * Group the parsed values of the private environment file by provider section.
+ *
+ * The builder accepts only `repo_url`, `base_url`, and `api_key`. It accepts `repo_url` without a
+ * use, because the plugin does not call one repository. A key outside the private set is a problem:
+ * the builder rejects the key and reports it.
+ *
+ * @param values - the parsed values of the private environment file.
+ * @returns the accepted section values and the rejected keys.
+ */
+export function buildPrivateProviderEnvironments(
+  values: Readonly<Record<string, string>>,
+): PrivateEnvironmentResult {
+  const environments = new Map<string, ProviderEnvironment>();
+  const rejectedKeys: string[] = [];
+  const accepted: ReadonlySet<string> = new Set(PRIVATE_ENVIRONMENT_PROPERTIES);
+  for (const [key, value] of Object.entries(values)) {
+    const parsed = splitEnvironmentKey(key);
+    if (parsed === undefined) {
+      continue;
+    }
+    if (!accepted.has(parsed.property)) {
+      rejectedKeys.push(describeEnvironmentKey(parsed.prefix, parsed.property));
+      continue;
+    }
+    applyProviderProperty(environments, parsed.prefix, parsed.property, value);
+  }
+  return { environments, rejectedKeys };
+}
+
+/**
+ * Describe the private property list for one problem line.
+ *
+ * @returns the property names, as in `repo_url, base_url, and api_key`.
+ */
+function describePrivateProperties(): string {
+  const names = [...PRIVATE_ENVIRONMENT_PROPERTIES];
+  if (names.length === 1) {
+    return names[0] ?? "";
+  }
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1] ?? ""}`;
 }
 
 /**
@@ -248,10 +349,12 @@ export function mergeProviderEnvironments(
 export interface ConfigurationState {
   /** The state of the private environment file. */
   readonly environment: EnvironmentFileState;
-  /** The path of the models file. */
-  readonly modelsFilePath?: string;
-  /** True when this command created the models file. */
-  readonly modelsFileCreated?: boolean;
+  /** The path of the public configuration file. */
+  readonly configFilePath?: string;
+  /** True when this command created the public configuration file. */
+  readonly configFileCreated?: boolean;
+  /** The path of the legacy configuration file that the command copied. */
+  readonly configFileMigratedFrom?: string;
 }
 
 /** The configuration of one workspace. */
@@ -306,23 +409,40 @@ export async function ensureEnvironmentFile(
   return { directory, created: false };
 }
 
+/** The state of the public configuration file of one workspace. */
+export interface ConfigFileState {
+  /** The path of the configuration file. */
+  readonly filePath?: string;
+  /** True when this command created the configuration file. */
+  readonly created: boolean;
+  /** The path of the legacy file that the command copied. */
+  readonly migratedFrom?: string;
+}
+
 /**
- * Ensure the models file of one workspace.
+ * Ensure the public configuration file of one workspace.
  *
- * The function keeps an existing file. When the file is absent, the function copies the packaged
- * file and reports that it created the file. A copy keeps the model lists of the package.
+ * The function keeps an existing file. When the file is absent and the older `models-to-use.env`
+ * file is present, the function copies the older file and keeps it in place. When both files are
+ * absent, the function copies the packaged file and reports that it created the file. A copy keeps
+ * the provider settings of the source file.
  *
  * @param workspace - the workspace directory.
- * @returns the path of the file, and the created flag.
+ * @returns the path of the file, the created flag, and the copy source.
  */
-export async function ensureModelsFile(
-  workspace: string,
-): Promise<{ readonly filePath?: string; readonly created: boolean }> {
-  const filePath = path.join(workspace, MODELS_FILE_NAME);
+export async function ensureConfigFile(workspace: string): Promise<ConfigFileState> {
+  const filePath = path.join(workspace, CONFIG_FILE_NAME);
   if (await pathExists(filePath)) {
     return { filePath, created: false };
   }
-  const packaged = packagedPath(MODELS_FILE_NAME);
+  const legacyPath = path.join(workspace, LEGACY_CONFIG_FILE_NAME);
+  if (await pathExists(legacyPath)) {
+    const text = await readTextFile(legacyPath);
+    const body = text.endsWith("\n") ? text : `${text}\n`;
+    await writeFile(filePath, body, { encoding: "utf8" });
+    return { filePath, created: true, migratedFrom: legacyPath };
+  }
+  const packaged = packagedPath(CONFIG_FILE_NAME);
   if (!(await pathExists(packaged))) {
     return { created: false };
   }
@@ -335,35 +455,45 @@ export async function ensureModelsFile(
 /**
  * Read the configuration of one workspace.
  *
- * The reader takes the base URL, the API key, and the switches from `.env`. It takes the model
- * lists from `models-to-use.env`. The models file wins for a model list, so a workspace can change
- * the tested models without a change of the private file.
+ * The reader takes the optional repository URL, the base URL, and the API key from `.env`. It takes
+ * the model lists and the switches from `configs.env`. A private property outside the private set
+ * is a problem, and the reader does not apply it. The configuration file wins for a property that
+ * both files hold, so a workspace can change the tested models without a change of the private
+ * file.
  *
  * @param workspace - the workspace directory.
  * @returns the configuration, with one problem line for each defect.
  */
 export async function readConfiguration(workspace: string): Promise<WorkspaceConfiguration> {
   const environment = await ensureEnvironmentFile(workspace);
-  const models = await ensureModelsFile(workspace);
+  const configFile = await ensureConfigFile(workspace);
   const environmentValues =
     environment.filePath === undefined ? {} : await readEnvironmentFile(environment.filePath);
-  const modelsValues = models.filePath === undefined ? {} : await readEnvironmentFile(models.filePath);
+  const configValues =
+    configFile.filePath === undefined ? {} : await readEnvironmentFile(configFile.filePath);
   const problems: string[] = [];
   if (environment.filePath === undefined) {
     problems.push(`The workspace holds no ${ENV_FILE_NAME} file and no example file to copy.`);
   }
-  if (models.filePath === undefined) {
-    problems.push(`The workspace holds no ${MODELS_FILE_NAME} file.`);
+  if (configFile.filePath === undefined) {
+    problems.push(`The workspace holds no ${CONFIG_FILE_NAME} file.`);
   }
-  const baseSections = buildProviderEnvironments(environmentValues);
-  const modelSections = buildProviderEnvironments(modelsValues);
+  const privateRead = buildPrivateProviderEnvironments(environmentValues);
+  for (const key of privateRead.rejectedKeys) {
+    problems.push(
+      `The ${ENV_FILE_NAME} file holds ${key}. The ${ENV_FILE_NAME} file accepts only ` +
+        `${describePrivateProperties()}. Move ${key} to ${CONFIG_FILE_NAME}.`,
+    );
+  }
+  const configSections = buildProviderEnvironments(configValues);
   return {
     state: {
       environment,
-      modelsFilePath: models.filePath,
-      modelsFileCreated: models.created,
+      configFilePath: configFile.filePath,
+      configFileCreated: configFile.created,
+      configFileMigratedFrom: configFile.migratedFrom,
     },
-    environments: mergeProviderEnvironments(baseSections, modelSections),
+    environments: mergeProviderEnvironments(privateRead.environments, configSections),
     problems,
   };
 }

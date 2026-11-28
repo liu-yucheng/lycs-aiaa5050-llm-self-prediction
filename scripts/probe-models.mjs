@@ -23,7 +23,7 @@ import https from "node:https";
 import path from "node:path";
 
 import { readConfiguration } from "../lib/env.js";
-import { MODELS_FILE_NAME, TOP_LOGPROBS_COUNT } from "../lib/constants.js";
+import { CONFIG_FILE_NAME, TOP_LOGPROBS_COUNT } from "../lib/constants.js";
 
 /** The organizations of the top-tier Chinese and international companies. */
 const TARGET_ORGANIZATIONS = [
@@ -322,7 +322,7 @@ async function main() {
     `${lines.join("\n")}\n`,
     "utf8",
   );
-  process.stdout.write(`\nModels file: ${MODELS_FILE_NAME}\n`);
+  process.stdout.write(`\nConfiguration file: ${CONFIG_FILE_NAME}\n`);
   process.stdout.write(`Passing model count: ${passed.length}\n`);
 }
 

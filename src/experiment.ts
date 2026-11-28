@@ -269,7 +269,7 @@ export class ExperimentService {
       elapsedSeconds: 0,
       environmentFile: environmentState.filePath,
       environmentFileCreated: environmentState.created,
-      modelsFile: configuration.state.modelsFilePath,
+      configFile: configuration.state.configFilePath,
     };
     const manifest: SessionManifest = {
       xid,
