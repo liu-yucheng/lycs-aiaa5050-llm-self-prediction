@@ -16,9 +16,9 @@ import {
   CONDITION_INJECTED_SELF,
   CONDITION_PLAIN_ACTUAL,
   CONDITION_PLAIN_SELF,
+  CONFIG_FILE_NAME,
   DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
   MAX_PROBABILITY_ENTRY_COUNT,
-  MODELS_FILE_NAME,
   PROBABILITY_FLOOR,
   REQUEST_ATTEMPT_COUNT,
   REQUEST_RETRY_DELAY_MILLISECONDS,
@@ -400,7 +400,7 @@ export function resolveRequestedKeys(
     if (enabled.length === 0) {
       throw new ExperimentError(
         "INVALID_PROVIDER",
-        `The catalog holds no model. Add one <section>.models_to_use= line to ${MODELS_FILE_NAME}.`,
+        `The catalog holds no model. Add one <section>.models_to_use= line to ${CONFIG_FILE_NAME}.`,
       );
     }
     return enabled;
@@ -423,7 +423,7 @@ export function resolveRequestedKeys(
         throw new ExperimentError(
           "INVALID_PROVIDER",
           `The provider ${key} holds no model. Add one ${key}.models_to_use= line to ` +
-            `${MODELS_FILE_NAME}.`,
+            `${CONFIG_FILE_NAME}.`,
         );
       }
       throw new ExperimentError(

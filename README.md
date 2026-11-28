@@ -87,7 +87,7 @@ metric reads the reference token.
 
 ## Tested models
 
-The public file `models-to-use.env` holds the model list. The probe script measures the four
+The public `configs.env` file holds the model list. The probe script measures the four
 requirements of the protocol before a run: an open-source model, a top-tier publisher, the latest
 version of its series, and a served table of 20 candidates at `temperature=0`.
 
@@ -122,13 +122,18 @@ DeepSeek provider for a pre-test of the pipeline, not for a published measuremen
 
 ## Credentials
 
-The plugin reads `.env` in the workspace root. A repository also holds the public files
-`.env.example` and `models-to-use.env`. The first run copies each absent file from the packaged
-copy and stops with a prompt when a key is absent. A value in angle brackets counts as an absent
-key. Never commit `.env`.
+The plugin reads `.env` in the workspace root. The private file holds only `repo_url`, `base_url`,
+and `api_key`. Every other setting belongs to the public `configs.env` file. A repository also
+holds the public `.env.example` file, and its keys match the private set. The first run copies each
+absent file from the packaged copy and stops with a prompt when a key is absent. A value in angle
+brackets counts as an absent key. Never commit `.env`.
+
+The reader enforces the split. It drops a key outside the private set when `.env` holds the key,
+and it reports the key and the file that holds it. The run uses the `configs.env` value.
 
 ```text
-# .env, private: endpoints and keys
+# .env, private: the optional repository, the endpoints, and the keys
+huggingface.repo_url=https://github.com/your-org/your-repository
 huggingface.base_url=https://router.huggingface.co/v1
 huggingface.api_key=<your key>
 deepseek.base_url=https://api.deepseek.com
@@ -136,15 +141,20 @@ deepseek.api_key=<your key>
 ```
 
 ```text
-# models-to-use.env, public: the tested models
+# configs.env, public: the tested models and the switches
 huggingface.models_to_use=Qwen/Qwen3-Coder-Next, zai-org/GLM-5.2
+huggingface.edge_host=cdn-lfs.hf.co
 deepseek.models_to_use=deepseek-flash
 ```
 
-| Key | Meaning |
+| Private key | Meaning |
 | --- | --- |
+| `<section>.repo_url` | The optional code repository of the section. The plugin reads it and calls no repository. |
 | `<section>.base_url` | The endpoint that serves the OpenAI-compatible chat route. |
 | `<section>.api_key` | The API key of the section. |
+
+| Configuration key | Meaning |
+| --- | --- |
 | `<section>.model_to_use` | One model name. |
 | `<section>.models_to_use` | A comma-separated model list that replaces the catalog list. |
 | `<section>.top_logprobs` | The requested table size. |
@@ -158,9 +168,9 @@ the right distribution. The edge certificate replaces the certificate of the bas
 
 The plugin holds the catalog in code. It serves two providers, Hugging Face for the test and
 DeepSeek for the pre-test, and one local test provider that a dry run selects. The private
-`.env` file holds the base URL and the API key. The public `models-to-use.env` file holds the
-model list, so a workspace changes the tested models without a change of the private file. A
-provider with no model stops the run with a message that names the missing line.
+`.env` file holds the base URL and the API key. The public `configs.env` file holds the model
+list, so a workspace changes the tested models without a change of the private file. A provider
+with no model stops the run with a message that names the missing line.
 
 ## Run
 

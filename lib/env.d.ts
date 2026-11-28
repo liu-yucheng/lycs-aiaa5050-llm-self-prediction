@@ -52,16 +52,34 @@ export declare function parseEnvironmentText(text: string): Record<string, strin
  */
 export declare function readEnvironmentFile(filePath: string): Promise<Record<string, string>>;
 /**
- * Group the parsed values by provider section.
+ * Group the parsed values of one configuration file by provider section.
  *
- * A key has the form `<prefix>.<property>`. The builder accepts the properties `base_url`,
- * `model_to_use`, `api_key`, `top_logprobs`, and `thinking`. It ignores any other property and any
- * key without a dot.
+ * A key has the form `<prefix>.<property>`. The builder accepts `base_url`, `model_to_use`,
+ * `models_to_use`, `api_key`, `top_logprobs`, `edge_host`, `thinking`, and `reasoning`. It ignores
+ * any other property and any key without a dot.
  *
  * @param values - the parsed values of one environment file.
  * @returns the section values in file order.
  */
 export declare function buildProviderEnvironments(values: Readonly<Record<string, string>>): Map<string, ProviderEnvironment>;
+/** The result of one read of the private environment file. */
+export interface PrivateEnvironmentResult {
+    /** The accepted section values in file order. */
+    readonly environments: Map<string, ProviderEnvironment>;
+    /** The keys that hold a property outside the private set, as in `huggingface.edge_host`. */
+    readonly rejectedKeys: readonly string[];
+}
+/**
+ * Group the parsed values of the private environment file by provider section.
+ *
+ * The builder accepts only `repo_url`, `base_url`, and `api_key`. It accepts `repo_url` without a
+ * use, because the plugin does not call one repository. A key outside the private set is a problem:
+ * the builder rejects the key and reports it.
+ *
+ * @param values - the parsed values of the private environment file.
+ * @returns the accepted section values and the rejected keys.
+ */
+export declare function buildPrivateProviderEnvironments(values: Readonly<Record<string, string>>): PrivateEnvironmentResult;
 /**
  * Name the environment key of one provider property.
  *
@@ -85,10 +103,12 @@ export declare function mergeProviderEnvironments(base: ReadonlyMap<string, Prov
 export interface ConfigurationState {
     /** The state of the private environment file. */
     readonly environment: EnvironmentFileState;
-    /** The path of the models file. */
-    readonly modelsFilePath?: string;
-    /** True when this command created the models file. */
-    readonly modelsFileCreated?: boolean;
+    /** The path of the public configuration file. */
+    readonly configFilePath?: string;
+    /** True when this command created the public configuration file. */
+    readonly configFileCreated?: boolean;
+    /** The path of the legacy configuration file that the command copied. */
+    readonly configFileMigratedFrom?: string;
 }
 /** The configuration of one workspace. */
 export interface WorkspaceConfiguration {
@@ -111,25 +131,35 @@ export interface WorkspaceConfiguration {
  * @returns the state of the environment file.
  */
 export declare function ensureEnvironmentFile(workspace: string): Promise<EnvironmentFileState>;
+/** The state of the public configuration file of one workspace. */
+export interface ConfigFileState {
+    /** The path of the configuration file. */
+    readonly filePath?: string;
+    /** True when this command created the configuration file. */
+    readonly created: boolean;
+    /** The path of the legacy file that the command copied. */
+    readonly migratedFrom?: string;
+}
 /**
- * Ensure the models file of one workspace.
+ * Ensure the public configuration file of one workspace.
  *
- * The function keeps an existing file. When the file is absent, the function copies the packaged
- * file and reports that it created the file. A copy keeps the model lists of the package.
+ * The function keeps an existing file. When the file is absent and the older `models-to-use.env`
+ * file is present, the function copies the older file and keeps it in place. When both files are
+ * absent, the function copies the packaged file and reports that it created the file. A copy keeps
+ * the provider settings of the source file.
  *
  * @param workspace - the workspace directory.
- * @returns the path of the file, and the created flag.
+ * @returns the path of the file, the created flag, and the copy source.
  */
-export declare function ensureModelsFile(workspace: string): Promise<{
-    readonly filePath?: string;
-    readonly created: boolean;
-}>;
+export declare function ensureConfigFile(workspace: string): Promise<ConfigFileState>;
 /**
  * Read the configuration of one workspace.
  *
- * The reader takes the base URL, the API key, and the switches from `.env`. It takes the model
- * lists from `models-to-use.env`. The models file wins for a model list, so a workspace can change
- * the tested models without a change of the private file.
+ * The reader takes the optional repository URL, the base URL, and the API key from `.env`. It takes
+ * the model lists and the switches from `configs.env`. A private property outside the private set
+ * is a problem, and the reader does not apply it. The configuration file wins for a property that
+ * both files hold, so a workspace can change the tested models without a change of the private
+ * file.
  *
  * @param workspace - the workspace directory.
  * @returns the configuration, with one problem line for each defect.

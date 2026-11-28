@@ -265,8 +265,11 @@ export async function runCommandLine(argv: readonly string[]): Promise<number> {
       const environment = configuration.state.environment;
       writeLine(`Environment file: ${environment.filePath ?? "(none)"}`);
       writeLine(`Example file: ${environment.examplePath ?? "(none)"}`);
-      writeLine(`Models file: ${configuration.state.modelsFilePath ?? "(none)"}`);
+      writeLine(`Configuration file: ${configuration.state.configFilePath ?? "(none)"}`);
       writeLine(`Created by this command: ${environment.created ? "yes" : "no"}`);
+      if (configuration.state.configFileMigratedFrom !== undefined) {
+        writeLine(`Configuration file copied from: ${configuration.state.configFileMigratedFrom}`);
+      }
       const catalog = applyProviderEnvironments(
         createProviderCatalog(),
         configuration.environments,

@@ -3,8 +3,8 @@
  *
  * The plugin serves two providers. Hugging Face serves the tested models. DeepSeek serves the
  * pre-test, because a short DeepSeek run is cheap and it shows that the protocol works. The catalog
- * holds no API key. The private environment file holds the key, and `models-to-use.env` holds the
- * model list.
+ * holds no API key. The private environment file holds the key and the endpoint, and `configs.env`
+ * holds the model list and the switches.
  */
 import type { ProviderCatalog } from "./types.js";
 /** The provider key of Hugging Face. */

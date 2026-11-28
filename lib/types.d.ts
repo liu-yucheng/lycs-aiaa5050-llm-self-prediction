@@ -331,8 +331,8 @@ export interface SessionEnvironment {
     readonly environmentFile?: string;
     /** True when the run created the environment file. */
     readonly environmentFileCreated?: boolean;
-    /** The path of the models file. */
-    readonly modelsFile?: string;
+    /** The path of the public configuration file. */
+    readonly configFile?: string;
 }
 /** The manifest of one run. */
 export interface SessionManifest {

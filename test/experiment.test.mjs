@@ -32,8 +32,8 @@ async function createWorkspace() {
     path.join(workspace, ".env.example"),
   );
   await fs.copyFile(
-    path.join(repository, "models-to-use.env"),
-    path.join(workspace, "models-to-use.env"),
+    path.join(repository, "configs.env"),
+    path.join(workspace, "configs.env"),
   );
   return workspace;
 }
