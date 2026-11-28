@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
   <div class="inner">
-    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.11.1</small></div>
+    <div class="brand">Next-token self-prediction<small>lycs-aiaa5050-llm-self-prediction 0.12.0</small></div>
     <nav class="site-nav" aria-label="Documentation">
       <a href="index.html">Overview</a>
       <a href="design.html">Design</a>
@@ -48,10 +48,11 @@
             {&quot;token&quot;:&quot;光&quot;,&quot;logProbability&quot;:-1.05}]}</code></pre>
   <p>The prompt describes the tokenize cut. A tokenizer can split one word into several tokens. The prompt asks the model to list the leading pieces as separate entries and to give the rest of the mass to the whole word.</p>
 
-<h2>The two injections</h2>
-<p><strong>Injected self.</strong> The plugin sends the task prompt, then one assistant message that holds a served table, then one user message that asks for the self report again. The second report is the measurement.</p>
-  <p><strong>Injected actual.</strong> The plugin reads one self report, keeps that report as one assistant message, and then asks for the served table of the same prefix. The served table that follows is the measurement.</p>
-  <p>The plugin records both calls of the second injection, so a reader can see whether the model repeated its own table or changed it.</p>
+<h2>The two injected conditions</h2>
+<p><strong>Actual then self.</strong> The plugin sends the task prompt, then one assistant message that holds the served table of the same repetition, then one user message that asks for the own table. The second table is the measurement.</p>
+  <p><strong>Actual then actual.</strong> The plugin sends the task prompt, then one assistant message that holds the served table of the same repetition, then the task prompt again. The served table of the second read is the measurement. The first read of the pair is the <code>actual</code> table of the same repetition, so the folder needs no extra call.</p>
+  <p>The condition that reads the table twice is the control. It shows how far one reading stands from another reading of the same model and the same prefix. A divergence that stays near that level is not evidence of a self report.</p>
+  <p>The plugin writes a marker file for the reused first read, so a reader can tell a reused table from a fresh call. The marker holds no table.</p>
 
 <h2>The reply rules</h2>
   <table>
@@ -77,7 +78,7 @@
 </main>
 
 <footer>
-  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.11.1. Released under the GNU AGPL 3.0 License.
+  <p class="muted">lycs-aiaa5050-llm-self-prediction 0.12.0. Released under the GNU AGPL 3.0 License.
     The plugin records one run per directory and never edits a raw reply.</p>
 </footer>
 </body>

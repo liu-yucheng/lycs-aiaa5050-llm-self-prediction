@@ -33,21 +33,21 @@ is larger than the tolerance.
 
 | Condition | Context | Table origin |
 | --- | --- | --- |
-| `plain_actual` | The task prompt. | The provider logprobs of one served token. |
-| `plain_self` | The task prompt. | The JSON table in the reply body. |
-| `injected_self` | Task prompt, then an assistant message with a served table. | The JSON table in the second reply. |
-| `injected_actual` | Task prompt, then an assistant message with a self report. | The served table that follows. |
+| `actual` | The task prompt. | The provider logprobs of one served token. |
+| `self` | The task prompt. | The JSON table in the reply body. |
+| `actual_injected_actual` | Task prompt, then an assistant message with the served table, then the task prompt again. | The provider logprobs of the second read. This condition is the control. |
+| `actual_injected_self` | Task prompt, then an assistant message with the served table, then one request for the own table. | The JSON table in the second reply. |
 
-Each condition runs three times for each task. Each comparison pairs each actual repetition with
-each predicted repetition, so one task gives nine pairs for each comparison.
+Each condition runs eight times for each task. Each comparison pairs each actual repetition with
+each predicted repetition, so one task gives sixty-four pairs for each comparison.
 
 ## The three comparisons
 
 | Comparison | Actual side | Predicted side |
 | --- | --- | --- |
-| `plain_self` | `plain_actual` | `plain_self` |
-| `injected_self` | `plain_actual` | `injected_self` |
-| `injected_actual` | `plain_actual` | `injected_actual` |
+| `self` | `actual` | `self` |
+| `actual_injected_self` | `actual` | `actual_injected_self` |
+| `actual_injected_actual` | `actual` | `actual_injected_actual` |
 
 The plugin reports the directed divergences, the symmetric divergence, the Jensen-Shannon
 divergence, the total variation distance, the top-token agreement, the coverage of each side, and
@@ -226,9 +226,10 @@ is left out, and the run records one warning for that model.
 ```text
 outputs/<xid>/
   run.json                     the manifest: status, options, providers, versions
+  revision.json                one record for each revise pass of the folder
   tasks.json                   the selected tasks
   intermediate/<providerKey>/<taskId>/<condition>-r<n>-call<k>.json
-  results/metrics.json         the three comparisons, the summaries, the verdicts
+  results/metrics.json         the three comparisons, the summaries, the tests, the verdicts
   results/records.json         one task record for each task and model
   results/records/<providerKey>/<taskId>.json
   results/report.md            the Markdown report
@@ -280,18 +281,20 @@ first model and the default comparison. Each pane sorts its rows by its own dist
 served pane puts the largest served probability first and the predicted pane puts the largest
 predicted probability first.
 
-## The five tools
+## The six tools
 
 | Tool | Purpose |
 | --- | --- |
-| `llm_self_prediction_run` | Run one session and write the session directory. |
+| `llm_self_prediction_run` | Run or revise one folder and write the session files. |
 | `llm_self_prediction_status` | List the recent sessions with their verdicts. |
 | `llm_self_prediction_report` | Read the Markdown report of one session. |
+| `llm_self_prediction_rename` | Move one folder to a fresh identifier. |
 | `llm_self_prediction_dataset` | Summarize the two dataset files. |
 | `llm_self_prediction_help` | Explain the protocol and the provider setup. |
 
-The run tool accepts `providers`, `tasks`, `repetitions`, `toleranceNats`, `outputDirectory`,
-`seed`, `maxConcurrency`, `topLogprobsCount`, and `dryRun`.
+The run tool accepts `providers`, `tasks`, `repetitions`, `toleranceNats`, `alpha`,
+`outputDirectory`, `folder`, `renameFolder`, `seed`, `maxConcurrency`, `topLogprobsCount`, and
+`dryRun`.
 
 ## Verdict
 
@@ -304,6 +307,28 @@ that mean with 2000 resamples and a seed of 20260815. The default tolerance is 0
 | The lower bound is above the tolerance. | `separated` |
 | The interval covers the tolerance. | `inconclusive` |
 | The comparison holds no pair. | `inconclusive` |
+
+## Hypothesis test
+
+The plugin runs one one-sided Wilcoxon signed-rank test for each comparison. The sample is the
+per-task median symmetric KL, the null value is the tolerance, and the alternative states that the
+median stands above the null value. The test uses the normal approximation with a tie correction,
+drops every zero difference, and reports a one-sided p-value. A comparison rejects the null
+hypothesis when the p-value is below alpha, which is 0.05 by default.
+
+The session holds the alternative hypothesis only when every comparison rejects the null and every
+median stands above the tolerance. The session holds the null hypothesis when no comparison rejects
+the null. A mixed result means that one comparison rejects and another one does not.
+
+## One folder for one run
+
+A run reads one output folder and writes only that folder. A run that names an existing folder
+revises it. The pass keeps every raw table that the current protocol reads, requests the absent
+tables, and removes each raw file that the current protocol does not read. The pass appends one
+record to `revision.json`.
+
+`node lib/cli.js rename --session=<xid>` moves the folder to a fresh identifier of the form
+`<timestamp>_<short identifier>`. The manifest keeps the old identifier in `previousXid`.
 
 ## Settings
 
@@ -323,8 +348,14 @@ a separate file. The plugin never rewrites a raw file and never changes a task o
 a metric pass.
 
 A reported run of this machine used Node.js 26.13.0, TypeScript 5.9.3, and Windows 11 x64 with the
-seed 20260815. The run `20261125T050722Z_d59ca3` applied three repetitions to each of the four
-conditions of the 64 tasks for five Hugging Face models, and it took 2467 seconds.
+seed 20260815. The folder `outputs/20261128T195348Z_fe334a` holds protocol 2.0.0 with eight
+repetitions of each of the four conditions of the 64 tasks for ten Hugging Face models, so the run
+gives 39,864 paired tables for each comparison. The folder began as
+`outputs/20261125T065931Z_48d684` under protocol 1.0.0 with three repetitions, and two revise
+passes brought it to protocol 2.0.0: the first pass reused 2,976 tables and requested 14,953, and
+the second pass reused 18,313 tables and requested 1,530. The last pass took 1554 seconds. The run
+reports 20 of 20 self-prediction tests above the null hypothesis, 29 separated verdicts of 30, and
+6 of 10 control medians above the tolerance, so the session verdict is `mixed`.
 
 ## Tests
 

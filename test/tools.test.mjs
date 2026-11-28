@@ -8,6 +8,7 @@ import { buildHelpText, createToolDefinitions } from "../lib/tools.js";
 import {
   TOOL_DATASET,
   TOOL_HELP,
+  TOOL_RENAME,
   TOOL_REPORT,
   TOOL_RUN,
   TOOL_STATUS,
@@ -22,10 +23,24 @@ function createStubService() {
       return {
         xid: "20261125T090000Z_abc123",
         directory: "outputs/20261125T090000Z_abc123",
-        metrics: { taskCount: 2, providers: [], verdicts: [] },
+        metrics: {
+          taskCount: 2,
+          providers: [],
+          verdicts: [],
+          hypothesis: { verdict: "alternative", rejectedCount: 3, testCount: 3 },
+        },
         reportPath: "outputs/20261125T090000Z_abc123/results/report.md",
         demosPath: "outputs/20261125T090000Z_abc123/demos/index.html",
         warnings: [],
+        reuse: { reusedRecordCount: 0, requestedRecordCount: 8, droppedFileCount: 0 },
+      };
+    },
+    async rename(agent, signal, session) {
+      calls.push({ method: "rename", agent, signal, session });
+      return {
+        previousXid: "20261125T090000Z_abc123",
+        xid: "20261126T090000Z_def456",
+        directory: "outputs/20261126T090000Z_def456",
       };
     },
     async status(agent, signal, limit) {
@@ -67,12 +82,12 @@ function renderText(tool, value) {
   return tool.output.render({}, value)[0].text;
 }
 
-test("the tool set holds the five tools of the protocol", () => {
+test("the tool set holds the six tools of the protocol", () => {
   const { service } = createStubService();
   const tools = createToolDefinitions(service);
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    [TOOL_RUN, TOOL_STATUS, TOOL_REPORT, TOOL_DATASET, TOOL_HELP],
+    [TOOL_RUN, TOOL_STATUS, TOOL_REPORT, TOOL_RENAME, TOOL_DATASET, TOOL_HELP],
   );
   for (const tool of tools) {
     assert.equal(typeof tool.description, "string");
@@ -104,7 +119,10 @@ test("the run tool maps the arguments onto one request", async () => {
     taskIds: ["Z001"],
     repetitions: 2,
     toleranceNats: 0.1,
+    alpha: undefined,
     outputDirectory: undefined,
+    folder: undefined,
+    renameFolder: false,
     randomSeed: 7,
     maxConcurrency: 2,
     topLogprobsCount: 20,
@@ -114,6 +132,7 @@ test("the run tool maps the arguments onto one request", async () => {
   assert.match(text, /20261125T090000Z_abc123/u);
   assert.match(text, /report\.md/u);
   assert.match(text, /demos/u);
+  assert.match(text, /Hypothesis verdict: alternative/u);
 });
 
 test("the run tool keeps a long time limit for the network calls", () => {
@@ -152,10 +171,30 @@ test("the dataset tool describes the two dataset files", async () => {
 
 test("the help text describes the protocol and the comparisons", () => {
   const text = buildHelpText();
-  for (const name of [TOOL_RUN, TOOL_STATUS, TOOL_REPORT, TOOL_DATASET, TOOL_HELP]) {
+  for (const name of [
+    TOOL_RUN,
+    TOOL_STATUS,
+    TOOL_REPORT,
+    TOOL_RENAME,
+    TOOL_DATASET,
+    TOOL_HELP,
+  ]) {
     assert.ok(text.includes(name), name);
   }
-  for (const name of ["plain_self", "injected_self", "injected_actual"]) {
+  for (const name of ["self", "actual_injected_self", "actual_injected_actual"]) {
     assert.ok(text.includes(name), name);
   }
+  assert.match(text, /Wilcoxon/u);
+});
+
+test("the rename tool renames the folder of one run", async () => {
+  const { service, calls } = createStubService();
+  const rename = createToolDefinitions(service).find((tool) => tool.name === TOOL_RENAME);
+  const value = await rename.execute(
+    { session: "20261125T090000Z_abc123" },
+    { signal: new AbortController().signal },
+  );
+  assert.equal(calls[0].method, "rename");
+  assert.equal(calls[0].session, "20261125T090000Z_abc123");
+  assert.match(renderText(rename, value), /20261126T090000Z_def456/u);
 });

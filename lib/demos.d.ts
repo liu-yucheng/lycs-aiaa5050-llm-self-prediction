@@ -1,4 +1,4 @@
-import type { SessionEnvironment, SessionMetrics, TaskRecord } from "./types.js";
+import type { ReuseSummary, SessionEnvironment, SessionMetrics, TaskRecord } from "./types.js";
 /** The description of the datasets of one run. */
 export interface DemoDatasetDescription {
     /** The dataset identifiers. */
@@ -25,6 +25,8 @@ export interface DemoOptions {
     readonly environment: SessionEnvironment;
     /** The description of the datasets of the run. */
     readonly dataset: DemoDatasetDescription;
+    /** The count of the reused tables and of the requested tables. */
+    readonly reuse?: ReuseSummary;
 }
 /**
  * Read the options of one demonstration site from a run directory.

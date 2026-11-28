@@ -21,6 +21,7 @@
   --sans: Arial, SimHei, "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --serif: Cambria, NSimSun, "Songti SC", "Source Serif 4", Georgia, serif;
   --mono: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --math: "XITS Math", "STIX Two Math", "Cambria Math", Cambria, serif;
 }
 
 * { box-sizing: border-box; }
@@ -285,6 +286,7 @@ div.stat-card.predicted { border-top-color: var(--predicted); }
 div.stat-card.symmetric { border-top-color: var(--symmetric); }
 
 span.stat-icon { font-size: 1.05rem; line-height: 1.2; }
+span.formula { font-family: var(--math); font-size: 1rem; }
 span.stat-value { font-family: var(--sans); font-size: 1.45rem; font-weight: 700; }
 span.stat-label { font-family: var(--sans); color: var(--muted); font-size: 0.82rem; }
 
