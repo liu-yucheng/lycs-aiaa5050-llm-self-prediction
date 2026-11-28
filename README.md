@@ -131,8 +131,9 @@ provider four exceptions, because the endpoint is stricter than the other endpoi
 
 The probe on 2026-11-29 sent these requests to every chat model that the `GET /models` call lists.
 Eleven models pass: the `gpt-4o` and `gpt-4.1` aliases and their dated snapshots serve 20 entries,
-and `gpt-5.1` and its snapshot serve 5 entries. The list holds the latest model of each line and no
-dated snapshot: `gpt-5.1`, `gpt-4.1`, and `gpt-4.1-mini`.
+and `gpt-5.1` and its snapshot serve 5 entries. The list holds `gpt-4.1`, `gpt-4o`, `gpt-5.1`,
+`gpt-5.2`, and `gpt-5.4`. A run leaves `gpt-5.2` and `gpt-5.4` out with a warning, because each
+answers the probe with a table of one entry.
 
 The other chat models fail one requirement each. `gpt-5.2` and `gpt-5.4` accept five entries but
 return a table of one to four tokens, so the table holds too few candidates. The `gpt-5`, `o3`, and
